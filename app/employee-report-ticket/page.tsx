@@ -45,7 +45,7 @@ type TicketItem = {
   title: string;
   category: string;
   description: string;
-  occurredAt: string;
+  occurredAt?: string;
   createdAt: string;
   updatedAt: string;
   status: TicketStatus;
@@ -173,6 +173,12 @@ function formatDate(value: string, withTime = false) {
   }).format(new Date(value));
 }
 
+function currentLocalDateTime() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 16);
+}
+
 export default function EmployeeReportTicketPage() {
   const [tickets, setTickets] = useState<TicketItem[]>(initialTickets);
   const [selectedId, setSelectedId] = useState(initialTickets[0].id);
@@ -183,19 +189,21 @@ export default function EmployeeReportTicketPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [followUp, setFollowUp] = useState("");
+  const [followUpAt, setFollowUpAt] = useState(currentLocalDateTime);
   const [notice, setNotice] = useState("");
+
+  const accessibleTickets = useMemo(() => tickets.filter((ticket) => viewRole === "manager" || ticket.employeeId === currentEmployeeId), [tickets, viewRole]);
 
   const visibleTickets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return tickets.filter((ticket) => {
-      const isOwned = viewRole === "manager" || ticket.employeeId === currentEmployeeId;
+    return accessibleTickets.filter((ticket) => {
       const isMatchingStatus = statusFilter === "ALL" || ticket.status === statusFilter;
       const searchable = `${ticket.id} ${ticket.employeeName} ${ticket.title} ${ticket.category}`.toLowerCase();
-      return isOwned && isMatchingStatus && (!normalizedQuery || searchable.includes(normalizedQuery));
+      return isMatchingStatus && (!normalizedQuery || searchable.includes(normalizedQuery));
     });
-  }, [query, statusFilter, tickets, viewRole]);
+  }, [accessibleTickets, query, statusFilter]);
 
-  const selectedTicket = tickets.find((ticket) => ticket.id === selectedId) ?? visibleTickets[0];
+  const selectedTicket = visibleTickets.find((ticket) => ticket.id === selectedId);
 
   function showNotice(message: string) {
     setNotice(message);
@@ -218,7 +226,7 @@ export default function EmployeeReportTicketPage() {
 
   function addFollowUp() {
     if (!selectedTicket || viewRole !== "manager" || !followUp.trim()) return;
-    const now = new Date().toISOString();
+    const now = followUpAt ? new Date(followUpAt).toISOString() : new Date().toISOString();
     setTickets((current) => current.map((ticket) => ticket.id === selectedTicket.id
       ? {
           ...ticket,
@@ -227,22 +235,16 @@ export default function EmployeeReportTicketPage() {
         }
       : ticket));
     setFollowUp("");
+    setFollowUpAt(currentLocalDateTime());
     showNotice("Follow-up tersimpan di riwayat ticket.");
   }
 
-  function createTicket(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const title = String(formData.get("title") ?? "").trim();
-    const category = String(formData.get("category") ?? "");
-    const description = String(formData.get("description") ?? "").trim();
-    const occurredAt = String(formData.get("occurredAt") ?? "");
-    const attachment = String(formData.get("attachment") ?? "");
-    if (!title || !category || !description || !occurredAt) return;
+  function createTicket(input: { title: string; category: string; description: string; occurredAt?: string; attachment?: string }) {
+    const { title, category, description, occurredAt, attachment } = input;
 
     const now = new Date().toISOString();
     const created: TicketItem = {
-      id: `TCK-${new Date().getFullYear()}-${String(tickets.length + 43).padStart(4, "0")}`,
+      id: `TCK-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
       employeeId: currentEmployeeId,
       employeeName: "Nadira Putri",
       department: "Operations",
@@ -253,7 +255,7 @@ export default function EmployeeReportTicketPage() {
       createdAt: now,
       updatedAt: now,
       status: "SUBMITTED",
-      attachment: attachment || undefined,
+      attachment,
       history: [{ id: crypto.randomUUID(), kind: "created", message: "Ticket berhasil diajukan.", actor: "Nadira Putri", at: now }],
     };
     setTickets((current) => [created, ...current]);
@@ -305,23 +307,23 @@ export default function EmployeeReportTicketPage() {
 
         <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
           <div className="flex flex-col justify-between gap-4 border-b border-[#d9e2fc] pb-5 xl:flex-row xl:items-end">
-            <div><div className="mb-3 flex items-center gap-5 text-xs font-semibold text-[#4d5f81]"><span>Overview</span><span className="rounded-full bg-[#d9e2fc]/60 px-2 py-0.5">12</span><span className="border-b-2 border-[#069494] pb-2 text-[#006838]">Tickets</span><span>My tasks</span></div><h1 className="text-2xl font-bold tracking-[-0.4px]">Employee Report & Ticket</h1><p className="mt-1 text-sm text-[#4d5f81]">Catat, tindak lanjuti, dan pantau kebutuhan pekerjaan secara terstruktur.</p></div>
-            <div className="flex flex-wrap items-center gap-2"><select value={viewRole} onChange={(event) => setViewRole(event.target.value as ViewRole)} className="rounded-lg border border-[#becabd]/60 bg-white px-3 py-2 text-xs font-semibold text-[#3f4940] outline-none"><option value="manager">HR / Manager view</option><option value="employee">Employee view</option></select><button onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#006838]"><FilePlus2 size={15} /> Buat Ticket</button></div>
+            <div><div className="mb-3 flex items-center gap-5 text-xs font-semibold text-[#4d5f81]"><span>Overview</span><span className="rounded-full bg-[#d9e2fc]/60 px-2 py-0.5">{accessibleTickets.length}</span><span className="border-b-2 border-[#069494] pb-2 text-[#006838]">Tickets</span><span>My tasks</span></div><h1 className="text-2xl font-bold tracking-[-0.4px]">Employee Report & Ticket</h1><p className="mt-1 text-sm text-[#4d5f81]">Catat, tindak lanjuti, dan pantau kebutuhan pekerjaan secara terstruktur.</p></div>
+            <div className="flex flex-wrap items-center gap-2"><label className="text-[11px] font-semibold text-[#4d5f81]">Pratinjau role<select value={viewRole} onChange={(event) => setViewRole(event.target.value as ViewRole)} className="ml-2 rounded-lg border border-[#becabd]/60 bg-white px-3 py-2 text-xs font-semibold text-[#3f4940] outline-none"><option value="manager">HR / Manager</option><option value="employee">Employee</option></select></label>{viewRole === "employee" && <button onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#006838]"><FilePlus2 size={15} /> Buat Ticket</button>}</div>
           </div>
 
           <div className="mt-5 flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(0,1fr)_420px]">
             <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-              <div className="flex flex-col gap-3 border-b border-[#becabd]/35 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap items-center gap-2"><Filter size={15} className="text-[#4d5f81]" /><FilterButton active={statusFilter === "ALL"} onClick={() => setStatusFilter("ALL")}>Semua <span className="rounded bg-[#1e3765] px-1.5 py-0.5 text-[10px] text-white">{tickets.length}</span></FilterButton>{(["SUBMITTED", "IN_REVIEW", "IN_PROGRESS", "RESOLVED"] as TicketStatus[]).map((status) => <FilterButton key={status} active={statusFilter === status} onClick={() => setStatusFilter(status)}>{statusMeta[status].label}</FilterButton>)}</div><label className="flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:hidden"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none" placeholder="Cari ticket..." /></label></div>
+              <div className="flex flex-col gap-3 border-b border-[#becabd]/35 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap items-center gap-2"><Filter size={15} className="text-[#4d5f81]" /><FilterButton active={statusFilter === "ALL"} onClick={() => setStatusFilter("ALL")}>Semua <span className="rounded bg-[#1e3765] px-1.5 py-0.5 text-[10px] text-white">{accessibleTickets.length}</span></FilterButton>{(["SUBMITTED", "IN_REVIEW", "IN_PROGRESS", "RESOLVED", "REJECTED"] as TicketStatus[]).map((status) => <FilterButton key={status} active={statusFilter === status} onClick={() => setStatusFilter(status)}>{statusMeta[status].label}</FilterButton>)}</div><label className="flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:hidden"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none" placeholder="Cari ticket..." /></label></div>
               <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="w-10 px-4 py-3"><input aria-label="Pilih semua ticket" type="checkbox" className="size-4 accent-[#16834b]" /></th><th className="px-3 py-3">Employee</th><th className="px-3 py-3">Ticket</th><th className="px-3 py-3">Submitted</th><th className="px-3 py-3">Status</th><th className="w-12 px-3 py-3">Action</th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{visibleTickets.map((ticket) => <tr key={ticket.id} onClick={() => setSelectedId(ticket.id)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selectedTicket?.id === ticket.id ? "bg-[#eaf7f0]" : "bg-white"}`}><td className="px-4 py-3.5"><input onClick={(event) => event.stopPropagation()} aria-label={`Pilih ${ticket.id}`} type="checkbox" className="size-4 accent-[#16834b]" /></td><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="text-xs font-semibold">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {ticket.category}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt)}</td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5"><button onClick={(event) => { event.stopPropagation(); setSelectedId(ticket.id); }} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#d9e2fc]/55" aria-label={`Lihat ${ticket.id}`}><MoreHorizontal size={17} /></button></td></tr>)}{visibleTickets.length === 0 && <tr><td colSpan={6} className="px-6 py-14 text-center text-sm text-[#4d5f81]">Tidak ada ticket yang sesuai dengan filter.</td></tr>}</tbody></table></div>
-              <div className="flex flex-col gap-2 border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81] sm:flex-row sm:items-center sm:justify-between"><span>Menampilkan <b className="text-[#121b2e]">{visibleTickets.length}</b> dari <b className="text-[#121b2e]">{viewRole === "manager" ? tickets.length : tickets.filter((ticket) => ticket.employeeId === currentEmployeeId).length}</b> ticket</span><div className="flex items-center gap-1"><button disabled className="rounded border border-[#becabd]/35 px-2.5 py-1.5 opacity-50">Previous</button><button className="rounded bg-[#16834b] px-2.5 py-1.5 font-bold text-white">1</button><button className="rounded border border-[#becabd]/45 px-2.5 py-1.5">Next</button></div></div>
+              <div className="flex flex-col gap-2 border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81] sm:flex-row sm:items-center sm:justify-between"><span>Menampilkan <b className="text-[#121b2e]">{visibleTickets.length}</b> dari <b className="text-[#121b2e]">{accessibleTickets.length}</b> ticket</span><div className="flex items-center gap-1"><button disabled className="rounded border border-[#becabd]/35 px-2.5 py-1.5 opacity-50">Previous</button><button className="rounded bg-[#16834b] px-2.5 py-1.5 font-bold text-white">1</button><button disabled className="rounded border border-[#becabd]/45 px-2.5 py-1.5 opacity-50">Next</button></div></div>
             </section>
 
-            <TicketDetail ticket={selectedTicket} role={viewRole} followUp={followUp} onFollowUpChange={setFollowUp} onAddFollowUp={addFollowUp} onChangeStatus={changeStatus} />
+            <TicketDetail ticket={selectedTicket} role={viewRole} followUp={followUp} followUpAt={followUpAt} onFollowUpChange={setFollowUp} onFollowUpAtChange={setFollowUpAt} onAddFollowUp={addFollowUp} onChangeStatus={changeStatus} onClose={() => setSelectedId("")} />
           </div>
         </div>
       </section>
 
-      {notice && <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-lg bg-[#0f2342] px-4 py-3 text-sm font-semibold text-white shadow-xl"><CheckCircle2 size={17} className="text-[#77d8cd]" />{notice}</div>}
+      {notice && <div role="status" aria-live="polite" className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-lg bg-[#0f2342] px-4 py-3 text-sm font-semibold text-white shadow-xl"><CheckCircle2 size={17} className="text-[#77d8cd]" />{notice}</div>}
       {isCreateOpen && <CreateTicketModal onClose={() => setIsCreateOpen(false)} onSubmit={createTicket} />}
     </main>
   );
@@ -339,19 +341,37 @@ function FilterButton({ active, children, onClick }: { active: boolean; children
   return <button onClick={onClick} className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition ${active ? "bg-[#1e3765] text-white" : "bg-[#f1f3ff] text-[#4d5f81] hover:bg-[#d9e2fc]"}`}>{children}</button>;
 }
 
-function TicketDetail({ ticket, role, followUp, onFollowUpChange, onAddFollowUp, onChangeStatus }: { ticket?: TicketItem; role: ViewRole; followUp: string; onFollowUpChange: (value: string) => void; onAddFollowUp: () => void; onChangeStatus: (status: TicketStatus) => void }) {
+function TicketDetail({ ticket, role, followUp, followUpAt, onFollowUpChange, onFollowUpAtChange, onAddFollowUp, onChangeStatus, onClose }: { ticket?: TicketItem; role: ViewRole; followUp: string; followUpAt: string; onFollowUpChange: (value: string) => void; onFollowUpAtChange: (value: string) => void; onAddFollowUp: () => void; onChangeStatus: (status: TicketStatus) => void; onClose: () => void }) {
   if (!ticket) return <aside className="rounded-xl border border-[#becabd]/45 bg-white p-6 text-sm text-[#4d5f81]">Pilih ticket untuk melihat detail.</aside>;
   return <aside className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] xl:sticky xl:top-21 xl:h-fit">
-    <div className="flex items-start justify-between bg-[#1e3765] px-5 py-4 text-white"><div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-lg border border-[#069494] bg-[#577c8e]"><Ticket size={15} /></span><div><p className="text-sm font-bold">Ticket Details — {ticket.id.replace("TCK-2026-", "")}</p><p className="text-[11px] text-[#d9e2fc]">Employee report workflow</p></div></div><button className="rounded p-1 text-[#d9e2fc] hover:bg-white/10" aria-label="Tutup detail"><X size={16} /></button></div>
+    <div className="flex items-start justify-between bg-[#1e3765] px-5 py-4 text-white"><div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-lg border border-[#069494] bg-[#577c8e]"><Ticket size={15} /></span><div><p className="text-sm font-bold">Ticket Details — {ticket.id}</p><p className="text-[11px] text-[#d9e2fc]">Employee report workflow</p></div></div><button onClick={onClose} className="rounded p-1 text-[#d9e2fc] hover:bg-white/10" aria-label="Tutup detail"><X size={16} /></button></div>
     <div className="space-y-5 p-5"><div><div className="mb-2 flex items-center justify-between gap-3"><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#4d5f81]">Current status</p><StatusBadge status={ticket.status} /></div>{role === "manager" ? <select value={ticket.status} onChange={(event) => onChangeStatus(event.target.value as TicketStatus)} className="w-full rounded-lg border border-[#becabd]/60 bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-[#069494]">{(Object.keys(statusMeta) as TicketStatus[]).map((status) => <option key={status} value={status}>{statusMeta[status].label}</option>)}</select> : <p className="text-xs text-[#4d5f81]">Status dapat diperbarui oleh HR atau Manager.</p>}</div>
-      <div className="border-y border-[#becabd]/35 py-4"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId} · {ticket.department}</p></div></div><h2 className="mt-4 text-base font-bold leading-6">{ticket.title}</h2><p className="mt-1 text-xs text-[#4d5f81]">{ticket.category} · Dilaporkan {formatDate(ticket.createdAt, true)}</p><p className="mt-3 text-sm leading-6 text-[#3f4940]">{ticket.description}</p>{ticket.attachment && <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs font-semibold text-[#1e3765]"><Paperclip size={14} />{ticket.attachment}</div>}</div>
-      <div><div className="mb-3 flex items-center gap-2"><Clock3 size={15} className="text-[#069494]" /><p className="text-xs font-bold">Progress & history</p></div><ol className="space-y-4 border-l border-[#d9e2fc] pl-4">{[...ticket.history].reverse().map((activity) => <li key={activity.id} className="relative"><span className={`absolute -left-[21px] top-1 grid size-3 place-items-center rounded-full ${activity.kind === "status" ? "bg-[#069494]" : activity.kind === "followup" ? "bg-[#16834b]" : "bg-[#b0c6d4]"}`}><span className="size-1 rounded-full bg-white" /></span><p className="text-xs font-semibold text-[#3f4940]">{activity.message}</p><p className="mt-1 text-[10px] text-[#4d5f81]">{activity.actor} · {formatDate(activity.at, true)}</p></li>)}</ol></div>
-      {role === "manager" && <div className="rounded-lg bg-[#f1f3ff] p-3"><label className="flex items-center gap-2 text-xs font-bold text-[#1e3765]"><MessageSquareText size={14} /> Tambah follow-up</label><textarea value={followUp} onChange={(event) => onFollowUpChange(event.target.value)} className="mt-2 min-h-20 w-full resize-none rounded-lg border border-[#d9e2fc] bg-white p-2.5 text-xs outline-none focus:border-[#069494]" placeholder="Tuliskan tindakan atau informasi tindak lanjut..." /><button disabled={!followUp.trim()} onClick={onAddFollowUp} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Send size={13} /> Simpan follow-up</button></div>}</div>
+      <div className="border-y border-[#becabd]/35 py-4"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId} · {ticket.department}</p></div></div><h2 className="mt-4 text-base font-bold leading-6">{ticket.title}</h2><p className="mt-1 text-xs text-[#4d5f81]">{ticket.category} · Dilaporkan {formatDate(ticket.createdAt, true)}</p>{ticket.occurredAt && <p className="mt-1 text-xs text-[#4d5f81]">Kejadian/pengajuan: {formatDate(ticket.occurredAt, true)}</p>}<p className="mt-3 text-sm leading-6 text-[#3f4940]">{ticket.description}</p>{ticket.attachment && <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs font-semibold text-[#1e3765]"><Paperclip size={14} />{ticket.attachment}</div>}</div>
+      <div><div className="mb-3 flex items-center gap-2"><Clock3 size={15} className="text-[#069494]" /><p className="text-xs font-bold">Progress & history</p></div>{!ticket.history.some((activity) => activity.kind === "followup") && <p className="mb-3 rounded-lg bg-[#f7f8ff] px-3 py-2 text-xs text-[#4d5f81]">Belum ada tindak lanjut untuk ticket ini.</p>}<ol className="space-y-4 border-l border-[#d9e2fc] pl-4">{[...ticket.history].reverse().map((activity) => <li key={activity.id} className="relative"><span className={`absolute -left-[21px] top-1 grid size-3 place-items-center rounded-full ${activity.kind === "status" ? "bg-[#069494]" : activity.kind === "followup" ? "bg-[#16834b]" : "bg-[#b0c6d4]"}`}><span className="size-1 rounded-full bg-white" /></span><p className="text-xs font-semibold text-[#3f4940]">{activity.message}</p><p className="mt-1 text-[10px] text-[#4d5f81]">{activity.actor} · {formatDate(activity.at, true)}</p></li>)}</ol></div>
+      {role === "manager" && <div className="rounded-lg bg-[#f1f3ff] p-3"><label className="flex items-center gap-2 text-xs font-bold text-[#1e3765]"><MessageSquareText size={14} /> Tambah follow-up</label><textarea value={followUp} onChange={(event) => onFollowUpChange(event.target.value)} className="mt-2 min-h-20 w-full resize-none rounded-lg border border-[#d9e2fc] bg-white p-2.5 text-xs outline-none focus:border-[#069494]" placeholder="Tuliskan tindakan atau informasi tindak lanjut..." /><label className="mt-2 block text-[11px] font-semibold text-[#4d5f81]">Tanggal / waktu tindak lanjut<input value={followUpAt} onChange={(event) => onFollowUpAtChange(event.target.value)} type="datetime-local" className="mt-1 block w-full rounded-lg border border-[#d9e2fc] bg-white px-2.5 py-2 text-xs font-normal outline-none focus:border-[#069494]" /></label><button disabled={!followUp.trim()} onClick={onAddFollowUp} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Send size={13} /> Simpan follow-up</button></div>}</div>
   </aside>;
 }
 
-function CreateTicketModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f2342]/45 p-4"><section role="dialog" aria-modal="true" aria-labelledby="create-ticket-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#d9e2fc] px-6 py-4"><div><h2 id="create-ticket-title" className="text-lg font-bold">Buat Employee Ticket</h2><p className="mt-0.5 text-xs text-[#4d5f81]">Employee ID akan terhubung otomatis setelah login.</p></div><button onClick={onClose} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label="Tutup form"><X size={18} /></button></div><form onSubmit={onSubmit} className="space-y-4 p-6"><Field label="Judul ticket" required><input name="title" required className="field" placeholder="Contoh: Perbaikan kursi kerja di area dispatch" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Kategori" required><select name="category" required defaultValue="" className="field"><option value="" disabled>Pilih kategori</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></Field><Field label="Tanggal / waktu kejadian" required><input name="occurredAt" type="datetime-local" required className="field" /></Field></div><Field label="Deskripsi" required><textarea name="description" required className="field min-h-28 resize-y" placeholder="Jelaskan kondisi, masalah, atau kebutuhan pekerjaan secara singkat dan jelas." /></Field><Field label="Nama lampiran" hint="Opsional pada preview ini"><input name="attachment" className="field" placeholder="Contoh: foto-kondisi.jpg" /></Field><div className="flex justify-end gap-2 border-t border-[#d9e2fc] pt-4"><button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-xs font-bold text-[#4d5f81] hover:bg-[#f1f3ff]">Batal</button><button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#006838]"><FilePlus2 size={14} /> Ajukan Ticket</button></div></form></section></div>;
+function CreateTicketModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (input: { title: string; category: string; description: string; occurredAt?: string; attachment?: string }) => void }) {
+  const [error, setError] = useState("");
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const title = String(formData.get("title") ?? "").trim();
+    const category = String(formData.get("category") ?? "");
+    const description = String(formData.get("description") ?? "").trim();
+    const occurredAt = String(formData.get("occurredAt") ?? "");
+    const attachmentValue = formData.get("attachment");
+    const attachment = attachmentValue instanceof File && attachmentValue.name ? attachmentValue.name : undefined;
+    if (!title || !category || !description) {
+      setError("Judul, kategori, dan deskripsi wajib diisi sebelum ticket diajukan.");
+      return;
+    }
+    onSubmit({ title, category, description, occurredAt: occurredAt || undefined, attachment });
+  }
+
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f2342]/45 p-4"><section role="dialog" aria-modal="true" aria-labelledby="create-ticket-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#d9e2fc] px-6 py-4"><div><h2 id="create-ticket-title" className="text-lg font-bold">Buat Employee Ticket</h2><p className="mt-0.5 text-xs text-[#4d5f81]">Employee ID akan terhubung otomatis setelah login.</p></div><button onClick={onClose} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label="Tutup form"><X size={18} /></button></div><form noValidate onSubmit={handleSubmit} className="space-y-4 p-6"><Field label="Judul ticket" required><input name="title" className="field" placeholder="Contoh: Perbaikan kursi kerja di area dispatch" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Kategori" required><select name="category" defaultValue="" className="field"><option value="" disabled>Pilih kategori</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></Field><Field label="Tanggal / waktu kejadian" hint="Opsional"><input name="occurredAt" type="datetime-local" className="field" /></Field></div><Field label="Deskripsi" required><textarea name="description" className="field min-h-28 resize-y" placeholder="Jelaskan kondisi, masalah, atau kebutuhan pekerjaan secara singkat dan jelas." /></Field><Field label="Lampiran" hint="Opsional pada preview ini"><input name="attachment" type="file" className="field file:mr-3 file:rounded file:border-0 file:bg-[#eaf7f0] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#006838]" /></Field>{error && <p role="alert" className="rounded-lg bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#d64545]">{error}</p>}<div className="flex justify-end gap-2 border-t border-[#d9e2fc] pt-4"><button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-xs font-bold text-[#4d5f81] hover:bg-[#f1f3ff]">Batal</button><button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#006838]"><FilePlus2 size={14} /> Ajukan Ticket</button></div></form></section></div>;
 }
 
 function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
