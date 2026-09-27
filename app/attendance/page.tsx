@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { Bell, ChevronRight, CircleHelp } from 'lucide-react'
+import Sidebar from '@/components/Sidebar'
 
 // Dummy Data Sesuai Kebutuhan FR-D3-002 & Acceptance Criteria
 const DUMMY_ATTENDANCES = [
@@ -69,7 +71,7 @@ export default function AttendancePageUI() {
   const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Helper Perhitungan Durasi Kerja (Aturan BR-02.8 Minimum 7 Jam)[cite: 5]
+  // Helper perhitungan durasi kerja dengan batas minimum 7 jam.
   const calculateDuration = (clockIn: string, clockOut: string | null) => {
     if (!clockOut) return { text: 'Incomplete', isUnderMin: true }
     const start = new Date(clockIn).getTime()
@@ -77,16 +79,16 @@ export default function AttendancePageUI() {
     const diffHours = (end - start) / (1000 * 60 * 60)
     return {
       text: `${diffHours.toFixed(1)} Jam`,
-      isUnderMin: diffHours < 7.0, // Indikator BR-02.8[cite: 5]
+      isUnderMin: diffHours < 7.0,
     }
   }
 
-  // Helper Deteksi Keterlambatan (Aturan BR-02.7 Tolerance 15 Menit)[cite: 5]
+  // Helper deteksi keterlambatan dengan toleransi sampai 08:15.
   const checkIsLate = (clockIn: string) => {
     const inDate = new Date(clockIn)
     const hours = inDate.getHours()
     const minutes = inDate.getMinutes()
-    return hours > 8 || (hours === 8 && minutes > 15) // Batas 08:15 WIB[cite: 5]
+    return hours > 8 || (hours === 8 && minutes > 15)
   }
 
   // Filter Data Tab & Search
@@ -101,31 +103,55 @@ export default function AttendancePageUI() {
   })
 
   return (
-    <div className="flex flex-col h-full bg-slate-100 text-slate-800 -m-6">
-      {/* 1. Header & Filter Tabs (Adaptasi Referensi Gambar) */}
-      <div className="p-6 bg-white border-b border-slate-200 pl-10 pt-10">
-        <div className="flex justify-between items-start mb-4">
+    <>
+      <Sidebar userName="Attendance Team" userRole="Attendance Admin" userInitials="AT" />
+      <div className="min-h-screen bg-[#f7f8ff] text-[#121b2e] lg:pl-[260px]">
+      <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#d9e2fc] bg-white px-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6">
+        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
+          <div className="hidden min-w-0 items-center gap-3 sm:flex">
+            <span className="font-bold text-[#121b2e]">ANDIMA HRMS</span>
+            <span className="h-5 border-l border-[#d9e2fc]" />
+            <span className="text-xs font-semibold text-[#3f4940]">HRMS</span>
+            <ChevronRight size={13} className="text-[#4d5f81]/50" />
+            <span className="truncate text-xs font-semibold text-[#006838]">Attendance</span>
+          </div>
+          <span className="text-sm font-bold text-[#121b2e] sm:hidden">Attendance</span>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button type="button" className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]" aria-label="Notifikasi">
+              <Bell size={17} />
+              <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" />
+            </button>
+            <button type="button" className="grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]" aria-label="Bantuan"><CircleHelp size={17} /></button>
+            <div className="hidden items-center gap-2 border-l border-[#d9e2fc] pl-3 sm:flex">
+              <span className="grid size-8 place-items-center rounded-full border border-[#006838]/30 bg-[#16834b]/15 text-xs font-bold text-[#006838]">AT</span>
+              <div className="text-left"><p className="text-xs font-bold">Attendance Team</p><p className="text-[10px] text-[#4d5f81]">Attendance Admin</p></div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section className="border-b border-[#d9e2fc] bg-white px-4 py-5 sm:px-6">
+        <div className="mx-auto flex max-w-[1600px] flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
-            <h1 className="text-xl font-bold text-slate-900">Attendance & Correction Management</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Kelola riwayat presensi, validasi batas minimum 7 jam kerja, dan persetujuan koreksi absensi.[cite: 5]
+            <h1 className="text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">Attendance & Correction Management</h1>
+            <p className="mt-1 text-sm text-[#4d5f81]">
+              Kelola riwayat presensi, validasi minimum 7 jam kerja, dan persetujuan koreksi absensi.
             </p>
           </div>
-          {/* Tag Role Mockup */}
-          <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg border border-slate-200">
-            Preview Role: HR / Manager[cite: 5]
+          <span className="inline-flex w-fit items-center rounded-full border border-[#006838]/25 bg-[#eaf7f0] px-3 py-1.5 text-xs font-bold text-[#006838]">
+            Preview role: HR / Manager
           </span>
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex justify-between items-end">
-          <div className="flex gap-2 border-b border-slate-200 text-xs font-medium">
+        <div className="mx-auto mt-5 flex max-w-[1600px] flex-col justify-between gap-3 sm:flex-row sm:items-end">
+          <div className="flex flex-wrap gap-1 border-b border-[#d9e2fc] text-xs font-semibold">
             <button
               onClick={() => setActiveTab('ALL')}
               className={`pb-2 px-3 transition ${
                 activeTab === 'ALL'
-                  ? 'border-b-2 border-blue-600 text-blue-600 font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'border-b-2 border-[#069494] text-[#006838] font-bold'
+                  : 'text-[#4d5f81] hover:text-[#121b2e]'
               }`}
             >
               Semua ({DUMMY_ATTENDANCES.length})
@@ -134,8 +160,8 @@ export default function AttendancePageUI() {
               onClick={() => setActiveTab('PENDING')}
               className={`pb-2 px-3 transition ${
                 activeTab === 'PENDING'
-                  ? 'border-b-2 border-blue-600 text-blue-600 font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'border-b-2 border-[#069494] text-[#006838] font-bold'
+                  : 'text-[#4d5f81] hover:text-[#121b2e]'
               }`}
             >
               Menunggu Persetujuan
@@ -144,8 +170,8 @@ export default function AttendancePageUI() {
               onClick={() => setActiveTab('APPROVED')}
               className={`pb-2 px-3 transition ${
                 activeTab === 'APPROVED'
-                  ? 'border-b-2 border-blue-600 text-blue-600 font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'border-b-2 border-[#069494] text-[#006838] font-bold'
+                  : 'text-[#4d5f81] hover:text-[#121b2e]'
               }`}
             >
               Disetujui
@@ -158,24 +184,22 @@ export default function AttendancePageUI() {
             placeholder="Cari nama atau NIP..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="text-xs px-3 py-1.5 border border-slate-300 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs outline-none transition placeholder:text-[#4d5f81]/70 focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15 sm:w-64"
           />
         </div>
-      </div>
+      </section>
 
-      {/* 2. Main Content Split View (Master Table + Drawer Detail) */}
-      <div className="flex flex-1 overflow-hidden p-6 gap-6">
-        {/* Table Area (Kiri) */}
-        <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-5 px-4 py-6 xl:flex-row sm:px-6">
+        <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
           <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full min-w-[720px] text-left text-xs">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
-                  <th className="p-3">Employee</th>
-                  <th className="p-3">Tanggal</th>
-                  <th className="p-3">Clock In / Out</th>
-                  <th className="p-3">Durasi Kerja</th>
-                  <th className="p-3">Status</th>
+                <tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+                  <th className="px-4 py-3">Employee</th>
+                  <th className="px-3 py-3">Tanggal</th>
+                  <th className="px-3 py-3">Clock In / Out</th>
+                  <th className="px-3 py-3">Durasi Kerja</th>
+                  <th className="px-3 py-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -188,39 +212,39 @@ export default function AttendancePageUI() {
                     <tr
                       key={row.id}
                       onClick={() => setSelectedItem(row)}
-                      className={`cursor-pointer hover:bg-slate-50 transition ${
-                        isSelected ? 'bg-blue-50/70' : ''
+                      className={`cursor-pointer transition hover:bg-[#f7f8ff] ${
+                        isSelected ? 'bg-[#eaf7f0]' : ''
                       }`}
                     >
-                      <td className="p-3">
-                        <div className="font-bold text-slate-800">{row.full_name}</div>
-                        <div className="text-[10px] text-slate-400">{row.employee_id} • {row.department}</div>
+                      <td className="px-4 py-3.5">
+                        <div className="text-xs font-bold text-[#121b2e]">{row.full_name}</div>
+                        <div className="mt-0.5 text-[10px] text-[#4d5f81]">{row.employee_id} • {row.department}</div>
                       </td>
-                      <td className="p-3 font-medium text-slate-600">{row.date}</td>
-                      <td className="p-3 text-slate-600">
+                      <td className="px-3 py-3.5 font-medium text-[#3f4940]">{row.date}</td>
+                      <td className="px-3 py-3.5 text-[#4d5f81]">
                         <div>In: {new Date(row.clock_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB</div>
                         <div>Out: {row.clock_out ? `${new Date(row.clock_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB` : '-'}</div>
                       </td>
-                      <td className="p-3">
-                        <span className={`font-semibold ${duration.isUnderMin ? 'text-amber-600' : 'text-slate-700'}`}>
+                      <td className="px-3 py-3.5">
+                        <span className={`font-semibold ${duration.isUnderMin ? 'text-[#b7791f]' : 'text-[#121b2e]'}`}>
                           {duration.text}
                         </span>
                         {duration.isUnderMin && (
-                          <span className="block text-[9px] text-amber-600 font-bold">&lt; 7 Jam Kerja[cite: 5]</span>
+                          <span className="mt-0.5 block text-[9px] font-bold text-[#b7791f]">&lt; 7 Jam Kerja</span>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="px-3 py-3.5">
                         <div className="flex flex-col gap-1 items-start">
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              isLate ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                              isLate ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'
                             }`}
                           >
-                            {isLate ? 'LATE (>15m)[cite: 5]' : 'PRESENT'}
+                            {isLate ? 'LATE (>15m)' : 'PRESENT'}
                           </span>
                           {row.correction && (
-                            <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800">
-                              Koreksi: {row.correction.status}[cite: 5]
+                            <span className="rounded bg-[#edf6ff] px-2 py-0.5 text-[9px] font-bold text-[#1971c2]">
+                              Koreksi: {row.correction.status}
                             </span>
                           )}
                         </div>
@@ -235,100 +259,100 @@ export default function AttendancePageUI() {
 
         {/* 3. Drawer Panel Detail (Kanan - Sesuai Komponen Gambar Referensi) */}
         {selectedItem && (
-          <div className="w-96 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between overflow-y-auto shrink-0">
+          <div className="w-full shrink-0 overflow-y-auto rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] xl:w-[400px]">
             <div className="space-y-4">
               {/* Header Drawer */}
-              <div className="border-b border-slate-100 pb-3 flex justify-between items-start">
+              <div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
                     Detail Presensi & Audit
                   </span>
-                  <h3 className="font-bold text-sm text-slate-800 mt-0.5">
+                  <h3 className="mt-0.5 text-sm font-bold text-[#121b2e]">
                     {selectedItem.full_name}
                   </h3>
-                  <p className="text-xs text-slate-500">{selectedItem.employee_id} • Tanggal {selectedItem.date}</p>
+                  <p className="text-xs text-[#4d5f81]">{selectedItem.employee_id} • Tanggal {selectedItem.date}</p>
                 </div>
               </div>
 
               {/* Data Raw vs Corrected Log (BR-02.4) */}
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2">
-                <div className="font-bold text-slate-700 border-b border-slate-200 pb-1">
-                  Data Log Original (Raw Fingerprint)[cite: 5]
+              <div className="space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs">
+                <div className="border-b border-[#becabd]/35 pb-1 font-bold text-[#121b2e]">
+                  Data Log Original (Raw Fingerprint)
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-[#4d5f81]">
                   <span>Clock In:</span>
                   <span className="font-mono font-semibold">
                     {new Date(selectedItem.clock_in).toLocaleTimeString('id-ID')} WIB
                   </span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-[#4d5f81]">
                   <span>Clock Out:</span>
                   <span className="font-mono font-semibold">
                     {selectedItem.clock_out
                       ? `${new Date(selectedItem.clock_out).toLocaleTimeString('id-ID')} WIB`
-                      : 'Tidak Ada Scan[cite: 5]'}
+                      : 'Tidak ada scan'}
                   </span>
                 </div>
-                <div className="flex justify-between text-slate-600 pt-1 border-t border-slate-200/60 text-[11px]">
+                <div className="flex justify-between border-t border-[#becabd]/35 pt-1 text-[11px] text-[#4d5f81]">
                   <span>Sumber Data:</span>
-                  <span className="font-semibold text-blue-600">{selectedItem.source}[cite: 5]</span>
+                  <span className="font-semibold text-[#1971c2]">{selectedItem.source}</span>
                 </div>
               </div>
 
               {/* Pengajuan Koreksi & Reason Mandatory (FR-02.22) */}
               {selectedItem.correction ? (
-                <div className="border border-purple-200 bg-purple-50/50 p-3.5 rounded-xl text-xs space-y-2">
-                  <div className="font-bold text-purple-900 flex justify-between items-center">
-                    <span>Pengajuan Koreksi Absensi[cite: 5]</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-200 text-purple-800 rounded">
-                      {selectedItem.correction.status}[cite: 5]
+                <div className="space-y-2 rounded-xl border border-[#b9d6ff] bg-[#edf6ff] p-3.5 text-xs">
+                  <div className="flex items-center justify-between font-bold text-[#1e3765]">
+                    <span>Pengajuan Koreksi Absensi</span>
+                    <span className="rounded bg-[#b9d6ff] px-2 py-0.5 text-[10px] font-bold text-[#1971c2]">
+                      {selectedItem.correction.status}
                     </span>
                   </div>
 
-                  <div className="text-slate-600 space-y-1">
+                  <div className="space-y-1 text-[#4d5f81]">
                     <div>
-                      <span className="font-semibold">Tipe Koreksi:</span> {selectedItem.correction.correction_type}[cite: 5]
+                      <span className="font-semibold">Tipe Koreksi:</span> {selectedItem.correction.correction_type}
                     </div>
                     {selectedItem.correction.proposed_clock_in && (
                       <div>
-                        <span className="font-semibold">Clock In Diajukan:</span> {selectedItem.correction.proposed_clock_in} WIB[cite: 5]
+                        <span className="font-semibold">Clock In Diajukan:</span> {selectedItem.correction.proposed_clock_in} WIB
                       </div>
                     )}
                     {selectedItem.correction.proposed_clock_out && (
                       <div>
-                        <span className="font-semibold">Clock Out Diajukan:</span> {selectedItem.correction.proposed_clock_out} WIB[cite: 5]
+                        <span className="font-semibold">Clock Out Diajukan:</span> {selectedItem.correction.proposed_clock_out} WIB
                       </div>
                     )}
                   </div>
 
-                  <div className="pt-2 border-t border-purple-200/60">
-                    <span className="text-slate-500 font-semibold block">Alasan Pengajuan (Wajib):[cite: 5]</span>
-                    <p className="text-slate-800 italic mt-1 bg-white p-2 rounded border border-purple-100 text-[11px]">
-                      "{selectedItem.correction.reason}"[cite: 5]
+                  <div className="border-t border-[#b9d6ff] pt-2">
+                    <span className="block font-semibold text-[#4d5f81]">Alasan Pengajuan (Wajib):</span>
+                    <p className="mt-1 rounded border border-[#b9d6ff] bg-white p-2 text-[11px] italic text-[#121b2e]">
+                      "{selectedItem.correction.reason}"
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-xs text-slate-400 italic text-center">
-                  Tidak ada pengajuan koreksi aktif untuk tanggal ini.[cite: 5]
+                <div className="rounded-xl border border-dashed border-[#becabd] bg-[#f7f8ff] p-3 text-center text-xs italic text-[#4d5f81]">
+                  Tidak ada pengajuan koreksi aktif untuk tanggal ini.
                 </div>
               )}
 
               {/* Progress & Audit Trail (Mengadaptasi Komponen Gambar Referensi) */}
               <div className="space-y-2 pt-2">
-                <div className="font-bold text-xs text-slate-700">Progress & History Trail[cite: 5]</div>
-                <div className="border-l-2 border-slate-300 pl-3 space-y-3 text-xs">
+                <div className="text-xs font-bold text-[#121b2e]">Progress & History Trail</div>
+                <div className="space-y-3 border-l-2 border-[#d9e2fc] pl-3 text-xs">
                   <div className="relative">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 absolute -left-[17px] top-1"></div>
-                    <div className="font-semibold text-slate-800">Log Presensi Diterima</div>
-                    <div className="text-[10px] text-slate-400">Sistem Fingerprint • {selectedItem.date}[cite: 5]</div>
+                    <div className="font-semibold text-[#121b2e]">Log Presensi Diterima</div>
+                    <div className="text-[10px] text-[#4d5f81]">Sistem Fingerprint • {selectedItem.date}</div>
                   </div>
                   {selectedItem.correction && (
                     <div className="relative">
-                      <div className="w-2 h-2 rounded-full bg-purple-500 absolute -left-[17px] top-1"></div>
-                      <div className="font-semibold text-purple-800">Pengajuan Koreksi Dibuat</div>
-                      <div className="text-[10px] text-slate-400">
-                        Oleh Pegawai • {selectedItem.correction.created_at}[cite: 5]
+                      <div className="absolute -left-[17px] top-1 size-2 rounded-full bg-[#1971c2]"></div>
+                      <div className="font-semibold text-[#1971c2]">Pengajuan Koreksi Dibuat</div>
+                      <div className="text-[10px] text-[#4d5f81]">
+                        Oleh Pegawai • {selectedItem.correction.created_at}
                       </div>
                     </div>
                   )}
@@ -338,24 +362,25 @@ export default function AttendancePageUI() {
 
             {/* Tombol Action HR/Admin */}
             {selectedItem.correction?.status === 'PENDING' && (
-              <div className="pt-4 border-t border-slate-100 flex gap-2 mt-4">
+              <div className="mt-4 flex gap-2 border-t border-[#becabd]/35 pt-4">
                 <button
                   onClick={() => alert(`Koreksi ${selectedItem.full_name} Disetujui!`)}
-                  className="flex-1 bg-emerald-600 text-white text-xs py-2 rounded-lg font-bold hover:bg-emerald-700 transition"
+                  className="flex-1 rounded-lg bg-[#16834b] py-2 text-xs font-bold text-white transition hover:bg-[#006838]"
                 >
-                  Approve[cite: 5]
+                  Approve
                 </button>
                 <button
                   onClick={() => alert(`Koreksi ${selectedItem.full_name} Ditolak!`)}
-                  className="flex-1 bg-rose-600 text-white text-xs py-2 rounded-lg font-bold hover:bg-rose-700 transition"
+                  className="flex-1 rounded-lg bg-[#d64545] py-2 text-xs font-bold text-white transition hover:bg-[#b4232b]"
                 >
-                  Reject[cite: 5]
+                  Reject
                 </button>
               </div>
             )}
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   )
 }
