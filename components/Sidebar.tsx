@@ -166,8 +166,13 @@ export default function Sidebar() {
                 />
 
                 <SidebarSubItem
-                  label="Attendance & Productivity"
+                  label="Attendance"
                   href="/attendance"
+                />
+
+                <SidebarSubItem
+                  label="Attendance & Productivity"
+                  href="/attendance-productivity"
                 />
 
                 <SidebarSubItem
