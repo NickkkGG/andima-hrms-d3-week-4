@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,6 +11,7 @@ import {
   CircleHelp,
   ClipboardList,
   LayoutDashboard,
+  Layers3,
   LogOut,
   Menu,
   Settings,
@@ -62,9 +63,35 @@ function HrmsLink({ label, href }: { label: string; href: string }) {
   );
 }
 
+function PlannedD3Item({ label }: { label: string }) {
+  return (
+    <span
+      className="flex w-full cursor-not-allowed items-center justify-between rounded-md px-3 py-2 text-xs text-[#d9e2fc]/45"
+      title="Halaman fitur belum tersedia"
+      aria-disabled="true"
+    >
+      <span>{label}</span>
+      <span className="text-[9px] font-medium uppercase tracking-wide">Segera</span>
+    </span>
+  );
+}
+
 export default function Sidebar({ userName, userRole, userInitials, onSignOut, isSigningOut = false }: SidebarProps) {
+  const pathname = usePathname();
+  const isD3Route = [
+    "/employee-profile",
+    "/attendance",
+    "/attendance-productivity",
+    "/feedback-reward",
+    "/employee-report-ticket",
+  ].includes(pathname);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isHrmsOpen, setIsHrmsOpen] = useState(true);
+  const [isD3Open, setIsD3Open] = useState(isD3Route);
+
+  useEffect(() => {
+    if (isD3Route) setIsD3Open(true);
+  }, [isD3Route]);
 
   return (
     <>
@@ -94,11 +121,29 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
             </button>
             {isHrmsOpen && (
               <div className="ml-5 mt-2 border-l border-[#d9e2fc]/20 pl-3">
-                <HrmsLink label="Employee Profile" href="/employee-profile" />
-                <HrmsLink label="Attendance" href="/attendance" />
-                <HrmsLink label="Attendance & Productivity" href="/attendance-productivity" />
-                <HrmsLink label="Feedback & Reward" href="/feedback-reward" />
-                <HrmsLink label="Employee Report & Ticket" href="/employee-report-ticket" />
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsD3Open((value) => !value)}
+                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-xs transition-colors ${
+                      isD3Route ? "bg-[#1e3765] text-white" : "text-[#d9e2fc]/80 hover:bg-[#1e3765] hover:text-white"
+                    }`}
+                    aria-expanded={isD3Open}
+                  >
+                    <span className="flex items-center gap-2"><Layers3 size={14} /> D3</span>
+                    <ChevronDown size={14} className={`transition-transform ${isD3Open ? "rotate-0" : "-rotate-90"}`} />
+                  </button>
+                  {isD3Open && (
+                    <div className="ml-4 mt-1 border-l border-[#d9e2fc]/15 pl-2">
+                      <HrmsLink label="Employee Profile Management" href="/employee-profile" />
+                      <PlannedD3Item label="Fingerprint Attendance Integration" />
+                      <HrmsLink label="Attendance History & Correction" href="/attendance" />
+                      <HrmsLink label="Attendance & Productivity Dashboard" href="/attendance-productivity" />
+                      <HrmsLink label="Feedback & Reward Management" href="/feedback-reward" />
+                      <HrmsLink label="Employee Report & Ticket" href="/employee-report-ticket" />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
