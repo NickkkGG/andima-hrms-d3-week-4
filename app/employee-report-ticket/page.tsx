@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
 import { createClient } from "@/utils/supabase/client";
 
 type TicketStatus = "SUBMITTED" | "IN_REVIEW" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
@@ -353,18 +352,6 @@ export default function EmployeeReportTicketPage() {
     return { ok: true };
   }
 
-  async function signOut() {
-    setIsSaving(true);
-    const { error } = await createClient().auth.signOut({ scope: "local" });
-    setIsSaving(false);
-    if (error) {
-      showNotice("Logout belum berhasil. Coba lagi.");
-      return;
-    }
-    router.replace("/login");
-    router.refresh();
-  }
-
   async function openAttachment(attachment: { fileName: string; storagePath: string }) {
     const { data, error } = await createClient().storage.from("d3-ticket-attachments").createSignedUrl(attachment.storagePath, 60);
     if (error || !data?.signedUrl) {
@@ -380,9 +367,7 @@ export default function EmployeeReportTicketPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f8ff] text-[#121b2e]">
-      <Sidebar userName={viewerName} userRole={viewerRoleLabel} userInitials={viewerInitials} onSignOut={signOut} isSigningOut={isSaving} />
-
-      <section className="min-h-screen lg:pl-[260px]">
+      <section className="min-h-screen">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#d9e2fc] bg-white px-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6">
           <div className="flex min-w-0 items-center gap-3"><div className="hidden items-center gap-3 sm:flex"><span className="font-bold">ANDIMA HRMS</span><span className="text-[#d9e2fc]">|</span><span className="text-xs font-semibold text-[#3f4940]">HRMS</span><ChevronRight size={13} className="text-[#4d5f81]/50" /><span className="truncate text-xs font-semibold text-[#006838]">Employee Report & Ticket</span></div></div>
           <label className="hidden w-64 items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:flex"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none placeholder:text-[#4d5f81]/70" placeholder="Cari ticket, employee..." /></label>

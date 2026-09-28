@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { Bell, ChevronRight, CircleHelp } from 'lucide-react'
-import Sidebar from '@/components/Sidebar'
 
 // Dummy Data Sesuai Kebutuhan FR-D3-002 & Acceptance Criteria
 const DUMMY_ATTENDANCES = [
@@ -104,8 +103,7 @@ export default function AttendancePageUI() {
 
   return (
     <>
-      <Sidebar userName="Attendance Team" userRole="Attendance Admin" userInitials="AT" />
-      <div className="min-h-screen bg-[#f7f8ff] text-[#121b2e] lg:pl-[260px]">
+      <div className="min-h-screen bg-[#f7f8ff] text-[#121b2e]">
       <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#d9e2fc] bg-white px-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
           <div className="hidden min-w-0 items-center gap-3 sm:flex">

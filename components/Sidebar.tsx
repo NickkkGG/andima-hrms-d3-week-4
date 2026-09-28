@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 import {
   BriefcaseBusiness,
   ChevronDown,
@@ -21,9 +22,9 @@ import {
 } from "lucide-react";
 
 type SidebarProps = {
-  userName: string;
-  userRole: string;
-  userInitials: string;
+  userName?: string;
+  userRole?: string;
+  userInitials?: string;
   onSignOut?: () => void;
   isSigningOut?: boolean;
 };
@@ -78,6 +79,8 @@ function PlannedD3Item({ label }: { label: string }) {
 
 export default function Sidebar({ userName, userRole, userInitials, onSignOut, isSigningOut = false }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const isPublicRoute = pathname === "/login" || pathname === "/register" || pathname.startsWith("/auth/");
   const isD3Route = [
     "/employee-profile",
     "/attendance",
@@ -88,10 +91,70 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isHrmsOpen, setIsHrmsOpen] = useState(true);
   const [isD3Open, setIsD3Open] = useState(isD3Route);
+  const [isInternalSigningOut, setIsInternalSigningOut] = useState(false);
+  const [account, setAccount] = useState({
+    name: userName ?? "Andima User",
+    role: userRole ?? "HRMS User",
+    initials: userInitials ?? "AU",
+  });
 
   useEffect(() => {
     if (isD3Route) setIsD3Open(true);
   }, [isD3Route]);
+
+  useEffect(() => {
+    if (isPublicRoute) return;
+    if (userName && userRole && userInitials) {
+      setAccount({ name: userName, role: userRole, initials: userInitials });
+      return;
+    }
+
+    let isMounted = true;
+    async function loadAccount() {
+      try {
+        const supabase = createClient();
+        const { data: userData } = await supabase.auth.getUser();
+        const user = userData.user;
+        if (!user || !isMounted) return;
+
+        const { data: access } = await supabase
+          .from("d3_user_access")
+          .select("app_role")
+          .eq("auth_user_id", user.id)
+          .maybeSingle();
+
+        const metadataName = user.user_metadata?.full_name;
+        const name = typeof metadataName === "string" && metadataName.trim()
+          ? metadataName.trim()
+          : user.email?.split("@")[0] ?? "Andima User";
+        const role = access?.app_role === "HR" ? "HR" : access?.app_role === "MANAGER" ? "Manager" : access?.app_role === "EMPLOYEE" ? "Employee" : "HRMS User";
+        const initials = name.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "AU";
+        if (isMounted) setAccount({ name, role, initials });
+      } catch {
+        // The navigation remains available even if the account label cannot load.
+      }
+    }
+
+    void loadAccount();
+    return () => { isMounted = false; };
+  }, [isPublicRoute, userInitials, userName, userRole]);
+
+  async function handleSignOut() {
+    if (onSignOut) {
+      onSignOut();
+      return;
+    }
+    setIsInternalSigningOut(true);
+    try {
+      await createClient().auth.signOut({ scope: "local" });
+      router.replace("/login");
+      router.refresh();
+    } finally {
+      setIsInternalSigningOut(false);
+    }
+  }
+
+  if (isPublicRoute) return null;
 
   return (
     <>
@@ -154,9 +217,9 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
           <div className="rounded-lg border border-[#d9e2fc]/15 bg-[#1e3765] p-3"><div className="flex items-center gap-2 text-[11px] font-semibold text-white"><CircleHelp size={14} className="text-[#77d8cd]" /> Customer Support</div><p className="mt-1 text-[10px] text-[#d9e2fc]/80">24/7 Operations Line</p></div>
           <NavigationItem icon={<Settings size={15} />} label="Settings" />
           <div className="flex items-center gap-2 rounded-lg px-2 py-1.5">
-            <span className="grid size-7 place-items-center rounded-full bg-[#16834b] text-[10px] font-bold text-white">{userInitials}</span>
-            <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-white">{userName}</p><p className="text-[10px] text-[#d9e2fc]/75">{userRole}</p></div>
-            {onSignOut && <button type="button" onClick={onSignOut} disabled={isSigningOut} className="rounded p-1.5 text-[#d9e2fc] transition hover:bg-white/10 disabled:opacity-50" aria-label="Logout" title="Logout"><LogOut size={16} /></button>}
+            <span className="grid size-7 place-items-center rounded-full bg-[#16834b] text-[10px] font-bold text-white">{account.initials}</span>
+            <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-white">{account.name}</p><p className="text-[10px] text-[#d9e2fc]/75">{account.role}</p></div>
+            <button type="button" onClick={() => void handleSignOut()} disabled={isSigningOut || isInternalSigningOut} className="rounded p-1.5 text-[#d9e2fc] transition hover:bg-white/10 disabled:opacity-50" aria-label="Logout" title="Logout"><LogOut size={16} /></button>
           </div>
         </div>
       </aside>
