@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { Bell, ChevronRight, CircleHelp, RefreshCw, AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
+import { Bell, ChevronRight, RefreshCw, AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import HeaderAccount from '@/components/HeaderAccount'
 
 type CorrectionType = 'CLOCK_IN' | 'CLOCK_OUT' | 'FULL_DAY' | string
 type CorrectionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | string
@@ -320,16 +321,7 @@ export default function AttendancePageUI() {
                 <Bell size={17} />
                 <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" />
               </button>
-              <button type="button" className="grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]" aria-label="Bantuan">
-                <CircleHelp size={17} />
-              </button>
-              <div className="hidden items-center gap-2 border-l border-[#d9e2fc] pl-3 sm:flex">
-                <span className="grid size-8 place-items-center rounded-full border border-[#006838]/30 bg-[#16834b]/15 text-xs font-bold text-[#006838]">AT</span>
-                <div className="text-left">
-                  <p className="text-xs font-bold">Attendance Team</p>
-                  <p className="text-[10px] text-[#4d5f81]">Attendance Admin</p>
-                </div>
-              </div>
+              <HeaderAccount />
             </div>
           </div>
         </header>

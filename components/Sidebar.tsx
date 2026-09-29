@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -8,16 +7,10 @@ import { createClient } from "@/utils/supabase/client";
 import {
   BriefcaseBusiness,
   ChevronDown,
-  ChevronRight,
-  CircleHelp,
   ClipboardList,
-  LayoutDashboard,
   Layers3,
   LogOut,
   Menu,
-  Settings,
-  ShieldCheck,
-  UsersRound,
   X,
 } from "lucide-react";
 
@@ -27,13 +20,6 @@ type SidebarProps = {
   userInitials?: string;
   onSignOut?: () => void;
   isSigningOut?: boolean;
-};
-
-type NavigationItemProps = {
-  icon: ReactNode;
-  label: string;
-  href?: string;
-  suffix?: ReactNode;
 };
 
 type Account = {
@@ -47,18 +33,6 @@ const fallbackAccount: Account = {
   role: "HRMS User",
   initials: "AU",
 };
-
-function NavigationItem({ icon, label, href = "#", suffix }: NavigationItemProps) {
-  return (
-    <Link
-      href={href}
-      className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-[#d9e2fc] transition-colors hover:bg-[#1e3765] hover:text-white"
-    >
-      <span className="flex items-center gap-3">{icon}{label}</span>
-      {suffix}
-    </Link>
-  );
-}
 
 function HrmsLink({ label, href }: { label: string; href: string }) {
   const pathname = usePathname();
@@ -125,15 +99,17 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
 
         const { data: access } = await supabase
           .from("d3_user_access")
-          .select("app_role")
+          .select("app_role, d3_employee!d3_user_access_employee_id_fkey(full_name)")
           .eq("auth_user_id", user.id)
           .maybeSingle();
 
+        const accountAccess = access as unknown as { app_role: string | null; d3_employee: { full_name: string } | null } | null;
         const metadataName = user.user_metadata?.full_name;
-        const name = typeof metadataName === "string" && metadataName.trim()
+        const registeredName = typeof metadataName === "string" && metadataName.trim()
           ? metadataName.trim()
           : user.email?.split("@")[0] ?? "Andima User";
-        const role = access?.app_role === "HR" ? "HR" : access?.app_role === "MANAGER" ? "Manager" : access?.app_role === "EMPLOYEE" ? "Employee" : "HRMS User";
+        const name = accountAccess?.d3_employee?.full_name?.trim() || registeredName;
+        const role = accountAccess?.app_role === "HR" ? "HR" : accountAccess?.app_role === "MANAGER" ? "Manager" : accountAccess?.app_role === "EMPLOYEE" ? "Employee" : "HRMS User";
         const initials = name.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "AU";
         if (isMounted) setLoadedAccount({ name, role, initials });
       } catch {
@@ -176,9 +152,6 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
         </div>
 
         <nav className="mt-8 space-y-1.5 text-sm font-semibold">
-          <NavigationItem icon={<LayoutDashboard size={16} />} label="Dashboard" href="/home" />
-          <NavigationItem icon={<BriefcaseBusiness size={16} />} label="POS" />
-          <NavigationItem icon={<UsersRound size={16} />} label="CRM" suffix={<ChevronRight size={15} />} />
           <div>
             <button
               type="button"
@@ -216,12 +189,9 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
               </div>
             )}
           </div>
-          <NavigationItem icon={<ShieldCheck size={16} />} label="MID" suffix={<ChevronRight size={15} />} />
         </nav>
 
         <div className="mt-auto space-y-3">
-          <div className="rounded-lg border border-[#d9e2fc]/15 bg-[#1e3765] p-3"><div className="flex items-center gap-2 text-[11px] font-semibold text-white"><CircleHelp size={14} className="text-[#77d8cd]" /> Customer Support</div><p className="mt-1 text-[10px] text-[#d9e2fc]/80">24/7 Operations Line</p></div>
-          <NavigationItem icon={<Settings size={15} />} label="Settings" />
           <div className="flex items-center gap-2 rounded-lg px-2 py-1.5">
             <span className="grid size-7 place-items-center rounded-full bg-[#16834b] text-[10px] font-bold text-white">{account.initials}</span>
             <div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-white">{account.name}</p><p className="text-[10px] text-[#d9e2fc]/75">{account.role}</p></div>

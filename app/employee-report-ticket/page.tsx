@@ -4,7 +4,6 @@ import {
   Bell,
   CheckCircle2,
   ChevronRight,
-  CircleHelp,
   Clock3,
   FilePlus2,
   Filter,
@@ -371,7 +370,7 @@ export default function EmployeeReportTicketPage() {
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#d9e2fc] bg-white px-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6">
           <div className="flex min-w-0 items-center gap-3"><div className="hidden items-center gap-3 sm:flex"><span className="font-bold">ANDIMA HRMS</span><span className="text-[#d9e2fc]">|</span><span className="text-xs font-semibold text-[#3f4940]">HRMS</span><ChevronRight size={13} className="text-[#4d5f81]/50" /><span className="truncate text-xs font-semibold text-[#006838]">Employee Report & Ticket</span></div></div>
           <label className="hidden w-64 items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:flex"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none placeholder:text-[#4d5f81]/70" placeholder="Cari ticket, employee..." /></label>
-          <div className="flex items-center gap-2 sm:gap-3"><button className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label="Notifikasi"><Bell size={17} /><span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" /></button><button className="grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label="Bantuan"><CircleHelp size={17} /></button><div className="hidden items-center gap-2 border-l border-[#d9e2fc] pl-3 sm:flex"><span className="grid size-8 place-items-center rounded-full border border-[#006838]/30 bg-[#16834b]/15 text-xs font-bold text-[#006838]">{viewerInitials}</span><div className="text-left"><p className="text-xs font-bold">{viewerName}</p><p className="text-[10px] text-[#4d5f81]">{viewerRoleLabel}</p></div></div></div>
+          <div className="flex items-center gap-2 sm:gap-3"><button className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label="Notifikasi"><Bell size={17} /><span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" /></button><div className="hidden items-center gap-2 border-l border-[#d9e2fc] pl-3 sm:flex"><span className="grid size-8 place-items-center rounded-full border border-[#006838]/30 bg-[#16834b]/15 text-xs font-bold text-[#006838]">{viewerInitials}</span><div className="text-left"><p className="text-xs font-bold">{viewerName}</p><p className="text-[10px] text-[#4d5f81]">{viewerRoleLabel}</p></div></div></div>
         </header>
 
         <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
