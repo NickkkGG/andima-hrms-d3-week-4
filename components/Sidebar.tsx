@@ -36,6 +36,18 @@ type NavigationItemProps = {
   suffix?: ReactNode;
 };
 
+type Account = {
+  name: string;
+  role: string;
+  initials: string;
+};
+
+const fallbackAccount: Account = {
+  name: "Andima User",
+  role: "HRMS User",
+  initials: "AU",
+};
+
 function NavigationItem({ icon, label, href = "#", suffix }: NavigationItemProps) {
   return (
     <Link
@@ -90,24 +102,18 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
   ].includes(pathname);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isHrmsOpen, setIsHrmsOpen] = useState(true);
-  const [isD3Open, setIsD3Open] = useState(isD3Route);
+  const [isD3Open, setIsD3Open] = useState(false);
   const [isInternalSigningOut, setIsInternalSigningOut] = useState(false);
-  const [account, setAccount] = useState({
-    name: userName ?? "Andima User",
-    role: userRole ?? "HRMS User",
-    initials: userInitials ?? "AU",
-  });
+  const [loadedAccount, setLoadedAccount] = useState<Account | null>(null);
+  const hasSuppliedAccount = Boolean(userName && userRole && userInitials);
+  const suppliedAccount = hasSuppliedAccount
+    ? { name: userName, role: userRole, initials: userInitials }
+    : null;
+  const account = suppliedAccount ?? loadedAccount ?? fallbackAccount;
+  const isD3Expanded = isD3Route || isD3Open;
 
   useEffect(() => {
-    if (isD3Route) setIsD3Open(true);
-  }, [isD3Route]);
-
-  useEffect(() => {
-    if (isPublicRoute) return;
-    if (userName && userRole && userInitials) {
-      setAccount({ name: userName, role: userRole, initials: userInitials });
-      return;
-    }
+    if (isPublicRoute || hasSuppliedAccount) return;
 
     let isMounted = true;
     async function loadAccount() {
@@ -129,7 +135,7 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
           : user.email?.split("@")[0] ?? "Andima User";
         const role = access?.app_role === "HR" ? "HR" : access?.app_role === "MANAGER" ? "Manager" : access?.app_role === "EMPLOYEE" ? "Employee" : "HRMS User";
         const initials = name.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "AU";
-        if (isMounted) setAccount({ name, role, initials });
+        if (isMounted) setLoadedAccount({ name, role, initials });
       } catch {
         // The navigation remains available even if the account label cannot load.
       }
@@ -137,7 +143,7 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
 
     void loadAccount();
     return () => { isMounted = false; };
-  }, [isPublicRoute, userInitials, userName, userRole]);
+  }, [hasSuppliedAccount, isPublicRoute]);
 
   async function handleSignOut() {
     if (onSignOut) {
@@ -191,12 +197,12 @@ export default function Sidebar({ userName, userRole, userInitials, onSignOut, i
                     className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-xs transition-colors ${
                       isD3Route ? "bg-[#1e3765] text-white" : "text-[#d9e2fc]/80 hover:bg-[#1e3765] hover:text-white"
                     }`}
-                    aria-expanded={isD3Open}
+                    aria-expanded={isD3Expanded}
                   >
                     <span className="flex items-center gap-2"><Layers3 size={14} /> D3</span>
-                    <ChevronDown size={14} className={`transition-transform ${isD3Open ? "rotate-0" : "-rotate-90"}`} />
+                    <ChevronDown size={14} className={`transition-transform ${isD3Expanded ? "rotate-0" : "-rotate-90"}`} />
                   </button>
-                  {isD3Open && (
+                  {isD3Expanded && (
                     <div className="ml-4 mt-1 border-l border-[#d9e2fc]/15 pl-2">
                       <HrmsLink label="Employee Profile Management" href="/employee-profile" />
                       <PlannedD3Item label="Fingerprint Attendance Integration" />
