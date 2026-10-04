@@ -1,13 +1,5 @@
-export default function AttendancePage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold font-black">
-        Feedback & Reward
-      </h1>
+import { redirect } from "next/navigation";
 
-      <p className="mt-2 text-gray-600">
-        Halaman Feedback & Reward
-      </p>
-    </div>
-  );
+export default function LegacyFeedbackRewardRoute() {
+  redirect("/employees");
 }

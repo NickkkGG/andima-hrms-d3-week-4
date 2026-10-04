@@ -53,7 +53,7 @@ export default function LoginPage() {
       const view = access.app_role === "EMPLOYEE" ? "employee" : "manager";
       setNotice({ tone: "success", text: "Login berhasil. Mengarahkan ke workspace Anda..." });
       window.setTimeout(() => {
-        router.replace(`/employee-report-ticket?view=${view}`);
+        router.replace(access.app_role === "EMPLOYEE" ? "/face-biometric-attendance" : `/employee-report-ticket?view=${view}`);
         router.refresh();
       }, 700);
     } catch {
