@@ -29,7 +29,6 @@ type HumanFace = {
   boxScore?: number;
   faceScore?: number;
   live?: number;
-  real?: number;
   box?: [number, number, number, number];
   mesh?: FaceMeshPoint[];
   rotation?: { angle: { yaw: number; pitch: number } } | null;
@@ -71,6 +70,8 @@ const CHALLENGE_HOLD_DURATION_MS = 450;
 const BLINK_CONFIRMATION_FRAMES = 2;
 const ENROLLMENT_SAMPLE_INTERVAL_MS = 350;
 const REQUIRED_ENROLLMENT_SAMPLES = 15;
+const MAX_TEMPLATE_DESCRIPTORS = 45;
+const TEMPLATE_TOP_MATCHES = 5;
 
 const challengeDetails: Record<ChallengeId, { label: string; helper: string }> = {
   left: { label: "Hadap kiri", helper: "Putar wajah sedikit ke kiri." },
@@ -86,8 +87,8 @@ const challengeDetails: Record<ChallengeId, { label: string; helper: string }> =
 const degreesToRadians = (degrees: number) => degrees * (Math.PI / 180);
 const CENTER_YAW_THRESHOLD = degreesToRadians(10);
 const CENTER_PITCH_THRESHOLD = degreesToRadians(10);
-const TURN_YAW_THRESHOLD = degreesToRadians(15);
-const TILT_PITCH_THRESHOLD = degreesToRadians(12);
+const TURN_YAW_THRESHOLD = degreesToRadians(12);
+const TILT_PITCH_THRESHOLD = degreesToRadians(10);
 
 const FACE_OVERLAY_PATHS = [
   [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10],
@@ -145,11 +146,18 @@ function cosineSimilarity(first: number[], second: number[]) {
 }
 
 function templateSimilarity(embedding: number[], descriptors: number[][]) {
-  if (descriptors.length === 0) return 0;
-  const averaged = Array.from({ length: embedding.length }, (_, index) => (
-    descriptors.reduce((total, descriptor) => total + (descriptor[index] ?? 0), 0) / descriptors.length
-  ));
-  return cosineSimilarity(embedding, averaged);
+  const scores = descriptors
+    .filter((descriptor) => descriptor.length === embedding.length)
+    .map((descriptor) => cosineSimilarity(embedding, descriptor))
+    .sort((first, second) => second - first);
+  if (scores.length === 0) return 0;
+
+  // A template may contain samples captured in more than one good-quality
+  // session. Averaging every descriptor lets an old camera, lighting, or pose
+  // outlier pull the entire reference down. Requiring the mean of the five
+  // closest stored samples remains stricter than accepting one best frame.
+  const nearest = scores.slice(0, Math.min(TEMPLATE_TOP_MATCHES, scores.length));
+  return nearest.reduce((total, score) => total + score, 0) / nearest.length;
 }
 
 function median(values: number[]) {
@@ -191,7 +199,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const [faceCount, setFaceCount] = useState(0);
   const [faceConfidence, setFaceConfidence] = useState(0);
   const [livenessScore, setLivenessScore] = useState<number | undefined>();
-  const [antiSpoofScore, setAntiSpoofScore] = useState<number | undefined>();
   const [matchScore, setMatchScore] = useState<number | null>(null);
   const [stableMatchFrames, setStableMatchFrames] = useState(0);
   const [identityVerified, setIdentityVerified] = useState(false);
@@ -214,8 +221,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     && faceConfidence >= 60
     && faceSize >= MIN_FACE_SIZE_PX
     && facingCenter
-    && (livenessScore ?? 0) >= 0.6
-    && (antiSpoofScore ?? 0) >= 0.6;
+    && (livenessScore ?? 0) >= 0.6;
   const canFinalize = scanState === "scanning"
     && allChallengesCompleted
     && hasEmbedding
@@ -244,13 +250,11 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     const baseQualityPassed = result.face.length === 1
       && nextFaceConfidence >= 60
       && nextFaceSize >= MIN_FACE_SIZE_PX
-      && (face?.live ?? 0) >= 0.6
-      && (face?.real ?? 0) >= 0.6;
+      && (face?.live ?? 0) >= 0.6;
     const nextQualityPassed = baseQualityPassed && nextFacingCenter;
     setFaceCount(result.face.length);
     setFaceConfidence(nextFaceConfidence);
     setLivenessScore(face?.live);
-    setAntiSpoofScore(face?.real);
     setFaceSize(nextFaceSize);
     setFacingCenter(nextFacingCenter);
     if (Date.now() - lastMeshRenderAtRef.current >= 66) {
@@ -388,9 +392,9 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
             : false;
     const detected = gestureDetected || rotationDetected;
 
-    // The final action still requires liveness/anti-spoof scores. During a
-    // head turn those scores can momentarily dip, so they must not freeze the
-    // visible liveness progress itself.
+    // Liveness challenges verify visible motion. During a head turn the model
+    // can briefly lose face detail, so challenge progress only requires a
+    // single well-sized face and sufficient detector confidence.
     const challengeCanBeCompleted = detected
       && result.face.length === 1
       && nextFaceConfidence >= 60
@@ -462,7 +466,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     setFaceCount(0);
     setFaceConfidence(0);
     setLivenessScore(undefined);
-    setAntiSpoofScore(undefined);
     setMatchScore(null);
     matchScoreRef.current = null;
     setStableMatchFrames(0);
@@ -516,7 +519,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
             skipFrames: 1,
             skipTime: 0,
           },
-          antispoof: { enabled: true },
+          antispoof: { enabled: false },
           liveness: { enabled: true },
         },
         gesture: { enabled: true },
@@ -562,7 +565,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     setFaceCount(0);
     setFaceConfidence(0);
     setLivenessScore(undefined);
-    setAntiSpoofScore(undefined);
     setMatchScore(null);
     matchScoreRef.current = null;
     setStableMatchFrames(0);
@@ -592,8 +594,11 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
       setErrorMessage(`Pendaftaran belum cukup kuat. Selesaikan lima gerakan, lalu kembali hadap kamera sampai ${REQUIRED_ENROLLMENT_SAMPLES} sampel wajah tengah terkumpul.`);
       return;
     }
+    const previousDescriptors = templateRef.current?.descriptors ?? [];
+    const combinedDescriptors = [...previousDescriptors, ...enrollmentSamplesRef.current]
+      .slice(-MAX_TEMPLATE_DESCRIPTORS);
     const nextTemplate: FaceTemplate = {
-      descriptors: enrollmentSamplesRef.current,
+      descriptors: combinedDescriptors,
       createdAt: new Date().toISOString(),
       modelVersion: humanRef.current.version,
       embeddingModel: "insightface-mobilenet-swish",
@@ -611,7 +616,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
         enrollment_quality: {
           face_confidence: faceConfidence,
           liveness_score: livenessScore ?? null,
-          anti_spoof_score: antiSpoofScore ?? null,
           sample_count: nextTemplate.descriptors.length,
         },
         enrolled_at: nextTemplate.createdAt,
@@ -628,9 +632,11 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     templateRef.current = nextTemplate;
     setTemplate(nextTemplate);
     setScanState("complete");
-    setActionMessage("Template biometrik tersimpan dan terikat ke akun karyawan ini.");
+    setActionMessage(previousDescriptors.length > 0
+      ? `Template biometrik diperbarui dengan ${enrollmentSamplesRef.current.length} sampel baru dari sesi ini.`
+      : "Template biometrik tersimpan dan terikat ke akun karyawan ini.");
     stopCamera();
-  }, [antiSpoofScore, currentUser, faceConfidence, livenessScore, stopCamera]);
+  }, [currentUser, faceConfidence, livenessScore, stopCamera]);
 
   const recordAttendance = useCallback(async () => {
     if (!identityVerifiedRef.current || !attendancePresenceRef.current || completedChallengesRef.current.length !== challengeOrderRef.current.length) {
@@ -696,14 +702,13 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
         event_type: type,
         similarity: matchScoreRef.current,
         liveness_score: livenessScore ?? null,
-        anti_spoof_score: antiSpoofScore ?? null,
       });
 
     setScanState("complete");
     setActionMessage(`${type === "CLOCK_IN" ? "Clock-in" : "Clock-out"} berhasil dicatat di Attendance History & Correction.${eventError ? " Audit biometrik belum tersimpan, tetapi data presensi sudah tercatat." : ""}`);
     stopCamera();
     window.setTimeout(() => router.push("/attendance"), 900);
-  }, [antiSpoofScore, currentUser, livenessScore, router, stopCamera]);
+  }, [currentUser, livenessScore, router, stopCamera]);
 
   useEffect(() => {
     let isMounted = true;
@@ -768,11 +773,10 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     { label: "Ukuran wajah", value: faceSize > 0 ? `${faceSize}px` : "Menunggu", valid: faceSize >= MIN_FACE_SIZE_PX },
     { label: "Hadap kamera", value: facingCenter ? "Terpusat" : "Kembali ke tengah", valid: facingCenter },
     { label: "Liveness", value: livenessLabel(livenessScore), valid: typeof livenessScore === "number" && livenessScore >= 0.6 },
-    { label: "Anti-spoof", value: typeof antiSpoofScore === "number" ? `${Math.round(antiSpoofScore * 100)}%` : "Menunggu", valid: typeof antiSpoofScore === "number" && antiSpoofScore >= 0.6 },
     ...(isEnrollment
       ? [{ label: "Sampel wajah tengah", value: `${enrollmentSampleCount}/${REQUIRED_ENROLLMENT_SAMPLES}`, valid: enrollmentSampleCount >= REQUIRED_ENROLLMENT_SAMPLES }]
       : [{ label: "Identitas wajah", value: matchScore === null ? "Menunggu" : identityVerified ? `Terverifikasi • ${matchScore}%` : `${matchScore}% • ${stableMatchFrames}/${REQUIRED_STABLE_MATCHES} frame`, valid: identityVerified }]),
-  ], [antiSpoofScore, enrollmentSampleCount, faceConfidence, faceCount, faceSize, facingCenter, identityVerified, isEnrollment, livenessScore, matchScore, stableMatchFrames]);
+  ], [enrollmentSampleCount, faceConfidence, faceCount, faceSize, facingCenter, identityVerified, isEnrollment, livenessScore, matchScore, stableMatchFrames]);
 
   const title = isEnrollment ? "Biometric Registration" : "Face Biometric Attendance";
   const subtitle = isEnrollment
@@ -885,7 +889,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
 
         <section className="mt-5 rounded-2xl border border-[#dbe4f0] bg-white p-5 shadow-[0_4px_18px_rgba(27,53,102,0.06)]">
           {isEnrollment ? (
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><h3 className="text-sm font-bold">Simpan template biometrik</h3><p className="mt-1 text-xs leading-5 text-[#4d5f81]">Selesaikan lima Liveness Checking, lalu hadap kamera sampai {REQUIRED_ENROLLMENT_SAMPLES} sampel wajah tengah terkumpul.</p>{currentUser?.email && <p className="mt-1 text-[11px] font-semibold text-[#1971c2]">Dipetakan ke akun: {currentUser.email}</p>}{template && <p className="mt-2 text-[11px] font-semibold text-[#006838]">Template terakhir: {formatTime(template.createdAt)} • Human {template.modelVersion}</p>}</div><button type="button" disabled={!canFinalize} onClick={() => void saveEnrollment()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#006838] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#005b30] disabled:cursor-not-allowed disabled:bg-slate-300"><UserRoundCheck size={16} /> Simpan template</button></div>
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><h3 className="text-sm font-bold">{template ? "Perbarui template biometrik" : "Simpan template biometrik"}</h3><p className="mt-1 text-xs leading-5 text-[#4d5f81]">Selesaikan lima Liveness Checking, lalu hadap kamera sampai {REQUIRED_ENROLLMENT_SAMPLES} sampel wajah tengah terkumpul. Saat diperbarui dari perangkat lain, sampel sesi baru ditambahkan agar pencocokan lebih tahan variasi kamera dan cahaya.</p>{currentUser?.email && <p className="mt-1 text-[11px] font-semibold text-[#1971c2]">Dipetakan ke akun: {currentUser.email}</p>}{template && <p className="mt-2 text-[11px] font-semibold text-[#006838]">Template terakhir: {formatTime(template.createdAt)} • {template.descriptors.length} sampel • Human {template.modelVersion}</p>}</div><button type="button" disabled={!canFinalize} onClick={() => void saveEnrollment()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#006838] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#005b30] disabled:cursor-not-allowed disabled:bg-slate-300"><UserRoundCheck size={16} /> {template ? "Perbarui template" : "Simpan template"}</button></div>
           ) : (
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><h3 className="text-sm font-bold">Simpan ke Attendance History</h3><p className="mt-1 text-xs leading-5 text-[#4d5f81]">Setelah identitas dan liveness terverifikasi, clock-in atau clock-out akan dicatat pada fitur Attendance History & Correction.</p><p className="mt-1 text-[11px] font-semibold text-[#1971c2]">Identitas harus cocok minimal {Math.round(MIN_IDENTITY_SIMILARITY * 100)}% selama {REQUIRED_STABLE_MATCHES} frame stabil. Setelah terverifikasi, gerakan kecil tidak langsung membatalkan tombol.</p></div><button type="button" disabled={!canFinalize || !template} onClick={() => void recordAttendance()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#006838] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#005b30] disabled:cursor-not-allowed disabled:bg-slate-300"><Clock3 size={16} /> Catat ke Attendance History</button></div>
           )}
