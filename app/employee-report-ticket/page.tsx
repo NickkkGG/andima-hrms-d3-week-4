@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   MoreHorizontal,
   Paperclip,
+  RefreshCw,
   Search,
   Send,
   Ticket,
@@ -55,6 +56,15 @@ type CreateTicketInput = {
   description: string;
   occurredAt?: string;
   attachment?: File;
+};
+
+type TicketNotification = {
+  id: string;
+  ticketId: string;
+  ticketTitle: string;
+  message: string;
+  at: string;
+  kind: "submitted" | "status";
 };
 
 const statusMeta: Record<TicketStatus, { label: string; className: string }> = {
@@ -110,6 +120,7 @@ export default function EmployeeReportTicketPage() {
   const [followUp, setFollowUp] = useState("");
   const [followUpAt, setFollowUpAt] = useState(currentLocalDateTime);
   const [notice, setNotice] = useState("");
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   async function loadTickets(actorEmployeeId = viewerEmployeeId, actorName = viewerName) {
     const supabase = createClient();
@@ -261,10 +272,59 @@ export default function EmployeeReportTicketPage() {
 
   const selectedTicket = visibleTickets.find((ticket) => ticket.id === selectedId);
 
+  const ticketNotifications = useMemo(() => {
+    const notifications = accessibleTickets.flatMap((ticket) => ticket.history.flatMap((activity): TicketNotification[] => {
+      if (viewRole === "employee" && activity.kind === "status") {
+        return [{
+          id: `status-${activity.id}`,
+          ticketId: ticket.id,
+          ticketTitle: ticket.title,
+          message: activity.message,
+          at: activity.at,
+          kind: "status",
+        }];
+      }
+      if (viewRole === "manager" && activity.kind === "created") {
+        return [{
+          id: `submitted-${activity.id}`,
+          ticketId: ticket.id,
+          ticketTitle: ticket.title,
+          message: `Ticket baru diajukan oleh ${ticket.employeeName}.`,
+          at: activity.at,
+          kind: "submitted",
+        }];
+      }
+      if (viewRole === "manager" && activity.kind === "status") {
+        return [{
+          id: `status-${activity.id}`,
+          ticketId: ticket.id,
+          ticketTitle: ticket.title,
+          message: activity.message,
+          at: activity.at,
+          kind: "status",
+        }];
+      }
+      return [];
+    }));
+    return notifications.sort((first, second) => second.at.localeCompare(first.at)).slice(0, 8);
+  }, [accessibleTickets, viewRole]);
+
   function showNotice(message: string) {
     setNotice(message);
     window.setTimeout(() => setNotice(""), 3200);
   }
+
+  function refreshTickets() {
+    void loadTickets(viewerEmployeeId, viewerName);
+  }
+
+  useEffect(() => {
+    if (!viewerEmployeeId || isAccountLoading) return;
+    const syncInterval = window.setInterval(refreshTickets, 15_000);
+    return () => window.clearInterval(syncInterval);
+  // Keep both HR and Employee views aligned with the shared ticket history.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewerEmployeeId, viewerName, isAccountLoading]);
 
   async function changeStatus(status: TicketStatus) {
     if (!selectedTicket || viewRole !== "manager" || selectedTicket.status === status) return;
@@ -370,20 +430,20 @@ export default function EmployeeReportTicketPage() {
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#d9e2fc] bg-white px-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6">
           <div className="flex min-w-0 items-center gap-3"><div className="hidden items-center gap-3 sm:flex"><span className="font-bold">ANDIMA HRMS</span><span className="text-[#d9e2fc]">|</span><span className="text-xs font-semibold text-[#3f4940]">HRMS</span><ChevronRight size={13} className="text-[#4d5f81]/50" /><span className="truncate text-xs font-semibold text-[#006838]">Employee Report & Ticket</span></div></div>
           <label className="hidden w-64 items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:flex"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none placeholder:text-[#4d5f81]/70" placeholder="Cari ticket, employee..." /></label>
-          <div className="flex items-center gap-2 sm:gap-3"><button className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label="Notifikasi"><Bell size={17} /><span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" /></button><div className="hidden items-center gap-2 border-l border-[#d9e2fc] pl-3 sm:flex"><span className="grid size-8 place-items-center rounded-full border border-[#006838]/30 bg-[#16834b]/15 text-xs font-bold text-[#006838]">{viewerInitials}</span><div className="text-left"><p className="text-xs font-bold">{viewerName}</p><p className="text-[10px] text-[#4d5f81]">{viewerRoleLabel}</p></div></div></div>
+          <div className="relative flex items-center gap-2 sm:gap-3"><button onClick={() => { setIsNotificationOpen((current) => !current); refreshTickets(); }} className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label="Notifikasi ticket" aria-expanded={isNotificationOpen}><Bell size={17} />{ticketNotifications.length > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-[#d64545] px-1 text-[9px] font-bold leading-4 text-white">{ticketNotifications.length > 9 ? "9+" : ticketNotifications.length}</span>}</button>{isNotificationOpen && <TicketNotificationPanel notifications={ticketNotifications} isLoading={isTicketLoading} onRefresh={refreshTickets} onSelect={(ticketId) => { setSelectedId(ticketId); setIsNotificationOpen(false); }} />}<div className="hidden items-center gap-2 border-l border-[#d9e2fc] pl-3 sm:flex"><span className="grid size-8 place-items-center rounded-full border border-[#006838]/30 bg-[#16834b]/15 text-xs font-bold text-[#006838]">{viewerInitials}</span><div className="text-left"><p className="text-xs font-bold">{viewerName}</p><p className="text-[10px] text-[#4d5f81]">{viewerRoleLabel}</p></div></div></div>
         </header>
 
         <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
           <div className="flex flex-col justify-between gap-4 border-b border-[#d9e2fc] pb-5 xl:flex-row xl:items-end">
-            <div><div className="mb-3 flex items-center gap-5 text-xs font-semibold text-[#4d5f81]"><span>Overview</span><span className="rounded-full bg-[#d9e2fc]/60 px-2 py-0.5">{accessibleTickets.length}</span><span className="border-b-2 border-[#069494] pb-2 text-[#006838]">Tickets</span><span>My tasks</span></div><h1 className="text-2xl font-bold tracking-[-0.4px]">Employee Report & Ticket</h1><p className="mt-1 text-sm text-[#4d5f81]">Catat, tindak lanjuti, dan pantau kebutuhan pekerjaan secara terstruktur.</p></div>
+            <div><div className="mb-3 flex items-center gap-2 text-xs font-semibold text-[#4d5f81]"><span className="rounded-full bg-[#d9e2fc]/60 px-2 py-0.5">{accessibleTickets.length} ticket</span><span className="text-[#006838]">Daftar ticket</span></div><h1 className="text-2xl font-bold tracking-[-0.4px]">Employee Report & Ticket</h1><p className="mt-1 text-sm text-[#4d5f81]">Catat, tindak lanjuti, dan pantau kebutuhan pekerjaan secara terstruktur.</p></div>
             <div className="flex flex-wrap items-center gap-2">{viewRole === "employee" && <button onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#006838]"><FilePlus2 size={15} /> Buat Ticket</button>}</div>
           </div>
 
           <div className="mt-5 flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(0,1fr)_420px]">
             <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
               <div className="flex flex-col gap-3 border-b border-[#becabd]/35 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap items-center gap-2"><Filter size={15} className="text-[#4d5f81]" /><FilterButton active={statusFilter === "ALL"} onClick={() => setStatusFilter("ALL")}>Semua <span className="rounded bg-[#1e3765] px-1.5 py-0.5 text-[10px] text-white">{accessibleTickets.length}</span></FilterButton>{(["SUBMITTED", "IN_REVIEW", "IN_PROGRESS", "RESOLVED", "REJECTED"] as TicketStatus[]).map((status) => <FilterButton key={status} active={statusFilter === status} onClick={() => setStatusFilter(status)}>{statusMeta[status].label}</FilterButton>)}</div><label className="flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:hidden"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none" placeholder="Cari ticket..." /></label></div>
-              <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="w-10 px-4 py-3"><input aria-label="Pilih semua ticket" type="checkbox" className="size-4 accent-[#16834b]" /></th><th className="px-3 py-3">Employee</th><th className="px-3 py-3">Ticket</th><th className="px-3 py-3">Submitted</th><th className="px-3 py-3">Status</th><th className="w-12 px-3 py-3">Action</th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{isTicketLoading ? <tr><td colSpan={6} className="px-6 py-14 text-center text-sm text-[#4d5f81]">Memuat ticket dari database...</td></tr> : visibleTickets.map((ticket) => <tr key={ticket.id} onClick={() => setSelectedId(ticket.id)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selectedTicket?.id === ticket.id ? "bg-[#eaf7f0]" : "bg-white"}`}><td className="px-4 py-3.5"><input onClick={(event) => event.stopPropagation()} aria-label={`Pilih ${ticket.id}`} type="checkbox" className="size-4 accent-[#16834b]" /></td><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="text-xs font-semibold">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {ticket.category}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt)}</td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5"><button onClick={(event) => { event.stopPropagation(); setSelectedId(ticket.id); }} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#d9e2fc]/55" aria-label={`Lihat ${ticket.id}`}><MoreHorizontal size={17} /></button></td></tr>)}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={6} className="px-6 py-14 text-center text-sm text-[#4d5f81]">Belum ada ticket yang sesuai dengan filter.</td></tr>}</tbody></table></div>
-              <div className="flex flex-col gap-2 border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81] sm:flex-row sm:items-center sm:justify-between"><span>Menampilkan <b className="text-[#121b2e]">{visibleTickets.length}</b> dari <b className="text-[#121b2e]">{accessibleTickets.length}</b> ticket</span><div className="flex items-center gap-1"><button disabled className="rounded border border-[#becabd]/35 px-2.5 py-1.5 opacity-50">Previous</button><button className="rounded bg-[#16834b] px-2.5 py-1.5 font-bold text-white">1</button><button disabled className="rounded border border-[#becabd]/45 px-2.5 py-1.5 opacity-50">Next</button></div></div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-3 py-3">Employee</th><th className="px-3 py-3">Ticket</th><th className="px-3 py-3">Submitted</th><th className="px-3 py-3">Status</th><th className="w-12 px-3 py-3">Action</th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{isTicketLoading ? <tr><td colSpan={5} className="px-6 py-14 text-center text-sm text-[#4d5f81]">Memuat ticket dari database...</td></tr> : visibleTickets.map((ticket) => <tr key={ticket.id} onClick={() => setSelectedId(ticket.id)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selectedTicket?.id === ticket.id ? "bg-[#eaf7f0]" : "bg-white"}`}><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="text-xs font-semibold">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {ticket.category}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt)}</td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5"><button onClick={(event) => { event.stopPropagation(); setSelectedId(ticket.id); }} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#d9e2fc]/55" aria-label={`Lihat ${ticket.id}`}><MoreHorizontal size={17} /></button></td></tr>)}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={5} className="px-6 py-14 text-center text-sm text-[#4d5f81]">Belum ada ticket yang sesuai dengan filter.</td></tr>}</tbody></table></div>
+              <div className="border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81]">Menampilkan <b className="text-[#121b2e]">{visibleTickets.length}</b> dari <b className="text-[#121b2e]">{accessibleTickets.length}</b> ticket.</div>
             </section>
 
             <TicketDetail ticket={selectedTicket} role={viewRole} followUp={followUp} followUpAt={followUpAt} isSaving={isSaving} onFollowUpChange={setFollowUp} onFollowUpAtChange={setFollowUpAt} onAddFollowUp={addFollowUp} onChangeStatus={changeStatus} onOpenAttachment={openAttachment} onClose={() => setSelectedId("")} />
@@ -399,6 +459,21 @@ export default function EmployeeReportTicketPage() {
 
 function FilterButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
   return <button onClick={onClick} className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition ${active ? "bg-[#1e3765] text-white" : "bg-[#f1f3ff] text-[#4d5f81] hover:bg-[#d9e2fc]"}`}>{children}</button>;
+}
+
+function TicketNotificationPanel({ notifications, isLoading, onRefresh, onSelect }: { notifications: TicketNotification[]; isLoading: boolean; onRefresh: () => void; onSelect: (ticketId: string) => void }) {
+  return <section aria-label="Update ticket" className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[#d9e2fc] bg-white shadow-xl">
+    <div className="flex items-center justify-between border-b border-[#d9e2fc] px-4 py-3">
+      <div><p className="text-xs font-bold text-[#121b2e]">Update ticket</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">Disinkronkan setiap 15 detik</p></div>
+      <button type="button" onClick={onRefresh} disabled={isLoading} className="grid size-8 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff] disabled:opacity-50" aria-label="Muat ulang notifikasi"><RefreshCw size={14} className={isLoading ? "animate-spin" : ""} /></button>
+    </div>
+    <div className="max-h-80 overflow-y-auto p-2">
+      {notifications.length === 0 ? <p className="px-3 py-6 text-center text-xs text-[#4d5f81]">Belum ada pembaruan ticket.</p> : notifications.map((notification) => <button key={notification.id} type="button" onClick={() => onSelect(notification.ticketId)} className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition hover:bg-[#f7f8ff]">
+        <span className={`mt-1 size-2 shrink-0 rounded-full ${notification.kind === "status" ? "bg-[#069494]" : "bg-[#16834b]"}`} />
+        <span className="min-w-0"><span className="block truncate text-xs font-bold text-[#121b2e]">{notification.ticketTitle}</span><span className="mt-0.5 block text-[11px] leading-4 text-[#4d5f81]">{notification.message}</span><span className="mt-1 block text-[10px] text-[#4d5f81]">{formatDate(notification.at, true)}</span></span>
+      </button>)}
+    </div>
+  </section>;
 }
 
 function TicketDetail({ ticket, role, followUp, followUpAt, isSaving, onFollowUpChange, onFollowUpAtChange, onAddFollowUp, onChangeStatus, onOpenAttachment, onClose }: { ticket?: TicketItem; role: ViewRole; followUp: string; followUpAt: string; isSaving: boolean; onFollowUpChange: (value: string) => void; onFollowUpAtChange: (value: string) => void; onAddFollowUp: () => void; onChangeStatus: (status: TicketStatus) => void; onOpenAttachment: (attachment: { fileName: string; storagePath: string }) => void; onClose: () => void }) {
