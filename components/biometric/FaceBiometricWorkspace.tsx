@@ -102,12 +102,8 @@ const FACE_OVERLAY_PATHS = [
 ];
 
 function shuffleChallenges() {
-  const values: ChallengeId[] = ["left", "right", "up", "down", "blink"];
-  for (let index = values.length - 1; index > 0; index -= 1) {
-    const target = Math.floor(Math.random() * (index + 1));
-    [values[index], values[target]] = [values[target], values[index]];
-  }
-  return values.slice(0, REQUIRED_LIVENESS_CHALLENGES);
+  const finalChallenge: ChallengeId[] = ["up", "down", "blink"];
+  return ["left", "right", finalChallenge[Math.floor(Math.random() * finalChallenge.length)]] as ChallengeId[];
 }
 
 function getJakartaDate(timestamp = new Date()) {
@@ -917,7 +913,13 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const activePrompt = activeChallenge && scanState === "scanning" ? challengeDetails[activeChallenge] : null;
+  const activePrompt = activeChallenge && scanState === "scanning"
+    ? (activeChallenge === "left" || activeChallenge === "right"
+      ? horizontalCalibrationRef.current
+        ? { label: "Putar ke sisi sebaliknya", helper: "Arahkan wajah ke sisi yang berlawanan dari gerakan sebelumnya." }
+        : { label: "Putar wajah ke salah satu sisi", helper: "Pilih kiri atau kanan, lalu putar kepala sedikit." }
+      : challengeDetails[activeChallenge])
+    : null;
   const attendanceReady = !isEnrollment && identityVerified && allChallengesCompleted && Boolean(template) && scanState === "scanning";
   const compactCamera = attendanceReady || isAttendanceRejected;
 
