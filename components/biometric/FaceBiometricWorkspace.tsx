@@ -982,8 +982,8 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
 
             <div className={`relative mx-auto aspect-square w-full transition-all duration-500 ${compactCamera ? "max-w-[300px] p-5 sm:p-6" : "max-w-[500px] p-7 sm:p-10"}`}>
               <div className={`absolute inset-3 rounded-full border shadow-[0_0_44px_rgba(27,53,102,0.18)] ${isAttendanceRejected ? "border-red-400/35" : "border-[#307ee7]/25"}`} />
-              <div className={`absolute inset-7 rounded-[46%] border ${isAttendanceRejected ? "border-red-300/60" : "border-[#65b5ff]/55"}`} />
-              <div className={`relative size-full overflow-hidden rounded-[46%] border-2 shadow-[0_0_0_10px_rgba(36,113,213,0.08),0_0_50px_rgba(29,115,227,0.25)] ${isAttendanceRejected ? "border-red-300/70 bg-[#260912]" : "border-[#77c0ff]/65 bg-[#071225]"}`}>
+              <div className={`absolute inset-7 rounded-full border ${isAttendanceRejected ? "border-red-300/60" : "border-[#65b5ff]/55"}`} />
+              <div className={`relative size-full overflow-hidden rounded-full border-2 shadow-[0_0_0_10px_rgba(36,113,213,0.08),0_0_50px_rgba(29,115,227,0.25)] ${isAttendanceRejected ? "border-red-300/70 bg-[#260912]" : "border-[#77c0ff]/65 bg-[#071225]"}`}>
               <video ref={videoRef} muted playsInline className={`size-full origin-center scale-x-[-1] object-cover transition duration-500 ${scanState === "scanning" ? "opacity-100" : "opacity-25"}`} />
               {isAttendanceRejected ? (
                 <div className="absolute inset-0 grid place-items-center p-6 text-center text-red-100"><div><div className="mx-auto grid size-14 place-items-center rounded-full border border-red-200/30 bg-red-500/20"><CircleAlert size={27} /></div><p className="mt-3 text-xs font-bold tracking-[0.08em]">WAJAH TIDAK TERVERIFIKASI</p></div></div>
@@ -993,7 +993,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
                 </div>
               )}
               {scanState === "scanning" && <>
-                <div className="pointer-events-none absolute inset-[9%] rounded-[46%] border-2 border-[#73c0ff] shadow-[0_0_22px_rgba(71,166,255,0.85)]" />
+                <div className="pointer-events-none absolute inset-[9%] rounded-full border-2 border-[#73c0ff] shadow-[0_0_22px_rgba(71,166,255,0.85)]" />
                 {faceMesh.length > 0 && <svg className="pointer-events-none absolute inset-0 size-full origin-center scale-x-[-1]" viewBox={`0 0 ${videoDimensions.width} ${videoDimensions.height}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
                   <g fill="none" stroke="#8ee7ff" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.9">
                     {FACE_OVERLAY_PATHS.map((path, index) => {
