@@ -19,7 +19,6 @@ type Mode = "enrollment" | "attendance";
 type ChallengeId = "left" | "right" | "up" | "down" | "blink";
 type ScanState = "idle" | "loading" | "ready" | "scanning" | "complete" | "error";
 type HorizontalDirection = "positive" | "negative";
-type FaceDistanceStatus = "ready" | "too-far" | "too-close";
 type FaceMeshPoint = { x: number; y: number };
 
 type HumanFace = {
@@ -76,10 +75,6 @@ const TEMPLATE_TOP_MATCHES = 5;
 const REQUIRED_LIVENESS_CHALLENGES = 3;
 const MIN_ENROLLMENT_SAMPLE_SIMILARITY = 0.82;
 const ATTENDANCE_VERIFICATION_TIMEOUT_MS = 15000;
-// Identity embeddings deliberately ignore image scale. Attendance, however,
-// needs a useful camera distance so a tiny or cropped face cannot be accepted.
-const MIN_FACE_FRAME_RATIO = 0.22;
-const MAX_FACE_FRAME_RATIO = 0.7;
 
 const challengeDetails: Record<ChallengeId, { label: string; helper: string }> = {
   left: { label: "Hadap kiri", helper: "Putar wajah sedikit ke kiri." },
@@ -162,15 +157,6 @@ function median(values: number[]) {
   return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
 }
 
-function getFaceDistanceStatus(box: HumanFace["box"], sourceWidth: number, sourceHeight: number): FaceDistanceStatus {
-  if (!box || sourceWidth <= 0 || sourceHeight <= 0) return "too-far";
-  const [, , width, height] = box;
-  const scale = Math.max(width / sourceWidth, height / sourceHeight);
-  if (scale < MIN_FACE_FRAME_RATIO) return "too-far";
-  if (scale > MAX_FACE_FRAME_RATIO) return "too-close";
-  return "ready";
-}
-
 export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -213,7 +199,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const [faceSampleCount, setFaceSampleCount] = useState(0);
   const [facingCenter, setFacingCenter] = useState(false);
   const [faceMesh, setFaceMesh] = useState<FaceMeshPoint[]>([]);
-  const [faceDistanceStatus, setFaceDistanceStatus] = useState<FaceDistanceStatus>("too-far");
   const [videoDimensions, setVideoDimensions] = useState({ width: 640, height: 480 });
   const [hasEmbedding, setHasEmbedding] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
@@ -230,7 +215,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const qualityPassed = faceCount === 1
     && faceConfidence >= 60
     && facingCenter
-    && faceDistanceStatus === "ready"
     && (livenessScore ?? 0) >= 0.6;
   const canFinalize = scanState === "scanning"
     && allChallengesCompleted
@@ -295,19 +279,14 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     const gestureNames = result.gesture.map((entry) => String(entry.gesture));
     const yaw = face?.rotation?.angle.yaw ?? 0;
     const pitch = face?.rotation?.angle.pitch ?? 0;
-    const sourceWidth = videoRef.current?.videoWidth || videoDimensions.width;
-    const sourceHeight = videoRef.current?.videoHeight || videoDimensions.height;
-    const nextFaceDistanceStatus = getFaceDistanceStatus(face?.box, sourceWidth, sourceHeight);
     const nextFaceConfidence = Math.round(((face?.faceScore ?? face?.boxScore ?? 0) * 100));
     const nextFacingCenter = gestureNames.includes("facing center") || (Math.abs(yaw) <= CENTER_YAW_THRESHOLD && Math.abs(pitch) <= CENTER_PITCH_THRESHOLD);
     const baseQualityPassed = result.face.length === 1
       && nextFaceConfidence >= 60
-      && nextFaceDistanceStatus === "ready"
       && (face?.live ?? 0) >= 0.6;
     const nextQualityPassed = baseQualityPassed && nextFacingCenter;
     setFaceCount(result.face.length);
     setFaceConfidence(nextFaceConfidence);
-    setFaceDistanceStatus(nextFaceDistanceStatus);
     setLivenessScore(face?.live);
     setFacingCenter(nextFacingCenter);
     if (Date.now() - lastMeshRenderAtRef.current >= 66) {
@@ -514,7 +493,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
         challengeFramesRef.current = 0;
       }
     }
-  }, [captureFaceSample, isEnrollment, stopCamera, videoDimensions.height, videoDimensions.width]);
+  }, [captureFaceSample, isEnrollment, stopCamera]);
 
   const startDetection = useCallback(() => {
     const loop = async () => {
@@ -562,7 +541,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     setFaceSampleCount(0);
     setFacingCenter(false);
     setFaceMesh([]);
-    setFaceDistanceStatus("too-far");
     setHasEmbedding(false);
     latestEmbeddingRef.current = null;
     faceSamplePhotosRef.current = [];
@@ -677,7 +655,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     setFaceSampleCount(0);
     setFacingCenter(false);
     setFaceMesh([]);
-    setFaceDistanceStatus("too-far");
     setHasEmbedding(false);
     latestEmbeddingRef.current = null;
     faceSamplePhotosRef.current = [];
@@ -941,10 +918,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
       ? "Posisikan satu wajah ke dalam bingkai kamera."
       : faceCount > 1
         ? "Hanya satu wajah boleh terlihat di kamera."
-        : faceDistanceStatus === "too-far"
-          ? "Dekatkan wajah sampai memenuhi bingkai oval."
-          : faceDistanceStatus === "too-close"
-            ? "Jauhkan wajah sedikit agar seluruh wajah masuk bingkai."
         : faceConfidence < 60
           ? "Pencahayaan atau fokus kamera belum cukup jelas."
           : !activePrompt && !facingCenter
