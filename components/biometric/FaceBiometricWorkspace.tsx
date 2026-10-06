@@ -68,12 +68,12 @@ const FAST_REQUIRED_STABLE_MATCHES = 3;
 const SIMILARITY_WINDOW_SIZE = 5;
 const CHALLENGE_HOLD_DURATION_MS = 450;
 const BLINK_CONFIRMATION_FRAMES = 2;
-const ENROLLMENT_CENTER_HOLD_MS = 1500;
-const FACE_SAMPLE_CAPTURE_INTERVAL_MS = 1000;
+const ENROLLMENT_CENTER_HOLD_MS = 700;
+const FACE_SAMPLE_CAPTURE_INTERVAL_MS = 650;
 const REQUIRED_FACE_SAMPLES = 5;
 const TEMPLATE_TOP_MATCHES = 5;
 const REQUIRED_LIVENESS_CHALLENGES = 3;
-const MIN_ENROLLMENT_SAMPLE_SIMILARITY = 0.82;
+const MIN_ENROLLMENT_SAMPLE_SIMILARITY = 0.7;
 const ATTENDANCE_VERIFICATION_TIMEOUT_MS = 15000;
 
 const challengeDetails: Record<ChallengeId, { label: string; helper: string }> = {
@@ -240,8 +240,8 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
 
     // A registration template must represent one stable face. The first
     // frame becomes the reference, then every later sample is accepted only
-    // when it closely matches the already accepted samples. This filters out
-    // temporary blur and pose changes without weakening attendance matching.
+    // when it remains broadly consistent with the same person. The attendance
+    // identity threshold stays separate and is not relaxed by this capture gate.
     const acceptedDescriptors = faceSamplePhotosRef.current.map((sample) => sample.descriptor);
     if (acceptedDescriptors.length > 0) {
       const nearestSimilarities = acceptedDescriptors
@@ -279,11 +279,19 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     const gestureNames = result.gesture.map((entry) => String(entry.gesture));
     const yaw = face?.rotation?.angle.yaw ?? 0;
     const pitch = face?.rotation?.angle.pitch ?? 0;
+    const livenessFinished = challengeOrderRef.current.length > 0
+      && completedChallengesRef.current.length === challengeOrderRef.current.length;
     const nextFaceConfidence = Math.round(((face?.faceScore ?? face?.boxScore ?? 0) * 100));
     const nextFacingCenter = gestureNames.includes("facing center") || (Math.abs(yaw) <= CENTER_YAW_THRESHOLD && Math.abs(pitch) <= CENTER_PITCH_THRESHOLD);
+    // Liveness has already been proven by the completed challenges. Requiring
+    // the live score to stay high for every later enrollment frame made sample
+    // capture stall even with a stable face, especially on slower cameras.
+    const livenessAccepted = isEnrollment && livenessFinished
+      ? true
+      : (face?.live ?? 0) >= 0.6;
     const baseQualityPassed = result.face.length === 1
       && nextFaceConfidence >= 60
-      && (face?.live ?? 0) >= 0.6;
+      && livenessAccepted;
     const nextQualityPassed = baseQualityPassed && nextFacingCenter;
     setFaceCount(result.face.length);
     setFaceConfidence(nextFaceConfidence);
@@ -328,9 +336,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     } else {
       facingCenterSinceRef.current = null;
     }
-
-    const livenessFinished = challengeOrderRef.current.length > 0
-      && completedChallengesRef.current.length === challengeOrderRef.current.length;
 
     const storedTemplate = templateRef.current;
 
@@ -913,19 +918,6 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   useEffect(() => () => stopCamera(), [stopCamera]);
 
   const activePrompt = activeChallenge && scanState === "scanning" ? challengeDetails[activeChallenge] : null;
-  const cameraWarning = scanState === "scanning" && !identityVerified
-    ? faceCount === 0
-      ? "Posisikan satu wajah ke dalam bingkai kamera."
-      : faceCount > 1
-        ? "Hanya satu wajah boleh terlihat di kamera."
-        : faceConfidence < 60
-          ? "Pencahayaan atau fokus kamera belum cukup jelas."
-          : !activePrompt && !facingCenter
-            ? "Kembali hadap lurus ke kamera."
-            : (livenessScore ?? 0) < 0.6
-              ? "Tunggu liveness membaca wajahmu dengan jelas."
-              : null
-    : null;
   const attendanceReady = !isEnrollment && identityVerified && allChallengesCompleted && Boolean(template) && scanState === "scanning";
   const compactCamera = attendanceReady || isAttendanceRejected;
 
@@ -1015,11 +1007,10 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
                 </svg>}
                 <div className="pointer-events-none absolute inset-x-[14%] h-px bg-[#c4ecff] shadow-[0_0_18px_4px_rgba(83,184,255,0.85)]" style={{ animation: "biometric-scan-sweep 2.15s ease-in-out infinite" }} />
                 {activePrompt && <div className="pointer-events-none absolute inset-x-4 top-4 rounded-xl border border-white/20 bg-[#061326]/85 p-3 text-center text-white shadow-lg"><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#9ed1ff]">Liveness {completedChallenges.length + 1}/{challengeOrder.length}</p><p className="mt-1 text-sm font-bold">{activePrompt.label}</p><p className="mt-0.5 text-[11px] text-[#dcefff]">{activePrompt.helper}</p></div>}
-                {isEnrollment && allChallengesCompleted && !isSavingTemplate && <div className="pointer-events-none absolute left-1/2 top-4 max-w-[calc(100%-2rem)] -translate-x-1/2 whitespace-nowrap rounded-full border border-[#9ed1ff]/35 bg-[#061326]/85 px-3 py-1.5 text-center text-[10px] font-bold text-white shadow-lg">Mengambil sampel {faceSampleCount}/{REQUIRED_FACE_SAMPLES} · diam sebentar</div>}
+                {isEnrollment && allChallengesCompleted && !isSavingTemplate && <div className="pointer-events-none absolute left-1/2 top-4 w-[62%] -translate-x-1/2 rounded-xl border border-[#9ed1ff]/35 bg-[#061326]/85 px-3 py-1.5 text-center text-[10px] font-bold leading-4 text-white shadow-lg">Merekam sampel {faceSampleCount}/{REQUIRED_FACE_SAMPLES} · tetap diam</div>}
                 {!isEnrollment && allChallengesCompleted && !identityVerified && <div className="pointer-events-none absolute left-1/2 top-4 max-w-[calc(100%-2rem)] -translate-x-1/2 whitespace-nowrap rounded-full border border-[#9ed1ff]/35 bg-[#061326]/85 px-3 py-1.5 text-center text-[10px] font-bold text-white shadow-lg">Memverifikasi wajah…</div>}
-                {cameraWarning && <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-xl border border-amber-200/35 bg-[#2a210d]/85 p-2.5 text-center text-[11px] font-semibold text-amber-100">{cameraWarning}</div>}
                 {attendanceReady && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500/90 px-3 py-1 text-[9px] font-bold tracking-[0.12em] text-white">WAJAH TERVERIFIKASI</div>}
-                {!attendanceReady && !cameraWarning && !activePrompt && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#061326]/75 px-3 py-1 text-[9px] font-bold tracking-[0.14em] text-[#dcefff]">FACE LOCK</div>}
+                {!attendanceReady && !activePrompt && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#061326]/75 px-3 py-1 text-[9px] font-bold tracking-[0.14em] text-[#dcefff]">FACE LOCK</div>}
               </>}
               </div>
             </div>
