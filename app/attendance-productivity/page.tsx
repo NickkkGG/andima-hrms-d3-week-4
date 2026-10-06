@@ -89,7 +89,6 @@ export default function AttendanceProductivityPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [appRole, setAppRole] = useState<AppRole | null>(null);
-  const [viewerEmployeeId, setViewerEmployeeId] = useState("");
   const [isResolvingAccess, setIsResolvingAccess] = useState(true);
 
   const [startDate, setStartDate] = useState(() => recentAttendanceRange().start);
@@ -98,8 +97,8 @@ export default function AttendanceProductivityPage() {
   // Fetch real data from Supabase
   async function fetchAttendanceFromSupabase() {
     if (!appRole) return;
-    if (appRole === "EMPLOYEE" && !viewerEmployeeId) {
-      setErrorMessage("Akun employee belum dipetakan ke data karyawan.");
+    if (appRole !== "HR" && appRole !== "MANAGER") {
+      setErrorMessage("Fitur ini hanya dapat diakses oleh HR atau Manager.");
       setAttendances([]);
       setSelectedItem(null);
       setLoading(false);
@@ -132,11 +131,8 @@ export default function AttendanceProductivityPage() {
         .lte("date", endDate)
         .order("date", { ascending: false });
 
-      // HR dan Manager melihat seluruh catatan. Employee hanya melihat
-      // presensinya sendiri; kebijakan RLS database perlu menyamai aturan ini.
-      if (appRole === "EMPLOYEE" && viewerEmployeeId) {
-        query = query.eq("employee_id", viewerEmployeeId);
-      }
+      // Rekap ini diperuntukkan bagi HR dan Manager agar dapat memantau
+      // attendance seluruh karyawan dalam rentang tanggal yang dipilih.
 
       const { data, error } = await query;
 
@@ -244,8 +240,15 @@ export default function AttendanceProductivityPage() {
         return;
       }
 
-      setAppRole(access.app_role as AppRole);
-      setViewerEmployeeId(access.employee_id);
+      const role = access.app_role as AppRole;
+      if (role !== "HR" && role !== "MANAGER") {
+        setErrorMessage("Fitur Attendance & Productivity hanya dapat diakses oleh HR atau Manager.");
+        setLoading(false);
+        setIsResolvingAccess(false);
+        return;
+      }
+
+      setAppRole(role);
       setIsResolvingAccess(false);
     }
 
@@ -259,7 +262,7 @@ export default function AttendanceProductivityPage() {
     if (!isResolvingAccess && appRole) void fetchAttendanceFromSupabase();
     // fetchAttendanceFromSupabase relies on the authenticated role and range.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appRole, viewerEmployeeId, isResolvingAccess, startDate, endDate]);
+  }, [appRole, isResolvingAccess, startDate, endDate]);
 
   const filteredData = useMemo(() => {
     return attendances.filter((item) => {
