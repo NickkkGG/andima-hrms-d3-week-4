@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import HeaderAccount from "@/components/HeaderAccount";
+import LocationMapPreview from "@/components/attendance/LocationMapPreview";
 
 type AttendanceStatus = "PRESENT" | "UNDER_MINIMUM" | "ABSENT" | "LEAVE" | string;
 type AppRole = "EMPLOYEE" | "HR" | "MANAGER";
@@ -28,6 +29,12 @@ type AttendanceRecord = {
   status: AttendanceStatus;
   clock_in: string | null;
   clock_out: string | null;
+  clock_in_latitude: number | null;
+  clock_in_longitude: number | null;
+  clock_in_accuracy_meters: number | null;
+  clock_out_latitude: number | null;
+  clock_out_longitude: number | null;
+  clock_out_accuracy_meters: number | null;
   work_hours: number | null;
 };
 
@@ -44,6 +51,12 @@ type AttendanceQueryRow = {
   date: string;
   clock_in: string | null;
   clock_out: string | null;
+  clock_in_latitude: number | null;
+  clock_in_longitude: number | null;
+  clock_in_accuracy_meters: number | null;
+  clock_out_latitude: number | null;
+  clock_out_longitude: number | null;
+  clock_out_accuracy_meters: number | null;
   status: AttendanceStatus | null;
   d3_employee: AttendanceEmployee | null;
 };
@@ -109,7 +122,7 @@ export default function AttendanceProductivityPage() {
       setErrorMessage("");
       const supabase = createClient();
 
-      let query = supabase
+      const query = supabase
         .from("d3_attendances")
         .select(`
           id,
@@ -117,6 +130,12 @@ export default function AttendanceProductivityPage() {
           date,
           clock_in,
           clock_out,
+          clock_in_latitude,
+          clock_in_longitude,
+          clock_in_accuracy_meters,
+          clock_out_latitude,
+          clock_out_longitude,
+          clock_out_accuracy_meters,
           status,
           d3_employee!fk_d3_attendances_d3_employee (
             employee_id,
@@ -192,6 +211,12 @@ export default function AttendanceProductivityPage() {
             status: derivedStatus,
             clock_in: clockInStr,
             clock_out: clockOutStr,
+            clock_in_latitude: item.clock_in_latitude,
+            clock_in_longitude: item.clock_in_longitude,
+            clock_in_accuracy_meters: item.clock_in_accuracy_meters,
+            clock_out_latitude: item.clock_out_latitude,
+            clock_out_longitude: item.clock_out_longitude,
+            clock_out_accuracy_meters: item.clock_out_accuracy_meters,
             work_hours: workHours,
           };
         });
@@ -807,6 +832,19 @@ export default function AttendanceProductivityPage() {
                       ? `${selectedItem.clock_out} WIB`
                       : "Tidak tersedia"
                   }
+                />
+
+                <LocationMapPreview
+                  clockIn={{
+                    latitude: selectedItem.clock_in_latitude,
+                    longitude: selectedItem.clock_in_longitude,
+                    accuracyMeters: selectedItem.clock_in_accuracy_meters,
+                  }}
+                  clockOut={{
+                    latitude: selectedItem.clock_out_latitude,
+                    longitude: selectedItem.clock_out_longitude,
+                    accuracyMeters: selectedItem.clock_out_accuracy_meters,
+                  }}
                 />
 
                 <DetailRow

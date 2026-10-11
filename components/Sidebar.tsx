@@ -39,8 +39,8 @@ export default function Sidebar() {
     "/attendance",
     "/attendance-productivity",
     "/biometric-enrollment",
-    "/feedback-reward",
     "/employee-report-ticket",
+    "/feedback-reward",
   ].includes(pathname);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isHrmsOpen, setIsHrmsOpen] = useState(true);
@@ -113,10 +113,10 @@ export default function Sidebar() {
                   {isD3Expanded && (
                     <div className="ml-4 mt-1 border-l border-[#d9e2fc]/15 pl-2">
                       <HrmsLink label="Employee Profile Management" href="/employees" />
-                      <HrmsLink label="Feedback & Reward" href="/feedback-reward" />
                       <HrmsLink label="Biometric Registration" href="/biometric-enrollment" />
                       <HrmsLink label="Attendance History & Correction" href="/attendance" />
                       <HrmsLink label="Attendance & Productivity Dashboard" href="/attendance-productivity" />
+                      <HrmsLink label="Feedback & Reward" href="/feedback-reward" />
                       <HrmsLink label="Employee Report & Ticket" href="/employee-report-ticket" />
                     </div>
                   )}
