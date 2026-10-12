@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -47,7 +47,34 @@ export default function Sidebar() {
   const [isD3Open, setIsD3Open] = useState(false);
   const [d3ClosedOnPath, setD3ClosedOnPath] = useState<string | null>(null);
   const [isInternalSigningOut, setIsInternalSigningOut] = useState(false);
+  const [appRole, setAppRole] = useState<"EMPLOYEE" | "HR" | "MANAGER" | null>(null);
   const isD3Expanded = isD3Route ? d3ClosedOnPath !== pathname : isD3Open;
+  const canViewAttendanceProductivity = appRole === "HR" || appRole === "MANAGER";
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadRole() {
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      const { data: access } = await supabase
+        .from("d3_user_access")
+        .select("app_role")
+        .eq("auth_user_id", userData.user.id)
+        .maybeSingle();
+
+      if (isMounted && access?.app_role) {
+        setAppRole(access.app_role as "EMPLOYEE" | "HR" | "MANAGER");
+      }
+    }
+
+    void loadRole();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function toggleD3Menu() {
     if (isD3Route) {
@@ -115,7 +142,9 @@ export default function Sidebar() {
                       <HrmsLink label="Employee Profile Management" href="/employees" />
                       <HrmsLink label="Biometric Registration" href="/biometric-enrollment" />
                       <HrmsLink label="Attendance History & Correction" href="/attendance" />
-                      <HrmsLink label="Attendance & Productivity Dashboard" href="/attendance-productivity" />
+                      {canViewAttendanceProductivity && (
+                        <HrmsLink label="Attendance & Productivity Dashboard" href="/attendance-productivity" />
+                      )}
                       <HrmsLink label="Feedback & Reward" href="/feedback-reward" />
                       <HrmsLink label="Employee Report & Ticket" href="/employee-report-ticket" />
                     </div>
