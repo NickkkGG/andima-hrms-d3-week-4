@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import {
-  BriefcaseBusiness,
   ChevronDown,
   ClipboardList,
   Layers3,
@@ -105,7 +104,13 @@ export default function Sidebar() {
         }`}
       >
         <div className="flex items-center gap-3 px-2">
-          <div className="grid size-9 place-items-center rounded-lg bg-[#155cfd] shadow-sm"><BriefcaseBusiness size={19} className="text-white" /></div>
+          <div className="grid size-9 place-items-center overflow-hidden rounded-lg bg-transparent p-0 shadow-none">
+            <img
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Logo-ANDIMA-wzx4gpZx20EFE5IYcH3jqabixELIo3.png"
+              alt="Logo Andima"
+              className="h-full w-full object-contain"
+            />
+          </div>
           <div><p className="text-xl font-bold tracking-[-0.5px] text-white">ANDIMA</p><p className="text-xs text-[#d9e2fc]/80">Logistics Suite</p></div>
           <button type="button" onClick={() => setIsSidebarOpen(false)} className="ml-auto rounded p-1 text-[#d9e2fc] lg:hidden" aria-label="Tutup navigasi"><X size={18} /></button>
         </div>

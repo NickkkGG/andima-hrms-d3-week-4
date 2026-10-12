@@ -1,165 +1,164 @@
 "use client";
 
-import { CircleAlert, CircleCheck, Eye, EyeOff, LockKeyhole, Mail, Phone, UserRound } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
-
-type Notice = { tone: "error" | "success"; text: string } | null;
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
+  const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [greeting, setGreeting] = useState("Good Morning");
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    const hour = new Date().getHours();
+    setGreeting(hour >= 3 && hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening");
+  }, []);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setNotice(null);
-
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const fullName = String(formData.get("fullName") ?? "").trim();
-    const email = String(formData.get("email") ?? "").trim();
-    const username = String(formData.get("username") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
-    const phone = String(formData.get("phone") ?? "").trim();
-
-    if (fullName.length < 3) {
-      setNotice({ tone: "error", text: "Nama lengkap minimal terdiri dari 3 karakter." });
-      return;
-    }
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      setNotice({ tone: "error", text: "Masukkan alamat email yang valid." });
-      return;
-    }
-    if (username.length < 3) {
-      setNotice({ tone: "error", text: "Username minimal terdiri dari 3 karakter." });
-      return;
-    }
-    if (password.length < 8) {
-      setNotice({ tone: "error", text: "Password minimal terdiri dari 8 karakter." });
-      return;
-    }
-    if (phone && !/^[0-9+()\-\s]{8,20}$/.test(phone)) {
-      setNotice({ tone: "error", text: "Nomor telepon belum valid." });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const supabase = createClient();
-      const emailRedirectTo = new URL("/auth/confirm?next=/login", window.location.origin).toString();
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo,
-          data: { full_name: fullName, username, phone_number: phone || null },
-        },
-      });
-
-      if (error) {
-        const message = error.code === "email_address_invalid"
-          ? "Alamat email ditolak. Pastikan tidak ada spasi atau karakter tambahan."
-          : error.code === "over_email_send_rate_limit"
-            ? "Terlalu banyak permintaan email konfirmasi. Tunggu beberapa saat sebelum mencoba lagi."
-            : error.code === "user_already_exists"
-              ? "Email ini sudah terdaftar. Gunakan halaman Login."
-              : "Pendaftaran belum berhasil. Periksa data lalu coba kembali.";
-        setNotice({ tone: "error", text: message });
-        return;
-      }
-
-      if (!data.user || data.user.identities?.length === 0) {
-        setNotice({ tone: "error", text: "Email ini sudah terdaftar. Gunakan halaman Login." });
-        return;
-      }
-
-      if (data.session) {
-        await supabase.auth.signOut();
-        setNotice({ tone: "success", text: "Pendaftaran berhasil. Akun sudah aktif; silakan masuk melalui halaman Login." });
-      } else {
-        setNotice({ tone: "success", text: "Pendaftaran berhasil. Periksa email untuk konfirmasi akun, lalu login. HR Admin kemudian perlu memetakan role D3 Anda." });
-      }
-      form.reset();
-    } catch {
-      setNotice({ tone: "error", text: "Koneksi pendaftaran belum siap. Periksa .env.local lalu coba kembali." });
-    } finally {
-      setIsSubmitting(false);
-    }
+    setIsLoading(true);
+    setMessage("Employee accounts are prepared by HR Admin. Redirecting to login...");
+    window.setTimeout(() => router.replace("/login"), 1600);
   }
 
   return (
-    <main className="relative isolate min-h-dvh overflow-y-auto bg-[#07111f] text-[#172033]">
-      <Image src="/images/andima-register-warehouse.png" alt="Area operasional PT Andima Transportindo" fill priority className="-z-20 object-cover object-center opacity-65" />
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(7,17,31,0.96),rgba(7,17,31,0.81)_52%,rgba(7,17,31,0.28))]" />
+    <main className="relative h-dvh w-full overflow-x-hidden overflow-y-auto bg-[#07111F] text-[#172033] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="relative z-10 flex min-h-full w-full flex-col justify-center p-4 sm:p-8 lg:w-1/2 lg:p-10">
+        <div className="relative mx-auto w-full max-w-2xl shrink-0 overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-b from-white/85 via-white/70 to-white/60 p-6 shadow-[0_20px_50px_rgba(7,17,31,0.5),inset_0_2px_4px_rgba(255,255,255,0.9)] backdrop-blur-2xl sm:p-9">
+          <div className="relative z-10 mb-7 text-left">
+            <h1 className="text-xl font-bold tracking-tight text-[#0D1B2A] sm:text-2xl">{greeting},</h1>
+            <p className="mt-1.5 text-sm font-medium text-[#334155]">Please register with your identity.</p>
+          </div>
 
-      <section className="flex min-h-dvh w-full items-center px-5 py-10 sm:px-10 lg:px-20">
-        <div className="w-full max-w-2xl">
-          <div className="relative overflow-hidden rounded-3xl border border-white/80 bg-gradient-to-b from-white/90 via-white/78 to-white/66 p-7 shadow-[0_20px_50px_rgba(7,17,31,0.5),inset_0_2px_4px_rgba(255,255,255,0.9)] backdrop-blur-2xl sm:p-10">
-            <div className="pointer-events-none absolute -top-24 left-1/2 h-32 w-3/4 -translate-x-1/2 rounded-full bg-gradient-to-b from-white/80 to-transparent blur-md" />
+          <form onSubmit={handleSubmit} className="relative z-10 w-full space-y-3.5 sm:space-y-4">
+            <Input label="Full Name" placeholder="Enter your full name" required />
+            <Input label="Email Address" type="email" placeholder="username@andima.co.id" required />
 
-            <header className="relative z-10 mb-7">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#3b6ff5]">ANDIMA HRMS</p>
-              <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-[#0d1b2a] sm:text-3xl">Daftarkan akun</h1>
-              <p className="mt-2 text-sm font-medium text-slate-600">Buat akun terlebih dahulu. Akses fitur aktif setelah HR Admin menetapkan role D3.</p>
-            </header>
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-[#172033]">Password</span>
+              <span className="relative block w-full">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Min. 10 chars (letters, numbers, symbols)"
+                  required
+                  minLength={10}
+                  className="w-full rounded-2xl border border-[#172033]/15 bg-white/90 py-3 pl-4 pr-12 text-sm text-[#172033] placeholder-[#172033]/50 shadow-sm transition-all focus:border-[#3B6FF5] focus:outline-none focus:ring-2 focus:ring-[#3B6FF5]/30"
+                />
+                <button
+                  type="button"
+                  onMouseDown={() => setShowPassword(true)}
+                  onMouseUp={() => setShowPassword(false)}
+                  onMouseLeave={() => setShowPassword(false)}
+                  onTouchStart={() => setShowPassword(true)}
+                  onTouchEnd={() => setShowPassword(false)}
+                  tabIndex={-1}
+                  aria-label="Show password while pressed"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer select-none p-1 text-[#172033]/60 transition-colors hover:text-[#172033] focus:outline-none"
+                >
+                  <EyeIcon open={showPassword} />
+                </button>
+              </span>
+            </label>
 
-            <form onSubmit={handleSubmit} noValidate className="relative z-10 grid gap-4 sm:grid-cols-2">
-              <RegisterField label="Nama lengkap" icon={<UserRound size={18} />} name="fullName" autoComplete="name" placeholder="Masukkan nama lengkap" disabled={isSubmitting} />
-              <RegisterField label="Email" icon={<Mail size={18} />} name="email" type="email" autoComplete="email" placeholder="nama@email.com" disabled={isSubmitting} />
-              <RegisterField label="Username" icon={<UserRound size={18} />} name="username" autoComplete="username" placeholder="Username untuk profil" disabled={isSubmitting} />
-              <RegisterField label="Nomor telepon" icon={<Phone size={18} />} name="phone" type="tel" autoComplete="tel" placeholder="Contoh: 0812xxxx" disabled={isSubmitting} />
-              <div className="sm:col-span-2">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-[#0f172a]">Password</span>
-                  <span className="flex h-14 items-center gap-3 rounded-xl border border-white/90 bg-white/75 px-4 text-slate-700 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04)] transition focus-within:border-[#3b6ff5] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#3b6ff5]/30">
-                    <LockKeyhole size={18} className="shrink-0 text-[#3b6ff5]" aria-hidden="true" />
-                    <input name="password" type={isPasswordVisible ? "text" : "password"} autoComplete="new-password" placeholder="Minimal 8 karakter" disabled={isSubmitting} className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-slate-400 disabled:cursor-not-allowed" />
-                    <button type="button" onClick={() => setIsPasswordVisible((visible) => !visible)} disabled={isSubmitting} className="rounded-lg p-1 text-slate-500 transition hover:bg-slate-100 hover:text-[#3b6ff5] disabled:cursor-not-allowed" aria-label={isPasswordVisible ? "Sembunyikan password" : "Tampilkan password"}>
-                      {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </span>
-                </label>
+            <Input label="Phone Number" placeholder="Max. 12 digits (e.g. 08123456789)" required />
+
+            <Select label="Employment Status" placeholder="Select Status" options={["Probation", "Permanent"]} />
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+              <Select label="Position" placeholder="Select Position" options={["Freight Forwarding Specialist", "HR Administrator", "Information Technology", "Director", "Accounting Associate", "Sales Executive"]} />
+              <Select label="Department" placeholder="Select Department" options={["Human Resources", "Logistics & Shipment Operations", "Information Technology", "Finance, Accounting & Tax", "Commercial & Customer Success"]} />
+            </div>
+
+            {message && (
+              <div role="status" className="rounded-2xl border border-[#16A37A]/30 bg-[#16A37A]/15 p-3 text-xs font-semibold text-[#16A37A] sm:text-sm">
+                {message}
               </div>
+            )}
 
-              {notice && <div className="sm:col-span-2"><NoticeBanner notice={notice} /></div>}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`mt-4 w-full rounded-2xl px-6 py-3.5 text-sm font-extrabold uppercase tracking-wider text-white shadow-[0_6px_24px_rgba(59,111,245,0.4)] transition-all sm:text-base ${
+                isLoading ? "cursor-not-allowed bg-gray-400 opacity-70" : "cursor-pointer bg-[#3B6FF5] hover:bg-[#2B5CE5] active:scale-[0.99]"
+              }`}
+            >
+              {isLoading ? "Processing..." : "Register"}
+            </button>
+          </form>
 
-              <button type="submit" disabled={isSubmitting} className="mt-2 h-14 w-full rounded-xl bg-[#3b6ff5] px-5 text-sm font-extrabold tracking-wider text-white shadow-[0_8px_25px_rgba(59,111,245,0.4)] transition hover:bg-[#2b5ce5] focus:outline-none focus:ring-4 focus:ring-[#3b6ff5]/30 disabled:cursor-wait disabled:opacity-60 sm:col-span-2">
-                {isSubmitting ? "MEMBUAT AKUN..." : "REGISTER"}
-              </button>
-            </form>
-
-            <p className="relative z-10 mt-7 text-center text-sm font-medium text-slate-600">
-              Sudah punya akun?{" "}
-              <Link href="/login" className="font-bold text-[#2b5ce5] underline-offset-4 hover:underline">Login</Link>
-            </p>
+          <div className="relative z-10 pt-4 text-center text-xs font-medium text-[#172033] sm:text-sm">
+            Already have an account?{" "}
+            <Link href="/login" className="font-bold text-[#172033] underline transition-opacity hover:opacity-80">
+              Login
+            </Link>
           </div>
         </div>
-      </section>
+      </div>
+
+      <aside className="pointer-events-none absolute right-8 top-1/2 z-20 hidden max-w-lg -translate-y-1/2 flex-col items-end text-right md:flex lg:right-16 xl:right-24">
+        <img
+          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Logo-ANDIMA-wzx4gpZx20EFE5IYcH3jqabixELIo3.png"
+          alt="Logo ANDIMA"
+          className="mb-4 w-32 object-contain drop-shadow-lg sm:w-40 lg:w-48"
+        />
+        <h2 className="text-2xl font-extrabold leading-tight tracking-wider text-white drop-shadow-md sm:text-3xl lg:text-4xl">
+          PT. ANDIMA<br />TRANSPORTINDO
+        </h2>
+      </aside>
+
+      <div className="pointer-events-none fixed inset-0 z-0">
+        <img
+          src="https://images.unsplash.com/photo-1578575437130-527eed3abbec?q=80&w=1600&auto=format&fit=crop"
+          alt=""
+          className="h-full w-full object-cover object-right opacity-60"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0D1B2A] via-[#0D1B2A]/85 via-40% to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#07111F] via-transparent to-transparent" />
+      </div>
     </main>
   );
 }
 
-function RegisterField({ label, icon, name, type = "text", autoComplete, placeholder, disabled }: { label: string; icon: React.ReactNode; name: string; type?: string; autoComplete: string; placeholder: string; disabled: boolean }) {
+function Input({ label, type = "text", placeholder, required = false }: { label: string; type?: string; placeholder: string; required?: boolean }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-[#0f172a]">{label}</span>
-      <span className="flex h-14 items-center gap-3 rounded-xl border border-white/90 bg-white/75 px-4 text-slate-700 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04)] transition focus-within:border-[#3b6ff5] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#3b6ff5]/30">
-        <span className="shrink-0 text-[#3b6ff5]" aria-hidden="true">{icon}</span>
-        <input name={name} type={type} autoComplete={autoComplete} placeholder={placeholder} disabled={disabled} className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-slate-400 disabled:cursor-not-allowed" />
-      </span>
+      <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-[#172033]">{label}</span>
+      <input
+        type={type}
+        placeholder={placeholder}
+        required={required}
+        className="w-full rounded-2xl border border-[#172033]/15 bg-white/90 px-4 py-3 text-sm text-[#172033] placeholder-[#172033]/50 shadow-sm transition-all focus:border-[#3B6FF5] focus:outline-none focus:ring-2 focus:ring-[#3B6FF5]/30"
+      />
     </label>
   );
 }
 
-function NoticeBanner({ notice }: { notice: Exclude<Notice, null> }) {
-  const isSuccess = notice.tone === "success";
+function Select({ label, placeholder, options = [] }: { label: string; placeholder: string; options?: string[] }) {
   return (
-    <p role={isSuccess ? "status" : "alert"} className={`flex items-start gap-2.5 rounded-xl border p-4 text-sm font-semibold ${isSuccess ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700" : "border-red-500/30 bg-red-500/10 text-red-700"}`}>
-      {isSuccess ? <CircleCheck size={19} className="mt-0.5 shrink-0" /> : <CircleAlert size={19} className="mt-0.5 shrink-0" />}
-      <span>{notice.text}</span>
-    </p>
+    <label className="block">
+      <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-[#172033]">{label}</span>
+      <select
+        required
+        defaultValue=""
+        className="w-full rounded-2xl border border-[#172033]/15 bg-white/90 px-4 py-3 text-sm text-[#172033] shadow-sm transition-all focus:border-[#3B6FF5] focus:outline-none focus:ring-2 focus:ring-[#3B6FF5]/30"
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => <option key={option}>{option}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function EyeIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-5 w-5 text-[#172033]">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.573 16.49 16.638 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ) : (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="h-5 w-5 text-[#172033]">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+    </svg>
   );
 }
