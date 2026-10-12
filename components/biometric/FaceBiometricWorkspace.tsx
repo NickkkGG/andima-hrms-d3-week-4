@@ -85,8 +85,11 @@ const FAST_IDENTITY_SIMILARITY = 0.78;
 const REQUIRED_STABLE_MATCHES = 7;
 const FAST_REQUIRED_STABLE_MATCHES = 4;
 const SIMILARITY_WINDOW_SIZE = 5;
-const CHALLENGE_HOLD_DURATION_MS = 450;
-const BLINK_CONFIRMATION_FRAMES = 2;
+// Liveness runs in ordinary laptop/mobile cameras, whose pose output is often
+// intermittent while a user turns their head. Keep a real movement challenge,
+// but do not require an exaggerated pose or a long uninterrupted hold.
+const CHALLENGE_HOLD_DURATION_MS = 250;
+const BLINK_CONFIRMATION_FRAMES = 1;
 const ENROLLMENT_CENTER_HOLD_MS = 700;
 const FACE_SAMPLE_CAPTURE_INTERVAL_MS = 650;
 const REQUIRED_FACE_SAMPLES = 9;
@@ -97,7 +100,7 @@ const MAX_TEMPLATE_SAMPLES = 18;
 const RAW_AUDIT_SAMPLE_COUNT = 5;
 const STORAGE_UPLOAD_TIMEOUT_MS = 12000;
 const TEMPLATE_TOP_MATCHES = 3;
-const REQUIRED_LIVENESS_CHALLENGES = 3;
+const REQUIRED_LIVENESS_CHALLENGES = 2;
 const MIN_ENROLLMENT_SAMPLE_SIMILARITY = 0.62;
 const ATTENDANCE_VERIFICATION_TIMEOUT_MS = 15000;
 
@@ -134,8 +137,8 @@ const challengeDetails: Record<ChallengeId, { label: string; helper: string }> =
 const degreesToRadians = (degrees: number) => degrees * (Math.PI / 180);
 const CENTER_YAW_THRESHOLD = degreesToRadians(10);
 const CENTER_PITCH_THRESHOLD = degreesToRadians(10);
-const TURN_YAW_THRESHOLD = degreesToRadians(12);
-const TILT_PITCH_THRESHOLD = degreesToRadians(10);
+const TURN_YAW_THRESHOLD = degreesToRadians(8);
+const TILT_PITCH_THRESHOLD = degreesToRadians(7);
 
 const FACE_OVERLAY_PATHS = [
   [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10],
@@ -591,7 +594,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     // single detected face and sufficient detector confidence.
     const challengeCanBeCompleted = detected
       && result.face.length === 1
-      && nextFaceConfidence >= 60;
+      && nextFaceConfidence >= 50;
     let confirmedChallenge = false;
 
     if (!challengeCanBeCompleted) {
@@ -1201,7 +1204,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
               <span className={`rounded-full border px-3 py-1 font-mono text-[10px] font-bold tracking-[0.08em] ${scanState === "scanning" ? "border-[#9acbff] bg-[#e3f1ff] text-[#0865cc]" : scanState === "error" ? "border-red-200 bg-red-50 text-red-600" : "border-[#cfddec] bg-white/75 text-[#54708f]"}`}>{scanState === "scanning" ? "MEMINDAI" : scanState === "loading" ? "MENYIAPKAN MODEL" : scanState === "complete" ? "SELESAI" : "SIAP"}</span>
             </div>
 
-            <div className={`relative mx-auto aspect-square shrink transition-all duration-500 ${compactCamera ? "p-4 sm:p-5" : "p-5 sm:p-7"}`} style={{ width: compactCamera ? "min(58vw, 32dvh, 285px)" : "min(82vw, 45dvh, 430px)" }}>
+            <div className={`relative mx-auto aspect-square shrink transition-all duration-500 ${compactCamera ? "p-3 sm:p-4" : "p-5 sm:p-7"}`} style={{ width: compactCamera ? "min(48vw, 24dvh, 215px)" : "min(82vw, 45dvh, 430px)" }}>
               <div className={`absolute inset-3 rounded-full border shadow-[0_0_44px_rgba(27,53,102,0.18)] ${isAttendanceRejected ? "border-red-400/35" : "border-[#307ee7]/25"}`} />
               <div className={`absolute inset-7 rounded-full border ${isAttendanceRejected ? "border-red-300/60" : "border-[#65b5ff]/55"}`} />
               <div className={`relative size-full overflow-hidden rounded-full border-2 shadow-[0_0_0_10px_rgba(36,113,213,0.08),0_0_50px_rgba(29,115,227,0.25)] ${isAttendanceRejected ? "border-red-300/70 bg-[#260912]" : "border-[#7fc6ff]/80 bg-[#071225]"}`}>
@@ -1236,7 +1239,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-[#e7edf5] px-4 py-3 sm:px-5">
+            <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-[#e7edf5] px-4 py-2.5 sm:px-5">
               {isAttendanceRejected ? (
                 <button type="button" onClick={() => void startScan()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#c4343f] px-4 py-2.5 text-xs font-bold text-white shadow-[0_6px_16px_rgba(196,52,63,0.25)] transition hover:bg-[#a82431] active:scale-[0.98]"><Video size={16} /> Coba kembali</button>
               ) : scanState === "loading" || isResolvingSession ? (
@@ -1249,17 +1252,17 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
               {!isEnrollment && !template && <Link href="/biometric-enrollment" className="text-xs font-semibold text-[#1971c2] underline underline-offset-4">Belum ada template untuk akun ini. Daftarkan biometrik.</Link>}
             </div>
 
-            {attendanceReady && <section className="mx-4 mb-3 shrink-0 rounded-2xl border border-emerald-200 bg-[linear-gradient(135deg,rgba(242,255,249,0.98),rgba(224,247,240,0.86))] p-3 shadow-[0_8px_20px_rgba(0,138,79,0.08)] sm:mx-5 sm:p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-2.5">
+            {attendanceReady && <section className="mx-4 mb-3 shrink-0 rounded-2xl border border-emerald-200 bg-[linear-gradient(135deg,rgba(242,255,249,0.98),rgba(224,247,240,0.86))] p-2.5 shadow-[0_8px_20px_rgba(0,138,79,0.08)] sm:mx-5 sm:p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-2">
                 <div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-emerald-600 text-white shadow-[0_4px_10px_rgba(0,138,79,0.22)]"><CheckCircle2 size={15} /></span><div><p className="text-xs font-bold text-emerald-950">Wajah terverifikasi</p><p className="font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-emerald-700">Identity lock active</p></div></div>
                 <span className="rounded-full border border-emerald-200 bg-white/70 px-2.5 py-1 text-[9px] font-bold text-emerald-800">{attendanceStatus}</span>
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <div className="rounded-xl border border-emerald-100 bg-white/70 px-3 py-2"><div className="flex items-center gap-1.5 text-[#3f7462]"><UserRound size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Employee</p></div><p className="mt-1 truncate text-xs font-bold text-[#123b2a]">{currentUser?.fullName ?? "Memuat employee…"}</p><p className="mt-0.5 font-mono text-[10px] text-[#4d7567]">ID · {currentUser?.employeeCode ?? "—"}</p></div>
-                <div className="rounded-xl border border-emerald-100 bg-white/70 px-3 py-2"><div className="flex items-center gap-1.5 text-[#3f7462]"><Clock3 size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Waktu kehadiran</p></div><p className="mt-1 text-xs font-bold text-[#123b2a]">{hasClockedIn ? `Clock-in · ${formatJakartaTime(todayAttendance!.clock_in)} WIB` : "Menunggu clock-in"}</p>{hasClockedIn && attendanceCompleted ? <p className="mt-0.5 text-[10px] text-[#4d7567]">Clock-out · {formatJakartaTime(todayAttendance!.clock_out!)} WIB</p> : <RealtimeAttendanceClock variant="inline" />}</div>
-                <div className="rounded-xl border border-emerald-100 bg-white/70 px-3 py-2"><div className="flex items-center gap-1.5 text-[#3f7462]"><MapPin size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Lokasi</p></div><p className="mt-1 text-xs font-bold text-[#123b2a]">GPS siap direkam</p><p className="mt-0.5 text-[10px] leading-4 text-[#4d7567]">Titik lokasi dicatat saat tombol ditekan.</p></div>
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
+                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><UserRound size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Employee</p></div><p className="mt-0.5 truncate text-xs font-bold text-[#123b2a]">{currentUser?.fullName ?? "Memuat employee…"}</p><p className="mt-0.5 font-mono text-[10px] text-[#4d7567]">ID · {currentUser?.employeeCode ?? "—"}</p></div>
+                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><Clock3 size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Waktu kehadiran</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">{hasClockedIn ? `Clock-in · ${formatJakartaTime(todayAttendance!.clock_in)} WIB` : "Menunggu clock-in"}</p>{hasClockedIn && attendanceCompleted ? <p className="mt-0.5 text-[10px] text-[#4d7567]">Clock-out · {formatJakartaTime(todayAttendance!.clock_out!)} WIB</p> : <RealtimeAttendanceClock variant="inline" />}</div>
+                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><MapPin size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Lokasi</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">GPS siap direkam</p><p className="mt-0.5 text-[10px] leading-3 text-[#4d7567]">Titik lokasi dicatat saat tombol ditekan.</p></div>
               </div>
-              <div className="mt-3 flex flex-col gap-2 border-t border-emerald-200/80 pt-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-[10px] text-emerald-800">{attendanceCompleted ? "Clock-in dan clock-out hari ini sudah lengkap." : "Lanjutkan untuk mencatat presensi dan lokasi perangkat ini."}</p><button type="button" disabled={isRecordingAttendance || attendanceCompleted} onClick={() => void recordAttendance()} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#008a4f] px-4 py-2.5 text-xs font-bold text-white shadow-[0_7px_16px_rgba(0,138,79,0.24)] transition hover:bg-[#007842] disabled:cursor-not-allowed disabled:opacity-55 active:scale-[0.98]">{isRecordingAttendance ? <LoaderCircle size={16} className="animate-spin" /> : <Clock3 size={16} />}{isRecordingAttendance ? "Membaca lokasi…" : attendanceCompleted ? "Presensi selesai" : nextAttendanceAction === "CLOCK_OUT" ? "Clock-out sekarang" : "Clock-in sekarang"}</button></div>
+              <div className="mt-2 flex flex-col gap-2 border-t border-emerald-200/80 pt-2 sm:flex-row sm:items-center sm:justify-between"><p className="text-[10px] text-emerald-800">{attendanceCompleted ? "Clock-in dan clock-out hari ini sudah lengkap." : "Lanjutkan untuk mencatat presensi dan lokasi perangkat ini."}</p><button type="button" disabled={isRecordingAttendance || attendanceCompleted} onClick={() => void recordAttendance()} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#008a4f] px-4 py-2 text-xs font-bold text-white shadow-[0_7px_16px_rgba(0,138,79,0.24)] transition hover:bg-[#007842] disabled:cursor-not-allowed disabled:opacity-55 active:scale-[0.98]">{isRecordingAttendance ? <LoaderCircle size={16} className="animate-spin" /> : <Clock3 size={16} />}{isRecordingAttendance ? "Membaca lokasi…" : attendanceCompleted ? "Presensi selesai" : nextAttendanceAction === "CLOCK_OUT" ? "Clock-out sekarang" : "Clock-in sekarang"}</button></div>
             </section>}
             {isAttendanceRejected && <div className="mx-4 mb-3 flex shrink-0 flex-col justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 sm:mx-5 sm:flex-row sm:items-center"><div><p className="text-xs font-bold text-red-800">Wajah tidak terverifikasi</p><p className="mt-0.5 text-[10px] text-red-700">Pastikan pemilik akun yang terdaftar berada di depan kamera.</p></div><button type="button" onClick={() => void startScan()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#c4343f] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#a82431]"><Video size={16} /> Coba kembali</button></div>}
           </section>
