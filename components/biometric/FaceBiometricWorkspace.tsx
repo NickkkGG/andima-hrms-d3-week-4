@@ -203,15 +203,20 @@ function requestAttendanceLocation(): Promise<AttendanceLocationPayload> {
   });
 }
 
-function RealtimeAttendanceClock({ variant = "header" }: { variant?: "header" | "inline" }) {
-  const [now, setNow] = useState<Date | null>(null);
+function RealtimeAttendanceClock({ variant = "header", frozenAt = null }: { variant?: "header" | "inline"; frozenAt?: Date | null }) {
+  const [now, setNow] = useState<Date | null>(frozenAt);
 
   useEffect(() => {
+    if (frozenAt) {
+      setNow(frozenAt);
+      return;
+    }
+
     const updateClock = () => setNow(new Date());
     updateClock();
     const timer = window.setInterval(updateClock, 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [frozenAt]);
 
   const time = now
     ? new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(now)
@@ -294,6 +299,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const stableMatchFramesRef = useRef(0);
   const mismatchFramesRef = useRef(0);
   const attendanceVerificationStartedAtRef = useRef<number | null>(null);
+  const verificationLockedAtRef = useRef<number | null>(null);
   const similarityWindowRef = useRef<number[]>([]);
   const identityVerifiedRef = useRef(false);
   const matchScoreRef = useRef<number | null>(null);
@@ -310,6 +316,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const [matchScore, setMatchScore] = useState<number | null>(null);
   const [stableMatchFrames, setStableMatchFrames] = useState(0);
   const [identityVerified, setIdentityVerified] = useState(false);
+  const [verificationLockedAt, setVerificationLockedAt] = useState<Date | null>(null);
   const [attendancePresence, setAttendancePresence] = useState(false);
   const [faceSampleCount, setFaceSampleCount] = useState(0);
   const [facingCenter, setFacingCenter] = useState(false);
@@ -526,6 +533,11 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
       setIdentityVerified(false);
     }
 
+    if (!isEnrollment && identityVerifiedRef.current && allChallengesCompleted && verificationLockedAtRef.current === null) {
+      verificationLockedAtRef.current = now;
+      setVerificationLockedAt(new Date(now));
+    }
+
     if (!isEnrollment && livenessFinished && storedTemplate && !identityVerifiedRef.current) {
       attendanceVerificationStartedAtRef.current ??= now;
       if (now - attendanceVerificationStartedAtRef.current >= ATTENDANCE_VERIFICATION_TIMEOUT_MS) {
@@ -667,6 +679,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     matchScoreRef.current = null;
     setStableMatchFrames(0);
     setIdentityVerified(false);
+    setVerificationLockedAt(null);
     setFaceSampleCount(0);
     setFacingCenter(false);
     setFaceMesh([]);
@@ -683,6 +696,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     challengeFramesRef.current = 0;
     horizontalCalibrationRef.current = null;
     attendanceVerificationStartedAtRef.current = null;
+    verificationLockedAtRef.current = null;
     identityVerifiedRef.current = false;
     qualityPassedRef.current = false;
     attendancePresenceRef.current = false;
@@ -781,6 +795,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     matchScoreRef.current = null;
     setStableMatchFrames(0);
     setIdentityVerified(false);
+    setVerificationLockedAt(null);
     setFaceSampleCount(0);
     setFacingCenter(false);
     setFaceMesh([]);
@@ -797,6 +812,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     challengeFramesRef.current = 0;
     horizontalCalibrationRef.current = null;
     attendanceVerificationStartedAtRef.current = null;
+    verificationLockedAtRef.current = null;
     identityVerifiedRef.current = false;
     qualityPassedRef.current = false;
     attendancePresenceRef.current = false;
@@ -1187,7 +1203,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
               <div className="grid size-9 place-items-center rounded-xl border border-[#9dc9f8] bg-[#e1f0ff] text-[#0c68d5]"><Eye size={18} /></div>
               <div><p className="text-sm font-bold text-[#0a2446]">Biometric Registration</p><p className="mt-0.5 text-[10px] font-medium text-[#58769c]">Selesaikan liveness, lalu hadap lurus sampai sampel tersimpan.</p></div>
             </div>
-          ) : <RealtimeAttendanceClock />}
+          ) : <RealtimeAttendanceClock frozenAt={attendanceReady ? verificationLockedAt : null} />}
         </section>
 
         {actionMessage && (
@@ -1259,7 +1275,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
               </div>
               <div className="mt-2 grid grid-cols-3 gap-1.5">
                 <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><UserRound size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Employee</p></div><p className="mt-0.5 truncate text-xs font-bold text-[#123b2a]">{currentUser?.fullName ?? "Memuat employee…"}</p><p className="mt-0.5 font-mono text-[10px] text-[#4d7567]">ID · {currentUser?.employeeCode ?? "—"}</p></div>
-                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><Clock3 size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Waktu kehadiran</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">{hasClockedIn ? `Clock-in · ${formatJakartaTime(todayAttendance!.clock_in)} WIB` : "Menunggu clock-in"}</p>{hasClockedIn && attendanceCompleted ? <p className="mt-0.5 text-[10px] text-[#4d7567]">Clock-out · {formatJakartaTime(todayAttendance!.clock_out!)} WIB</p> : <RealtimeAttendanceClock variant="inline" />}</div>
+                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><Clock3 size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Waktu kehadiran</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">{hasClockedIn ? `Clock-in · ${formatJakartaTime(todayAttendance!.clock_in)} WIB` : "Menunggu clock-in"}</p>{hasClockedIn && attendanceCompleted ? <p className="mt-0.5 text-[10px] text-[#4d7567]">Clock-out · {formatJakartaTime(todayAttendance!.clock_out!)} WIB</p> : <RealtimeAttendanceClock variant="inline" frozenAt={verificationLockedAt} />}</div>
                 <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><MapPin size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">Lokasi</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">GPS siap direkam</p><p className="mt-0.5 text-[10px] leading-3 text-[#4d7567]">Titik lokasi dicatat saat tombol ditekan.</p></div>
               </div>
               <div className="mt-2 flex flex-col gap-2 border-t border-emerald-200/80 pt-2 sm:flex-row sm:items-center sm:justify-between"><p className="text-[10px] text-emerald-800">{attendanceCompleted ? "Clock-in dan clock-out hari ini sudah lengkap." : "Lanjutkan untuk mencatat presensi dan lokasi perangkat ini."}</p><button type="button" disabled={isRecordingAttendance || attendanceCompleted} onClick={() => void recordAttendance()} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#008a4f] px-4 py-2 text-xs font-bold text-white shadow-[0_7px_16px_rgba(0,138,79,0.24)] transition hover:bg-[#007842] disabled:cursor-not-allowed disabled:opacity-55 active:scale-[0.98]">{isRecordingAttendance ? <LoaderCircle size={16} className="animate-spin" /> : <Clock3 size={16} />}{isRecordingAttendance ? "Membaca lokasi…" : attendanceCompleted ? "Presensi selesai" : nextAttendanceAction === "CLOCK_OUT" ? "Clock-out sekarang" : "Clock-in sekarang"}</button></div>
