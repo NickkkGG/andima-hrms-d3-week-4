@@ -19,6 +19,8 @@ Branch: `feature/D3-002-face-biometric-attendance`
 
 ### Fixed
 
+- Ticket creation now resolves the reporter from `d3_employee`, replacing the stale legacy-table reference that blocked new ticket submissions.
+- Ticket attachments are restricted to JPG/JPEG, PNG, and WebP images (maximum 5 MB) in both the form and Storage policy.
 - Freeze the displayed attendance time when face verification reaches the green identity-lock state.
 - Re-enable the realtime clock when a scan is reset or restarted.
 - B2 accounts that have been provisioned can now resolve their Employee/HRMS access instead of receiving the unmapped-account message.
