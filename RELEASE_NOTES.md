@@ -1,5 +1,35 @@
 # Release Notes — ANDIMA HRMS Squad D3
 
+## Unreleased — integrasi B2 dan biometrik
+
+**Tanggal pembaruan:** 13 Oktober 2026
+**Branch kerja:** `feature/D3-002-face-biometric-attendance`
+**Status:** siap diuji lokal; belum menjadi rilis produksi.
+
+### Perubahan terbaru
+
+- Tampilan halaman Login dan Register disamakan dengan desain B2.
+- Login memakai Supabase Auth lalu memvalidasi profil pada `b2_register`.
+- Register membuat akun Supabase Auth dan profil registrasi pada `b2_register`; halaman register tidak membuat data `d3_employee`.
+- Setelah login B2 berhasil, pengguna diarahkan ke `/face-biometric-attendance`.
+- Halaman Face Biometric Attendance mencakup liveness checking, registrasi template wajah, pencatatan clock-in/clock-out, waktu realtime, serta lokasi presensi saat izin lokasi tersedia.
+- Attendance History dan Attendance & Productivity menampilkan data presensi beserta detail lokasi untuk data yang sudah tersimpan.
+
+### Verifikasi teknis
+
+- `npm run typecheck` berhasil.
+- `npm run build` berhasil.
+- Tidak ada data Supabase yang diubah saat pembaruan release note ini.
+
+### Batasan integrasi B2 yang masih terbuka
+
+- B2 sudah menjadi sumber akun login/register, tetapi tabel operasional D3 (`d3_attendances`, ticket, biometrik, feedback, dan reward) masih memiliki foreign key ke `d3_employee`.
+- Karena itu, akun B2 yang belum memiliki pemetaan data operasional D3 belum dapat melakukan presensi biometrik atau memakai seluruh fitur D3 secara end-to-end.
+- Migrasi identitas fitur dari `d3_employee` ke `b2_register` harus dilakukan bertahap dan tidak boleh menghapus data presensi, tiket, audit, maupun template biometrik yang sudah ada.
+- Role sementara yang akan dipakai pada UI B2 perlu disepakati: posisi `HR Administrator` diperlakukan sebagai HR, sedangkan posisi lain sebagai Employee.
+
+---
+
 **Rilis:** Week 4 / demo internal  
 **Tanggal pembaruan:** 29 September 2026  
 **Cakupan:** fitur Squad D3 pada branch `feature/D3-005-employee-report-ticket`.
@@ -61,4 +91,3 @@ Tabel yang dipakai D3-005: `d3_user_access`, `d3_tickets`, `d3_ticket_followups`
 
 - [Dokumentasi backend](docs/BACKEND.md)
 - [Migration Supabase](supabase/migrations/)
-
