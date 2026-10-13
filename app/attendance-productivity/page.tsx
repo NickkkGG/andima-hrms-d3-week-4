@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Bell,
   UsersRound,
   UserCheck,
   UserX,
@@ -400,16 +399,16 @@ export default function AttendanceProductivityPage() {
           </span>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
+            {/* <button
               type="button"
               onClick={fetchAttendanceFromSupabase}
               title="Refresh Data Supabase"
               className="grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]"
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            </button>
+            </button> */}
 
-            <button
+            {/* <button
               type="button"
               className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]"
               aria-label="Notifikasi"
@@ -417,7 +416,7 @@ export default function AttendanceProductivityPage() {
               <Bell size={17} />
 
               <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" />
-            </button>
+            </button> */}
 
             <HeaderAccount />
           </div>

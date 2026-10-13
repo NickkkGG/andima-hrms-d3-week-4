@@ -411,19 +411,19 @@ export default function AttendancePageUI() {
             <span className="text-sm font-bold text-[#121b2e] sm:hidden">Attendance</span>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <button
+              {/* <button
                 type="button"
                 onClick={fetchAttendanceData}
                 title="Refresh Data dari Supabase"
                 className="grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]"
               >
                 <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              </button>
+              </button> */}
 
-              <button type="button" className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]" aria-label="Notifikasi">
+              {/* <button type="button" className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]" aria-label="Notifikasi">
                 <Bell size={17} />
                 <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" />
-              </button>
+              </button> */}
               <HeaderAccount />
             </div>
           </div>
