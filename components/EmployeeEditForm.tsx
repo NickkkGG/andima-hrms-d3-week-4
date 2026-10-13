@@ -17,9 +17,6 @@ interface EmployeeEditFormState {
   fullName: string;
   email: string;
   phone: string;
-  identityType: string;
-  identityNumber: string;
-  join_date: string;
   positionId: string;
   departmentId: string;
   workLocation: string;
@@ -37,18 +34,11 @@ function fieldClassName(hasError: boolean) {
   }`;
 }
 
-function toDateInputValue(value: string | null) {
-  return value ? value.slice(0, 10) : "";
-}
-
 export default function EmployeeEditForm({ employee, departments, positions }: EmployeeEditFormProps) {
   const [formData, setFormData] = useState<EmployeeEditFormState>({
     fullName: employee.full_name ?? "",
     email: employee.email ?? "",
     phone: employee.phone ?? "",
-    identityType: employee.identity_type ?? "",
-    identityNumber: employee.identity_number ?? "",
-    join_date: toDateInputValue(employee.join_date),
     positionId: employee.position_id ?? "",
     departmentId: employee.department_id ?? "",
     workLocation: employee.work_location ?? "",
@@ -72,7 +62,6 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
     if (!formData.fullName.trim()) return "Full Name wajib diisi.";
     if (!formData.email.trim()) return "Email wajib diisi.";
     if (!/^\S+@\S+\.\S+$/.test(formData.email.trim())) return "Format email tidak valid.";
-    if (!formData.join_date) return "Join Date wajib diisi.";
     if (!formData.departmentId) return "Department wajib dipilih.";
     if (!formData.positionId) return "Position wajib dipilih.";
     if (!formData.workLocation.trim()) return "Work Location wajib diisi.";
@@ -106,9 +95,6 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
           full_name: formData.fullName.trim(),
           email: formData.email.trim(),
           phone: formData.phone.trim() || null,
-          identity_type: formData.identityType.trim() || null,
-          identity_number: formData.identityNumber.trim() || null,
-          join_date: formData.join_date,
           position_id: formData.positionId,
           department_id: formData.departmentId,
           work_location: formData.workLocation.trim(),
@@ -155,12 +141,10 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
           <div className="flex flex-col gap-1 border-b border-[#D9E2FC] pb-5"><h2 className="text-xl font-extrabold tracking-tight text-[#121B2E]">Profile Information</h2><p className="text-sm text-slate-500">Employee ID is a fixed reference and cannot be changed.</p></div>
           <div className="mt-6 grid gap-x-6 gap-y-5 md:grid-cols-2">
             <label className="text-sm font-semibold text-[#121B2E]">Employee Name <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.fullName.trim()))} value={formData.fullName} onChange={(event) => updateField("fullName", event.target.value)} required /></label>
-            <dl className="text-sm font-semibold text-[#121B2E]"><dt>Employee ID</dt><dd className="mt-2 flex h-11 items-center rounded-[15px] border border-[#1E3765]/25 bg-[#1E3765]/5 px-3.5 text-sm font-bold tracking-wide text-[#1E3765]">{employee.employee_id}</dd></dl>
-            <label className="text-sm font-semibold text-[#121B2E]">Identity Number<input className={fieldClassName(false)} value={formData.identityNumber} onChange={(event) => updateField("identityNumber", event.target.value)} /></label>
+            <label className="text-sm font-semibold text-[#121B2E]">Employee ID<input className={fieldClassName(false)} value={employee.employee_id} disabled /></label>
             <label className="text-sm font-semibold text-[#121B2E]">Email <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.email.trim()))} type="email" value={formData.email} onChange={(event) => updateField("email", event.target.value)} required /></label>
             <label className="text-sm font-semibold text-[#121B2E]">Phone Number<input className={fieldClassName(false)} type="tel" value={formData.phone} onChange={(event) => updateField("phone", event.target.value)} /></label>
-            <label className="text-sm font-semibold text-[#121B2E]">Identity Type<input className={fieldClassName(false)} value={formData.identityType} onChange={(event) => updateField("identityType", event.target.value)} /></label>
-            <label className="text-sm font-semibold text-[#121B2E]">Join Date <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.join_date))} type="date" name="join_date" value={formData.join_date} onChange={(event) => updateField("join_date", event.target.value)} required /></label>
+            <label className="text-sm font-semibold text-[#121B2E]">Join Date<input className={fieldClassName(false)} type="date" value={employee.join_date?.slice(0, 10) ?? ""} disabled /></label>
             <label className="text-sm font-semibold text-[#121B2E]">Department <span className="text-[#E5484D]">*</span><select className={fieldClassName(Boolean(errorMessage && !formData.departmentId))} value={formData.departmentId} onChange={(event) => { const departmentId = event.target.value; setFormData((current) => ({ ...current, departmentId, positionId: current.positionId && positions.find((position) => position.id === current.positionId)?.department_id === departmentId ? current.positionId : "" })); }} required><option value="">Pilih department</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name} ({department.code})</option>)}</select></label>
             <label className="text-sm font-semibold text-[#121B2E]">Position <span className="text-[#E5484D]">*</span><select className={fieldClassName(Boolean(errorMessage && !formData.positionId))} value={formData.positionId} onChange={(event) => updateField("positionId", event.target.value)} disabled={!formData.departmentId} required><option value="">{formData.departmentId ? "Pilih position" : "Pilih department terlebih dahulu"}</option>{availablePositions.map((position) => <option key={position.id} value={position.id}>{position.title} ({position.code})</option>)}</select></label>
             <label className="text-sm font-semibold text-[#121B2E]">Work Location <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.workLocation.trim()))} value={formData.workLocation} onChange={(event) => updateField("workLocation", event.target.value)} required /></label>

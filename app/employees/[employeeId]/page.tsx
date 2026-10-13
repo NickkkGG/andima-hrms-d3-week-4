@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Link2, Mail, MapPin, Phone } from "lucide-react";
+import EmployeeDirectoryVisibilityButton from "@/components/EmployeeDirectoryVisibilityButton";
 import HrmsShell from "@/components/hrms/HrmsShell";
 import HrmsStatusPill from "@/components/hrms/HrmsStatusPill";
 import type {
@@ -139,6 +140,21 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
     );
   }
 
+  let isHiddenFromDirectory = false;
+  if (canManageEmployees) {
+    const { data: visibility, error: visibilityError } = await supabase
+      .from("d3_employee_directory_hidden")
+      .select("employee_id")
+      .eq("employee_id", employee.id)
+      .maybeSingle();
+
+    if (visibilityError) {
+      logRelatedQueryError("d3_employee_directory_hidden", visibilityError);
+    } else {
+      isHiddenFromDirectory = Boolean(visibility);
+    }
+  }
+
   const [skillsResult, certificationsResult, attendancesResult, feedbackRewardsResult] = await Promise.all([
     supabase
       .from("d3_employee_skills")
@@ -201,6 +217,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
               <Link className="inline-flex h-11 items-center justify-center rounded-[15px] bg-[#155DFC] px-5 text-sm font-bold text-white shadow-[3px_3px_14px_rgba(87,138,252,0.4)] transition hover:bg-[#0D4FDB]" href={`/employees/${encodeURIComponent(employee.employee_id)}/status`}>
                 Ubah Employment Status
               </Link>
+              <EmployeeDirectoryVisibilityButton employeeUuid={employee.id} initiallyHidden={isHiddenFromDirectory} />
             </div>
           )}
         </div>

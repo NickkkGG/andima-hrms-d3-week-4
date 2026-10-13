@@ -11,6 +11,15 @@ interface EditEmployeePageProps {
   params: Promise<{ employeeId: string }>;
 }
 
+interface D1PositionOption {
+  position_id: string;
+  position_code: string;
+  position_title: string;
+  department_id: string;
+  department_code: string;
+  department_name: string;
+}
+
 export default async function EditEmployeePage({ params }: EditEmployeePageProps) {
   const { employeeId } = await params;
   const supabase = await createClient();
@@ -35,7 +44,7 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
   const { data: employee, error: employeeError } = await supabase
     .from("d3_view_employee_360")
     .select(
-      "id, employee_id, full_name, email, phone, identity_type, identity_number, join_date, employment_status, work_location, position_id, position_title, department_id, department_name, tenure_years, tenure_months"
+      "id, employee_id, full_name, email, phone, join_date, employment_status, work_location, position_id, position_title, department_id, department_name, tenure_years, tenure_months"
     )
     .eq("employee_id", employeeId)
     .maybeSingle()
@@ -74,21 +83,57 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     );
   }
 
-  const [departmentsResult, positionsResult] = await Promise.all([
-    supabase
-      .from("d3_departments")
-      .select("id, code, name")
-      .order("name", { ascending: true })
-      .returns<DepartmentOption[]>(),
-    supabase
+  const { data: activeOptionsData, error: optionsError } = await supabase
+    .rpc("d3_active_d1_position_options")
+    .returns<D1PositionOption[]>();
+  const activeOptions: D1PositionOption[] = Array.isArray(activeOptionsData) ? activeOptionsData : [];
+
+  const positionsById = new Map(
+    activeOptions.map((option) => [option.position_id, {
+      id: option.position_id,
+      code: option.position_code,
+      title: option.position_title,
+      department_id: option.department_id,
+    }])
+  );
+  const departmentsById = new Map(
+    activeOptions.map((option) => [option.department_id, {
+      id: option.department_id,
+      code: option.department_code,
+      name: option.department_name,
+    }])
+  );
+
+  // A legacy assignment remains visible so HR can edit other profile fields without
+  // silently replacing a position that predates the D1 master mapping.
+  const needsLegacyPosition = Boolean(employee.position_id && !positionsById.has(employee.position_id));
+  const { data: legacyPosition, error: legacyPositionError } = needsLegacyPosition
+    ? await supabase
       .from("d3_positions")
       .select("id, code, title, department_id")
-      .order("title", { ascending: true })
-      .returns<PositionOption[]>(),
-  ]);
+      .eq("id", employee.position_id ?? "")
+      .maybeSingle()
+      .returns<PositionOption>()
+    : { data: null, error: null };
+  if (legacyPosition) positionsById.set(legacyPosition.id, legacyPosition);
 
-  if (departmentsResult.error || positionsResult.error) {
+  const needsLegacyDepartment = Boolean(employee.department_id && !departmentsById.has(employee.department_id));
+  const { data: legacyDepartment, error: legacyDepartmentError } = needsLegacyDepartment
+    ? await supabase
+      .from("d3_departments")
+      .select("id, code, name")
+      .eq("id", employee.department_id ?? "")
+      .maybeSingle()
+      .returns<DepartmentOption>()
+    : { data: null, error: null };
+  if (legacyDepartment) departmentsById.set(legacyDepartment.id, legacyDepartment);
+
+  const departmentsResult = { data: [...departmentsById.values()].sort((a, b) => a.name.localeCompare(b.name)), error: legacyDepartmentError };
+  const positionsResult = { data: [...positionsById.values()].sort((a, b) => a.title.localeCompare(b.title)), error: legacyPositionError };
+
+  if (optionsError || departmentsResult.error || positionsResult.error) {
     console.error("Employee edit lookup query failed", {
+      options: optionsError?.code,
       departments: departmentsResult.error?.code,
       positions: positionsResult.error?.code,
     });
@@ -122,8 +167,8 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
 
         <EmployeeEditForm
           employee={employee}
-          departments={departmentsResult.data ?? []}
-          positions={positionsResult.data ?? []}
+          departments={departmentsResult.data}
+          positions={positionsResult.data}
         />
       </section>
     </HrmsShell>

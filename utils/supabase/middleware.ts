@@ -4,7 +4,7 @@ import { type NextRequest, NextResponse } from "next/server";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-export const createClient = (request: NextRequest) => {
+export async function updateSession(request: NextRequest) {
   // Create an unmodified response
   let supabaseResponse = NextResponse.next({
     request: {
@@ -21,7 +21,10 @@ export const createClient = (request: NextRequest) => {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value, options }) => {
+            void options;
+            request.cookies.set(name, value);
+          })
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -33,5 +36,9 @@ export const createClient = (request: NextRequest) => {
     },
   );
 
-  return supabaseResponse
-};
+  // getUser validates the access token and refreshes the response cookies when
+  // needed. Do not use getSession here because it does not validate the token.
+  await supabase.auth.getUser();
+
+  return supabaseResponse;
+}
