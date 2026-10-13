@@ -349,6 +349,19 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     && matchPassed
     && (isEnrollment ? qualityPassed && faceSampleCount >= REQUIRED_FACE_SAMPLES : attendancePresence);
 
+  // The detection loop runs independently from React updates. Keep a UI-level
+  // lock as well, so both attendance clocks freeze at the exact moment the
+  // green verified state appears, even while the camera keeps rendering.
+  useEffect(() => {
+    if (isEnrollment || !identityVerified || !allChallengesCompleted || scanState !== "scanning" || verificationLockedAt) {
+      return;
+    }
+
+    const lockedAt = new Date();
+    verificationLockedAtRef.current = lockedAt.getTime();
+    setVerificationLockedAt(lockedAt);
+  }, [allChallengesCompleted, identityVerified, isEnrollment, scanState, verificationLockedAt]);
+
   const stopCamera = useCallback(() => {
     if (frameRef.current !== null) {
       window.cancelAnimationFrame(frameRef.current);
