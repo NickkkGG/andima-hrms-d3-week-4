@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import HeaderAccount from "@/components/HeaderAccount";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 import LocationMapPreview from "@/components/attendance/LocationMapPreview";
 
 type AttendanceStatus = "PRESENT" | "UNDER_MINIMUM" | "ABSENT" | "LEAVE" | string;
@@ -60,24 +61,13 @@ type AttendanceQueryRow = {
   d3_employee: AttendanceEmployee | null;
 };
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  PRESENT: {
-    label: "Hadir",
-    className: "bg-[#eaf7f0] text-[#16834b]",
-  },
-  UNDER_MINIMUM: {
-    label: "Di bawah 7 jam",
-    className: "bg-[#fef9c3] text-[#b7791f]",
-  },
-  ABSENT: {
-    label: "Tidak Hadir",
-    className: "bg-[#fff0f0] text-[#d64545]",
-  },
-  LEAVE: {
-    label: "Izin / Cuti",
-    className: "bg-[#edf6ff] text-[#1971c2]",
-  },
-};
+function statusConfig(status: AttendanceStatus, language: "id" | "en") {
+  const labels = language === "id"
+    ? { PRESENT: "Hadir", UNDER_MINIMUM: "Di bawah 7 jam", ABSENT: "Tidak hadir", LEAVE: "Izin / cuti" }
+    : { PRESENT: "Present", UNDER_MINIMUM: "Under 7 hours", ABSENT: "Absent", LEAVE: "Leave" };
+  const classes: Record<string, string> = { PRESENT: "bg-[#eaf7f0] text-[#16834b]", UNDER_MINIMUM: "bg-[#fef9c3] text-[#b7791f]", ABSENT: "bg-[#fff0f0] text-[#d64545]", LEAVE: "bg-[#edf6ff] text-[#1971c2]" };
+  return { label: labels[status as keyof typeof labels] ?? status, className: classes[status] ?? "bg-slate-100 text-slate-700" };
+}
 
 function toDateInputValue(date: Date) {
   const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60_000));
@@ -95,6 +85,13 @@ function recentAttendanceRange() {
 }
 
 export default function AttendanceProductivityPage() {
+  const { t, language } = useLanguage();
+  const locale = language === "id" ? "id-ID" : "en-GB";
+  const copy = language === "id" ? {
+    restricted: "Fitur ini hanya dapat diakses oleh HR atau Manajer.", accessRequired: "Akses dashboard memerlukan akun HRMS yang telah dipetakan ke data karyawan.", loadFailed: "Data kehadiran belum dapat dimuat. Coba kembali atau hubungi HR Admin.", connectionFailed: "Terjadi kesalahan saat menghubungkan ke Supabase.", sessionMissing: "Sesi login tidak ditemukan. Silakan login kembali.", accountMissing: "Akun belum dipetakan ke role HRMS. Hubungi HR Admin.", productivityRestricted: "Fitur Presensi & Produktivitas hanya dapat diakses oleh HR atau Manajer.", employee: "Karyawan", title: "Presensi & Produktivitas", description: "Pantau ringkasan kehadiran dan informasi produktivitas karyawan", from: "Dari", until: "Sampai", search: "Cari nama, NIP, departemen...", totalData: "Total data", attendanceRecords: "Catatan kehadiran", present: "Hadir", attendanceRecorded: "Kehadiran tercatat", underSeven: "Di bawah 7 jam", durationBelow: "Durasi belum memenuhi minimum", absent: "Tidak hadir", noAttendance: "Tidak ada kehadiran", leave: "Izin / cuti", leaveData: "Data izin atau cuti", workTrend: "Tren jam kerja", averageDaily: "Rata-rata jam kerja per hari", followsDate: "Periode mengikuti filter tanggal di atas.", noWorkHours: "Belum ada data jam kerja untuk periode ini.", productivityComparison: "Perbandingan produktivitas", averagePerEmployee: "Rata-rata per karyawan", sortedAverage: "Diurutkan berdasarkan jam kerja rata-rata.", noData: "Belum ada data.", history: "Riwayat kehadiran", found: "data ditemukan pada periode terpilih", loading: "Memuat data dari Supabase...", unavailable: "Data kehadiran belum tersedia", noResults: "Tidak terdapat data pada periode atau pencarian yang dipilih.", date: "Tanggal", status: "Status", clock: "Clock in / out", workHours: "Jam kerja", in: "Masuk", out: "Pulang", attendanceDetail: "Detail kehadiran", notAvailable: "Tidak tersedia", notYetAvailable: "Belum tersedia", productivityInfo: "Informasi produktivitas", flexibleDuration: "Penilaian durasi fleksibel: presensi memenuhi target jika total jam kerja minimal 7 jam.", meetsSeven: "MEMENUHI 7 JAM", belowSeven: "DI BAWAH 7 JAM", information: "Informasi", disclaimer: "Data presensi digunakan sebagai informasi monitoring dan tidak digunakan untuk menyimpulkan performa karyawan.", loadingData: "Memuat data kehadiran karyawan dari Supabase...", noDataTitle: "Tidak ada data presensi", noDataDescription: "Tidak ada data yang cocok dengan kriteria filter atau pencarian Anda.",
+  } : {
+    restricted: "This feature is only available to HR or Managers.", accessRequired: "This dashboard requires an HRMS account mapped to employee data.", loadFailed: "Attendance data could not be loaded. Please try again or contact an HR Admin.", connectionFailed: "An error occurred while connecting to Supabase.", sessionMissing: "No login session was found. Please sign in again.", accountMissing: "This account has not been mapped to an HRMS role. Contact an HR Admin.", productivityRestricted: "Attendance & Productivity is only available to HR or Managers.", employee: "Employee", title: "Attendance & Productivity", description: "Monitor employee attendance summaries and productivity information", from: "From", until: "To", search: "Search by name, employee ID, or department...", totalData: "Total data", attendanceRecords: "Attendance records", present: "Present", attendanceRecorded: "Recorded attendance", underSeven: "Under 7 hours", durationBelow: "Duration below the minimum", absent: "Absent", noAttendance: "No attendance", leave: "Leave", leaveData: "Leave records", workTrend: "Work-hour trend", averageDaily: "Average work hours per day", followsDate: "The period follows the selected date filter.", noWorkHours: "No work-hour data for this period.", productivityComparison: "Productivity comparison", averagePerEmployee: "Average per employee", sortedAverage: "Sorted by average work hours.", noData: "No data yet.", history: "Attendance history", found: "records found for the selected period", loading: "Loading data from Supabase...", unavailable: "Attendance data is not available yet", noResults: "There is no data for the selected period or search.", date: "Date", status: "Status", clock: "Clock in / out", workHours: "Work hours", in: "In", out: "Out", attendanceDetail: "Attendance details", notAvailable: "Not available", notYetAvailable: "Not available yet", productivityInfo: "Productivity information", flexibleDuration: "Flexible duration assessment: attendance meets the target when total work hours reach at least seven hours.", meetsSeven: "MEETS 7 HOURS", belowSeven: "UNDER 7 HOURS", information: "Information", disclaimer: "Attendance data is used for monitoring information and is not used to conclude employee performance.", loadingData: "Loading employee attendance data from Supabase...", noDataTitle: "No attendance data", noDataDescription: "No data matches your current filter or search.",
+  };
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
   const [selectedItem, setSelectedItem] = useState<AttendanceRecord | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -110,7 +107,7 @@ export default function AttendanceProductivityPage() {
   async function fetchAttendanceFromSupabase() {
     if (!appRole) return;
     if (appRole !== "HR" && appRole !== "MANAGER") {
-      setErrorMessage("Fitur ini hanya dapat diakses oleh HR atau Manager.");
+      setErrorMessage(copy.restricted);
       setAttendances([]);
       setSelectedItem(null);
       setLoading(false);
@@ -158,8 +155,8 @@ export default function AttendanceProductivityPage() {
         console.warn("Supabase query notice:", error.message);
         setErrorMessage(
           error.code === "42501"
-            ? "Akses dashboard memerlukan akun HRMS yang telah dipetakan ke data karyawan."
-            : "Data kehadiran belum dapat dimuat. Coba kembali atau hubungi HR Admin."
+            ? copy.accessRequired
+            : copy.loadFailed
         );
         setAttendances([]);
         setSelectedItem(null);
@@ -174,7 +171,7 @@ export default function AttendanceProductivityPage() {
           if (item.clock_in) {
             const inDate = new Date(item.clock_in);
             clockInStr = !isNaN(inDate.getTime())
-              ? inDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+              ? inDate.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })
               : String(item.clock_in);
           }
 
@@ -182,7 +179,7 @@ export default function AttendanceProductivityPage() {
           if (item.clock_out) {
             const outDate = new Date(item.clock_out);
             clockOutStr = !isNaN(outDate.getTime())
-              ? outDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
+              ? outDate.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })
               : String(item.clock_out);
           }
 
@@ -204,7 +201,7 @@ export default function AttendanceProductivityPage() {
           return {
             id: item.id || `ATT-${item.employee_id}`,
             employee_id: emp?.employee_id || item.employee_id || "EMP-AND-000",
-            full_name: emp?.full_name || "Karyawan",
+            full_name: emp?.full_name || copy.employee,
             department: emp?.d3_departments?.name || "-",
             date: item.date || new Date().toISOString().split("T")[0],
             status: derivedStatus,
@@ -226,7 +223,7 @@ export default function AttendanceProductivityPage() {
     } catch (err: unknown) {
       console.error("Fetch Exception:", err);
       setErrorMessage(
-        err instanceof Error ? err.message : "Terjadi kesalahan saat menghubungkan ke Supabase."
+        err instanceof Error ? err.message : copy.connectionFailed
       );
       setAttendances([]);
       setSelectedItem(null);
@@ -243,7 +240,7 @@ export default function AttendanceProductivityPage() {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user) {
         if (mounted) {
-          setErrorMessage("Sesi login tidak ditemukan. Silakan login kembali.");
+          setErrorMessage(copy.sessionMissing);
           setLoading(false);
           setIsResolvingAccess(false);
         }
@@ -258,7 +255,7 @@ export default function AttendanceProductivityPage() {
 
       if (!mounted) return;
       if (accessError || !access) {
-        setErrorMessage("Akun belum dipetakan ke role HRMS. Hubungi HR Admin.");
+        setErrorMessage(copy.accountMissing);
         setLoading(false);
         setIsResolvingAccess(false);
         return;
@@ -266,7 +263,7 @@ export default function AttendanceProductivityPage() {
 
       const role = access.app_role as AppRole;
       if (role !== "HR" && role !== "MANAGER") {
-        setErrorMessage("Fitur Attendance & Productivity hanya dapat diakses oleh HR atau Manager.");
+        setErrorMessage(copy.productivityRestricted);
         setLoading(false);
         setIsResolvingAccess(false);
         return;
@@ -369,16 +366,16 @@ export default function AttendanceProductivityPage() {
   }, [filteredData]);
 
   return (
-    <div className="min-h-screen bg-[#f7f8ff] text-[#121b2e]">
+    <div className="min-h-screen bg-[#eaf2fc] text-[#121b2e]">
       {/* HEADER */}
-      <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#d9e2fc] bg-white px-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
+      <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 px-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:px-6">
+        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-3">
           <div className="hidden min-w-0 items-center gap-3 sm:flex">
-            <span className="font-bold text-[#121b2e]">
+            <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">
               ANDIMA HRMS
             </span>
 
-            <span className="h-5 border-l border-[#d9e2fc]" />
+            <span className="h-5 border-l border-[#BCD4EE]" />
 
             <span className="text-xs font-semibold text-[#3f4940]">
               HRMS
@@ -386,40 +383,19 @@ export default function AttendanceProductivityPage() {
 
             <ChevronRight
               size={13}
-              className="text-[#4d5f81]/50"
+              className="shrink-0 text-[#52749B]/60"
             />
 
-            <span className="truncate text-xs font-semibold text-[#006838]">
-              Attendance & Productivity
+            <span className="truncate text-xs font-semibold text-[#0C68D5]">
+              {t("attendanceProductivity")}
             </span>
           </div>
 
-          <span className="text-sm font-bold text-[#121b2e] sm:hidden">
-            Attendance & Productivity
+          <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">
+            {t("attendanceProductivity")}
           </span>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* <button
-              type="button"
-              onClick={fetchAttendanceFromSupabase}
-              title="Refresh Data Supabase"
-              className="grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]"
-            >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            </button> */}
-
-            {/* <button
-              type="button"
-              className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]"
-              aria-label="Notifikasi"
-            >
-              <Bell size={17} />
-
-              <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" />
-            </button> */}
-
-            <HeaderAccount />
-          </div>
+          <div className="flex items-center gap-2 sm:gap-3"><HeaderAccount /></div>
         </div>
       </header>
 
@@ -429,11 +405,11 @@ export default function AttendanceProductivityPage() {
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
             <div>
               <h1 className="text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">
-                Attendance & Productivity
+                {copy.title}
               </h1>
 
               <p className="mt-1 max-w-3xl text-sm text-[#4d5f81]">
-                Monitor ringkasan kehadiran dan informasi produktivitas karyawan
+                {copy.description}
               </p>
             </div>
 
@@ -454,7 +430,7 @@ export default function AttendanceProductivityPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div>
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                  Dari
+                  {copy.from}
                 </label>
 
                 <div className="relative">
@@ -476,7 +452,7 @@ export default function AttendanceProductivityPage() {
 
               <div>
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                  Sampai
+                  {copy.until}
                 </label>
 
                 <div className="relative">
@@ -505,7 +481,7 @@ export default function AttendanceProductivityPage() {
 
               <input
                 type="text"
-                placeholder="Cari nama, NIP, departemen..."
+                placeholder={copy.search}
                 value={searchQuery}
                 onChange={(e) =>
                   setSearchQuery(e.target.value)
@@ -525,7 +501,7 @@ export default function AttendanceProductivityPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                  Total Data
+                  {copy.totalData}
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#121b2e]">
@@ -533,7 +509,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
-                  Record kehadiran
+                  {copy.attendanceRecords}
                 </p>
               </div>
 
@@ -548,7 +524,7 @@ export default function AttendanceProductivityPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                  Hadir
+                  {copy.present}
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#16834b]">
@@ -556,7 +532,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
-                  Kehadiran tercatat
+                  {copy.attendanceRecorded}
                 </p>
               </div>
 
@@ -571,7 +547,7 @@ export default function AttendanceProductivityPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                  Di bawah 7 jam
+                  {copy.underSeven}
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#b7791f]">
@@ -579,7 +555,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
-                  Durasi belum memenuhi minimum
+                  {copy.durationBelow}
                 </p>
               </div>
 
@@ -594,7 +570,7 @@ export default function AttendanceProductivityPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                  Tidak Hadir
+                  {copy.absent}
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#d64545]">
@@ -602,7 +578,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
-                  Tidak ada kehadiran
+                  {copy.noAttendance}
                 </p>
               </div>
 
@@ -617,7 +593,7 @@ export default function AttendanceProductivityPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                  Izin / Cuti
+                  {copy.leave}
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#1971c2]">
@@ -625,7 +601,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
-                  Data izin atau cuti
+                  {copy.leaveData}
                 </p>
               </div>
 
@@ -640,13 +616,13 @@ export default function AttendanceProductivityPage() {
         <div className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_1fr]">
           <div className="rounded-xl border border-[#d9e2fc] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
             <div className="flex items-start justify-between">
-              <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">Tren jam kerja</p><h2 className="mt-1 text-lg font-bold">Rata-rata jam kerja per hari</h2><p className="mt-1 text-xs text-[#4d5f81]">Periode mengikuti filter tanggal di atas.</p></div><TrendingUp size={19} className="text-[#006838]" />
+              <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.workTrend}</p><h2 className="mt-1 text-lg font-bold">{copy.averageDaily}</h2><p className="mt-1 text-xs text-[#4d5f81]">{copy.followsDate}</p></div><TrendingUp size={19} className="text-[#006838]" />
             </div>
-            {productivitySeries.daily.length === 0 ? <div className="flex h-48 items-center justify-center text-xs text-[#4d5f81]">Belum ada data jam kerja untuk periode ini.</div> : <div className="mt-6 flex h-52 items-end gap-2 border-b border-l border-[#d9e2fc] px-3 pb-0 pt-4">{productivitySeries.daily.map((point) => { const max = Math.max(...productivitySeries.daily.map((item) => item.hours), 7); const height = Math.max((point.hours / max) * 100, 4); return <div key={point.date} className="group flex h-full min-w-7 flex-1 flex-col items-center justify-end gap-1"><span className="text-[9px] font-bold text-[#4d5f81] opacity-0 transition group-hover:opacity-100">{point.hours.toFixed(1)}j</span><div className="w-full rounded-t-md bg-[#069494] transition group-hover:bg-[#006838]" style={{ height: `${height}%` }} /><span className="text-[9px] text-[#4d5f81]">{point.date.slice(5)}</span></div> })}</div>}
+            {productivitySeries.daily.length === 0 ? <div className="flex h-48 items-center justify-center text-xs text-[#4d5f81]">{copy.noWorkHours}</div> : <div className="mt-6 flex h-52 items-end gap-2 border-b border-l border-[#d9e2fc] px-3 pb-0 pt-4">{productivitySeries.daily.map((point) => { const max = Math.max(...productivitySeries.daily.map((item) => item.hours), 7); const height = Math.max((point.hours / max) * 100, 4); return <div key={point.date} className="group flex h-full min-w-7 flex-1 flex-col items-center justify-end gap-1"><span className="text-[9px] font-bold text-[#4d5f81] opacity-0 transition group-hover:opacity-100">{point.hours.toFixed(1)}{language === "id" ? "j" : "h"}</span><div className="w-full rounded-t-md bg-[#069494] transition group-hover:bg-[#006838]" style={{ height: `${height}%` }} /><span className="text-[9px] text-[#4d5f81]">{point.date.slice(5)}</span></div> })}</div>}
           </div>
           <div className="rounded-xl border border-[#d9e2fc] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">Perbandingan produktivitas</p><h2 className="mt-1 text-lg font-bold">Rata-rata per karyawan</h2><p className="mt-1 text-xs text-[#4d5f81]">Diurutkan berdasarkan jam kerja rata-rata.</p>
-            <div className="mt-5 space-y-3">{productivitySeries.employees.length === 0 ? <p className="py-12 text-center text-xs text-[#4d5f81]">Belum ada data.</p> : productivitySeries.employees.map((employee) => { const width = Math.min((employee.hours / 9) * 100, 100); return <div key={employee.name}><div className="mb-1 flex justify-between gap-2 text-[10px]"><span className="truncate font-semibold text-[#3f4940]">{employee.name}</span><span className="font-bold text-[#121b2e]">{employee.hours.toFixed(1)} jam</span></div><div className="h-2 overflow-hidden rounded-full bg-[#edf0f7]"><div className="h-full rounded-full bg-[#16834b]" style={{ width: `${width}%` }} /></div></div> })}</div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.productivityComparison}</p><h2 className="mt-1 text-lg font-bold">{copy.averagePerEmployee}</h2><p className="mt-1 text-xs text-[#4d5f81]">{copy.sortedAverage}</p>
+            <div className="mt-5 space-y-3">{productivitySeries.employees.length === 0 ? <p className="py-12 text-center text-xs text-[#4d5f81]">{copy.noData}</p> : productivitySeries.employees.map((employee) => { const width = Math.min((employee.hours / 9) * 100, 100); return <div key={employee.name}><div className="mb-1 flex justify-between gap-2 text-[10px]"><span className="truncate font-semibold text-[#3f4940]">{employee.name}</span><span className="font-bold text-[#121b2e]">{employee.hours.toFixed(1)} {language === "id" ? "jam" : "hours"}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#edf0f7]"><div className="h-full rounded-full bg-[#16834b]" style={{ width: `${width}%` }} /></div></div> })}</div>
           </div>
         </div>
 
@@ -657,11 +633,11 @@ export default function AttendanceProductivityPage() {
             <div className="flex items-center justify-between border-b border-[#d9e2fc] px-5 py-4">
               <div>
                 <h2 className="text-sm font-bold text-[#121b2e]">
-                  Riwayat Kehadiran
+                  {copy.history}
                 </h2>
 
                 <p className="mt-0.5 text-[10px] text-[#4d5f81]">
-                  {filteredData.length} data ditemukan pada periode terpilih
+                  {filteredData.length} {copy.found}
                 </p>
               </div>
             </div>
@@ -669,7 +645,7 @@ export default function AttendanceProductivityPage() {
             {loading ? (
               <div className="flex min-h-[250px] items-center justify-center p-6 text-xs text-[#4d5f81]">
                 <RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />
-                <span>Memuat data dari Supabase...</span>
+                <span>{copy.loading}</span>
               </div>
             ) : filteredData.length === 0 ? (
               <div className="flex min-h-[250px] items-center justify-center p-6 text-center">
@@ -680,11 +656,11 @@ export default function AttendanceProductivityPage() {
                   />
 
                   <p className="mt-3 text-sm font-bold text-[#121b2e]">
-                    Data kehadiran belum tersedia
+                    {copy.unavailable}
                   </p>
 
                   <p className="mt-1 text-xs text-[#4d5f81]">
-                    Tidak terdapat data pada periode atau pencarian yang dipilih.
+                    {copy.noResults}
                   </p>
                 </div>
               </div>
@@ -694,23 +670,23 @@ export default function AttendanceProductivityPage() {
                   <thead>
                     <tr className="border-b border-[#d9e2fc] bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
                       <th className="px-5 py-3">
-                        Employee
+                        {copy.employee}
                       </th>
 
                       <th className="px-3 py-3">
-                        Tanggal
+                        {copy.date}
                       </th>
 
                       <th className="px-3 py-3">
-                        Status
+                        {copy.status}
                       </th>
 
                       <th className="px-3 py-3">
-                        Clock In / Out
+                        {copy.clock}
                       </th>
 
                       <th className="px-3 py-3">
-                        Jam Kerja
+                        {copy.workHours}
                       </th>
                     </tr>
                   </thead>
@@ -719,10 +695,7 @@ export default function AttendanceProductivityPage() {
                     {filteredData.map((row) => {
                       const isSelected = selectedItem?.id === row.id;
 
-                      const status = STATUS_CONFIG[row.status] || {
-                        label: row.status,
-                        className: "bg-slate-100 text-slate-700",
-                      };
+                      const status = statusConfig(row.status, language);
 
                       return (
                         <tr
@@ -756,18 +729,18 @@ export default function AttendanceProductivityPage() {
 
                           <td className="px-3 py-3.5 text-[#4d5f81]">
                             <div>
-                              In: {row.clock_in ? `${row.clock_in} WIB` : "-"}
+                              {copy.in}: {row.clock_in ? `${row.clock_in} WIB` : "-"}
                             </div>
 
                             <div>
-                              Out: {row.clock_out ? `${row.clock_out} WIB` : "-"}
+                              {copy.out}: {row.clock_out ? `${row.clock_out} WIB` : "-"}
                             </div>
                           </td>
 
                           <td className="px-3 py-3.5">
                             {row.work_hours !== null ? (
                               <span className="font-semibold text-[#121b2e]">
-                                {row.work_hours.toFixed(1)} jam
+                                {row.work_hours.toFixed(1)} {language === "id" ? "jam" : "hours"}
                               </span>
                             ) : (
                               <span className="text-[#4d5f81]">-</span>
@@ -787,7 +760,7 @@ export default function AttendanceProductivityPage() {
             <div className="w-full shrink-0 rounded-xl border border-[#d9e2fc] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] xl:w-[360px]">
               <div className="border-b border-[#d9e2fc] pb-4">
                 <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                  Detail Kehadiran
+                  {copy.attendanceDetail}
                 </span>
 
                 <h3 className="mt-1 text-base font-bold text-[#121b2e]">
@@ -802,16 +775,16 @@ export default function AttendanceProductivityPage() {
               <div className="mt-4">
                 <span
                   className={`inline-flex rounded px-2.5 py-1 text-[10px] font-bold ${
-                    (STATUS_CONFIG[selectedItem.status] || { className: "bg-slate-100 text-slate-700" }).className
+                    statusConfig(selectedItem.status, language).className
                   }`}
                 >
-                  {(STATUS_CONFIG[selectedItem.status] || { label: selectedItem.status }).label}
+                  {statusConfig(selectedItem.status, language).label}
                 </span>
               </div>
 
               <div className="mt-4 space-y-3">
                 <DetailRow
-                  label="Tanggal"
+                  label={copy.date}
                   value={selectedItem.date}
                 />
 
@@ -820,7 +793,7 @@ export default function AttendanceProductivityPage() {
                   value={
                     selectedItem.clock_in
                       ? `${selectedItem.clock_in} WIB`
-                      : "Tidak tersedia"
+                      : copy.notAvailable
                   }
                 />
 
@@ -829,7 +802,7 @@ export default function AttendanceProductivityPage() {
                   value={
                     selectedItem.clock_out
                       ? `${selectedItem.clock_out} WIB`
-                      : "Tidak tersedia"
+                      : copy.notAvailable
                   }
                 />
 
@@ -847,11 +820,11 @@ export default function AttendanceProductivityPage() {
                 />
 
                 <DetailRow
-                  label="Jam Kerja"
+                  label={copy.workHours}
                   value={
                     selectedItem.work_hours !== null
-                      ? `${selectedItem.work_hours.toFixed(1)} jam`
-                      : "Belum tersedia"
+                      ? `${selectedItem.work_hours.toFixed(1)} ${language === "id" ? "jam" : "hours"}`
+                      : copy.notYetAvailable
                   }
                 />
               </div>
@@ -865,27 +838,27 @@ export default function AttendanceProductivityPage() {
                   />
 
                   <span className="text-xs font-bold text-[#121b2e]">
-                    Informasi Produktivitas
+                    {copy.productivityInfo}
                   </span>
                 </div>
 
                 <p className="mt-2 text-[11px] leading-relaxed text-[#4d5f81]">
-                  Penilaian durasi fleksibel: presensi memenuhi target jika total jam kerja minimal 7 jam.
+                  {copy.flexibleDuration}
                 </p>
 
                 <span className={`mt-3 inline-flex rounded px-2 py-1 text-[9px] font-bold ${selectedItem.work_hours !== null && selectedItem.work_hours >= 7 ? 'bg-[#eaf7f0] text-[#16834b]' : 'bg-[#fef9c3] text-[#b7791f]'}`}>
-                  {selectedItem.work_hours !== null && selectedItem.work_hours >= 7 ? 'MEMENUHI 7 JAM' : 'DI BAWAH 7 JAM'}
+                  {selectedItem.work_hours !== null && selectedItem.work_hours >= 7 ? copy.meetsSeven : copy.belowSeven}
                 </span>
               </div>
 
               {/* NOTE */}
               <div className="mt-4 rounded-xl border border-[#b9d6ff] bg-[#edf6ff] p-3">
                 <p className="text-[10px] font-bold text-[#1971c2]">
-                  Informasi
+                  {copy.information}
                 </p>
 
                 <p className="mt-1 text-[10px] leading-relaxed text-[#4d5f81]">
-                  Data attendance digunakan sebagai informasi monitoring dan tidak digunakan untuk menyimpulkan performance karyawan.
+                  {copy.disclaimer}
                 </p>
               </div>
             </div>

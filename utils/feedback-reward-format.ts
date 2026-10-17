@@ -1,5 +1,5 @@
-export function dateLabel(date: string, includeTime = false) {
-  return new Intl.DateTimeFormat("en-GB", {
+export function dateLabel(date: string, includeTime = false, language: "id" | "en" = "en") {
+  return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",

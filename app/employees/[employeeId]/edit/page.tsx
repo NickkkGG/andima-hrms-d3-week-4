@@ -6,6 +6,7 @@ import HrmsShell from "@/components/hrms/HrmsShell";
 import type { DepartmentOption, EmployeeProfile, PositionOption } from "@/types/employee";
 import { canManageEmployeeProfiles, getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
+import { getServerLanguage } from "@/lib/i18n-server";
 
 interface EditEmployeePageProps {
   params: Promise<{ employeeId: string }>;
@@ -21,6 +22,8 @@ interface D1PositionOption {
 }
 
 export default async function EditEmployeePage({ params }: EditEmployeePageProps) {
+  const language = await getServerLanguage();
+  const copy = language === "id" ? { title: "Edit profil pegawai", back: "← Profil pegawai", eyebrow: "MANAJEMEN PEGAWAI", description: (name: string) => `Perbarui informasi profil untuk ${name}.` } : { title: "Edit employee profile", back: "← Employee profile", eyebrow: "EMPLOYEE MANAGEMENT", description: (name: string) => `Update profile information for ${name}.` };
   const { employeeId } = await params;
   const supabase = await createClient();
   const {
@@ -36,7 +39,7 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
   if (!canManageEmployeeProfiles(userRole)) {
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <EmployeeManagementAccessDenied title="Edit Employee Profile" />
+        <EmployeeManagementAccessDenied title={copy.title} />
       </HrmsShell>
     );
   }
@@ -59,7 +62,7 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">Edit Employee Profile</h1>
+          <h1 className="text-xl font-bold">Edit Profil Pegawai</h1>
           <p className="mt-2">Profil pegawai belum dapat dimuat. Silakan coba lagi nanti.</p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
             ← Kembali ke Daftar Pegawai
@@ -73,8 +76,35 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">Edit Employee Profile</h1>
+          <h1 className="text-xl font-bold text-[#121B2E]">Edit Profil Pegawai</h1>
           <p className="mt-2 text-slate-600">Data pegawai tidak ditemukan.</p>
+          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
+            ← Kembali ke Daftar Pegawai
+          </Link>
+        </section>
+      </HrmsShell>
+    );
+  }
+
+  const { data: b2Source, error: b2SourceError } = await supabase
+    .from("d3_b2_employee_sources")
+    .select("employee_id")
+    .eq("employee_id", employee.id)
+    .maybeSingle();
+
+  if (b2SourceError) {
+    console.error("Employee edit B2 source query failed", {
+      code: b2SourceError.code,
+      message: b2SourceError.message,
+    });
+  }
+
+  if (b2SourceError || !b2Source) {
+    return (
+      <HrmsShell userEmail={user.email} userRole={userRole}>
+        <section className="mx-auto max-w-5xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
+          <h1 className="text-xl font-bold text-[#121B2E]">Edit Profil Pegawai</h1>
+          <p className="mt-2 text-slate-600">Data employee dari registrasi B2 tidak ditemukan.</p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
             ← Kembali ke Daftar Pegawai
           </Link>
@@ -141,7 +171,7 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">Edit Employee Profile</h1>
+          <h1 className="text-xl font-bold">Edit Profil Pegawai</h1>
           <p className="mt-2">Pilihan position atau department belum dapat dimuat. Silakan coba lagi nanti.</p>
           <Link
             className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]"
@@ -157,12 +187,12 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
   return (
     <HrmsShell userEmail={user.email} userRole={userRole}>
       <section className="mx-auto max-w-6xl space-y-7">
-        <Link className="inline-flex text-sm font-semibold text-[#1E3765] hover:text-[#155DFC]" href={`/employees/${encodeURIComponent(employee.employee_id)}`}>← Employee Profile</Link>
+        <Link className="inline-flex text-sm font-semibold text-[#1E3765] hover:text-[#155DFC]" href={`/employees/${encodeURIComponent(employee.employee_id)}`}>{copy.back}</Link>
 
         <header>
-          <p className="text-xs font-bold tracking-[0.16em] text-[#1E3765]">EMPLOYEE MANAGEMENT</p>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.04em] text-[#121B2E] sm:text-[42px]">Edit Employee Profile</h1>
-          <p className="mt-3 text-base text-slate-600">Update profile information for {employee.full_name}.</p>
+          <p className="text-xs font-bold tracking-[0.16em] text-[#1E3765]">{copy.eyebrow}</p>
+          <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.04em] text-[#121B2E] sm:text-[42px]">{copy.title}</h1>
+          <p className="mt-3 text-base text-slate-600">{copy.description(employee.full_name)}</p>
         </header>
 
         <EmployeeEditForm
