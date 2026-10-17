@@ -115,10 +115,22 @@ export default function LoginPage() {
       }
 
       if (registeredUser) {
+        const { data: d3Access, error: accessError } = await supabase
+          .from('d3_user_access')
+          .select('app_role')
+          .eq('auth_user_id', data.user.id)
+          .maybeSingle();
+
+        if (accessError) {
+          await supabase.auth.signOut();
+          setErrorMessage('Akun berhasil login, tetapi akses D3 belum dapat dibaca.');
+          return;
+        }
+
         setLoginAttempts(0);
         setSuccessMessage('Login berhasil. Mengarahkan ke halaman utama...');
         window.setTimeout(() => {
-          router.replace('/face-biometric-attendance');
+          router.replace(d3Access?.app_role === 'HR' ? '/face-biometric-attendance' : '/employees');
           router.refresh();
         }, 700);
         return;

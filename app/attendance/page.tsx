@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { Bell, ChevronRight, RefreshCw, AlertCircle, CheckCircle2, Clock3, FilePlus2, X } from 'lucide-react'
+import { ChevronRight, RefreshCw, AlertCircle, CheckCircle2, Clock3, FilePlus2, X } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import HeaderAccount from '@/components/HeaderAccount'
+import { useLanguage } from '@/components/i18n/LanguageProvider'
 import LocationMapPreview from '@/components/attendance/LocationMapPreview'
 
 type CorrectionType = 'CLOCK_IN' | 'CLOCK_OUT' | 'FULL_DAY' | string
@@ -66,6 +67,21 @@ type AttendanceQueryRow = {
 }
 
 export default function AttendancePageUI() {
+  const { t, language } = useLanguage()
+  const locale = language === 'id' ? 'id-ID' : 'en-GB'
+  const copy = language === 'id' ? {
+    accessRequired: 'Akses dashboard memerlukan akun HRMS yang telah dipetakan.', loadFailed: 'Data presensi belum dapat dimuat dari Supabase.', connectionFailed: 'Terjadi kesalahan saat menghubungkan ke Supabase.', employee: 'Karyawan', general: 'Umum', correction: 'Koreksi presensi', correctionApproved: 'Koreksi absensi {name} berhasil disetujui dan diterapkan.', correctionRejected: 'Koreksi absensi {name} berhasil ditolak.', updateFailed: 'Gagal memperbarui koreksi', unknownError: 'Terjadi kesalahan', requestFailed: 'Pengajuan koreksi gagal disimpan.', noteFailed: 'Koreksi tersimpan, tetapi catatan insentif gagal disimpan', requestSuccess: 'Koreksi berhasil diajukan dan menunggu persetujuan HR.', incomplete: 'Belum lengkap', hours: 'jam',
+    selfService: 'Layanan mandiri karyawan', myHistory: 'Riwayat Presensi Saya', greeting: 'Halo', reviewMy: 'Tinjau detail kehadiran dan ajukan koreksi bila ada data yang perlu diperbaiki.', attendanceHistory: 'Riwayat kehadiran', recorded: 'catatan presensi tercatat', pendingCorrections: 'koreksi menunggu', loadingHistory: 'Memuat riwayat presensi...', noHistory: 'Belum ada riwayat presensi.', date: 'Tanggal', clock: 'Clock in / out', duration: 'Durasi', status: 'Status', underSeven: 'DI BAWAH 7 JAM', meetsSeven: 'MEMENUHI 7 JAM', attendanceDetail: 'Detail presensi', noScan: 'Belum ada scan', source: 'Sumber', incentiveNotes: 'Catatan insentif/lembur', correctionRequest: 'Pengajuan koreksi', noCorrectionForDate: 'Belum ada pengajuan koreksi untuk tanggal ini.', correctionSubmitted: 'Koreksi sudah diajukan', submitCorrection: 'Ajukan koreksi',
+    submitAttendanceCorrection: 'Ajukan koreksi presensi', sentToHr: 'Tanggal {date} akan dikirim ke HR untuk ditinjau.', close: 'Tutup', correctionType: 'Tipe koreksi', correctClockIn: 'Perbaikan Clock In', correctClockOut: 'Perbaikan Clock Out', correctFullDay: 'Perbaikan satu hari penuh', correctClockInLabel: 'Clock In yang benar', correctClockOutLabel: 'Clock Out yang benar', overtimeNote: 'Catatan lembur / insentif (opsional)', overtimePlaceholder: 'Isi jika jam kerja melebihi jam formal dan membutuhkan catatan insentif', requestReason: 'Alasan pengajuan', reasonPlaceholder: 'Jelaskan alasan koreksi (minimal 10 karakter)', cancel: 'Batal', sending: 'Mengirim...', sendRequest: 'Kirim pengajuan',
+    managementTitle: 'Manajemen Presensi & Koreksi', managementDescription: 'Kelola riwayat presensi, validasi minimum 7 jam kerja, dan persetujuan koreksi absensi yang terhubung ke database Supabase.', all: 'Semua', awaitingApproval: 'Menunggu Persetujuan', approved: 'Disetujui', searchPlaceholder: 'Cari nama, NIP, atau divisi...', loadingData: 'Memuat data kehadiran karyawan dari Supabase...', noAttendance: 'Tidak ada data presensi', noResults: 'Tidak ada data yang cocok dengan kriteria filter atau pencarian Anda.', workDuration: 'Durasi kerja', lessThanSeven: '< 7 jam kerja', detailAudit: 'Detail presensi & audit', originalLog: 'Data log asli (fingerprint)', dataSource: 'Sumber data', activeCorrectionNone: 'Tidak ada pengajuan koreksi aktif untuk tanggal ini.', correctionTypeLabel: 'Tipe koreksi', proposedClockIn: 'Clock In diajukan', proposedClockOut: 'Clock Out diajukan', reasonRequired: 'Alasan pengajuan (wajib)', progressTrail: 'Progres & riwayat', attendanceReceived: 'Log presensi diterima', fingerprintSystem: 'Sistem fingerprint', correctionCreated: 'Pengajuan koreksi dibuat', byEmployee: 'Oleh pegawai', correctionApprovedTrail: 'Koreksi disetujui', correctionRejectedTrail: 'Koreksi ditolak', byHr: 'Oleh HR Admin', approve: 'Setujui', reject: 'Tolak', in: 'Masuk', out: 'Pulang',
+  } : {
+    accessRequired: 'This dashboard requires a mapped HRMS account.', loadFailed: 'Attendance data could not be loaded from Supabase.', connectionFailed: 'An error occurred while connecting to Supabase.', employee: 'Employee', general: 'General', correction: 'Attendance correction', correctionApproved: 'Attendance correction for {name} was approved and applied.', correctionRejected: 'Attendance correction for {name} was rejected.', updateFailed: 'Unable to update correction', unknownError: 'An unexpected error occurred', requestFailed: 'The correction request could not be saved.', noteFailed: 'The correction was saved, but the incentive note could not be saved', requestSuccess: 'Correction request submitted and awaiting HR approval.', incomplete: 'Incomplete', hours: 'hours',
+    selfService: 'Employee self service', myHistory: 'My Attendance History', greeting: 'Hello', reviewMy: 'Review attendance details and submit a correction when a record needs updating.', attendanceHistory: 'Attendance history', recorded: 'attendance records', pendingCorrections: 'pending corrections', loadingHistory: 'Loading attendance history...', noHistory: 'No attendance history yet.', date: 'Date', clock: 'Clock in / out', duration: 'Duration', status: 'Status', underSeven: 'UNDER 7 HOURS', meetsSeven: 'MEETS 7 HOURS', attendanceDetail: 'Attendance details', noScan: 'No scan yet', source: 'Source', incentiveNotes: 'Overtime / incentive note', correctionRequest: 'Correction request', noCorrectionForDate: 'No correction request for this date.', correctionSubmitted: 'Correction submitted', submitCorrection: 'Submit correction',
+    submitAttendanceCorrection: 'Submit attendance correction', sentToHr: 'The record for {date} will be sent to HR for review.', close: 'Close', correctionType: 'Correction type', correctClockIn: 'Correct clock in', correctClockOut: 'Correct clock out', correctFullDay: 'Correct full day', correctClockInLabel: 'Correct clock in', correctClockOutLabel: 'Correct clock out', overtimeNote: 'Overtime / incentive note (optional)', overtimePlaceholder: 'Add a note when working hours exceed normal hours and need an incentive record', requestReason: 'Reason for request', reasonPlaceholder: 'Explain the correction reason (at least 10 characters)', cancel: 'Cancel', sending: 'Sending...', sendRequest: 'Submit request',
+    managementTitle: 'Attendance & Correction Management', managementDescription: 'Manage attendance history, the seven-hour minimum validation, and attendance-correction approvals connected to Supabase.', all: 'All', awaitingApproval: 'Awaiting approval', approved: 'Approved', searchPlaceholder: 'Search by name, employee ID, or department...', loadingData: 'Loading employee attendance data from Supabase...', noAttendance: 'No attendance data', noResults: 'No data matches your current filter or search.', workDuration: 'Work duration', lessThanSeven: '< 7 work hours', detailAudit: 'Attendance details & audit', originalLog: 'Original log data (fingerprint)', dataSource: 'Data source', activeCorrectionNone: 'There is no active correction request for this date.', correctionTypeLabel: 'Correction type', proposedClockIn: 'Proposed clock in', proposedClockOut: 'Proposed clock out', reasonRequired: 'Request reason (required)', progressTrail: 'Progress & history', attendanceReceived: 'Attendance log received', fingerprintSystem: 'Fingerprint system', correctionCreated: 'Correction request created', byEmployee: 'By employee', correctionApprovedTrail: 'Correction approved', correctionRejectedTrail: 'Correction rejected', byHr: 'By HR Admin', approve: 'Approve', reject: 'Reject', in: 'In', out: 'Out',
+  }
+  const interpolate = (value: string, values: Record<string, string>) => value.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '')
+  const correctionStatusLabel = (status: CorrectionStatus) => ({ PENDING: language === 'id' ? 'Menunggu persetujuan' : 'Awaiting approval', APPROVED: copy.approved, REJECTED: language === 'id' ? 'Ditolak' : 'Rejected' }[status] ?? status)
   const [attendances, setAttendances] = useState<AttendanceItem[]>([])
   const [selectedItem, setSelectedItem] = useState<AttendanceItem | null>(null)
   const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL')
@@ -137,8 +153,8 @@ export default function AttendancePageUI() {
         console.warn('Supabase fetch query notice:', error.message)
         setErrorMessage(
           error.code === '42501'
-            ? 'Akses dashboard memerlukan akun HRMS yang telah dipetakan.'
-            : 'Data presensi belum dapat dimuat dari Supabase.'
+            ? copy.accessRequired
+            : copy.loadFailed
         )
         setAttendances([])
         setSelectedItem(null)
@@ -154,8 +170,8 @@ export default function AttendancePageUI() {
           return {
             id: item.id || `ATT-${item.employee_id}`,
             employee_id: emp?.employee_id || item.employee_id || 'EMP-AND-000',
-            full_name: emp?.full_name || 'Karyawan',
-            department: emp?.d3_departments?.name || 'Umum',
+            full_name: emp?.full_name || copy.employee,
+            department: emp?.d3_departments?.name || copy.general,
             date: item.date || new Date().toISOString().split('T')[0],
             clock_in: item.clock_in ? (item.clock_in.includes('T') ? item.clock_in : `${item.date}T${item.clock_in}`) : `${item.date}T08:00:00`,
             clock_out: item.clock_out ? (item.clock_out.includes('T') ? item.clock_out : `${item.date}T${item.clock_out}`) : null,
@@ -173,9 +189,9 @@ export default function AttendancePageUI() {
                   correction_type: corr.correction_type || 'CLOCK_IN',
                   proposed_clock_in: corr.proposed_clock_in,
                   proposed_clock_out: corr.proposed_clock_out,
-                  reason: corr.reason || 'Koreksi presensi',
+                  reason: corr.reason || copy.correction,
                   status: corr.status || 'PENDING',
-                  created_at: corr.created_at ? new Date(corr.created_at).toLocaleString('id-ID') : item.date,
+                  created_at: corr.created_at ? new Date(corr.created_at).toLocaleString(locale) : item.date,
                 }
               : null,
           }
@@ -191,7 +207,7 @@ export default function AttendancePageUI() {
     } catch (err: unknown) {
       console.error('Error fetching attendance from Supabase:', err)
       setErrorMessage(
-        err instanceof Error ? err.message : 'Terjadi kesalahan saat menghubungkan ke Supabase.'
+        err instanceof Error ? err.message : copy.connectionFailed
       )
       setAttendances([])
       setSelectedItem(null)
@@ -218,7 +234,7 @@ export default function AttendancePageUI() {
       const name = userData.user.user_metadata?.full_name
       setAppRole(access.app_role as AppRole)
       setViewerEmployeeId(access.employee_id)
-      setViewerName(typeof name === 'string' && name.trim() ? name.trim() : userData.user.email?.split('@')[0] || 'Employee')
+      setViewerName(typeof name === 'string' && name.trim() ? name.trim() : userData.user.email?.split('@')[0] || copy.employee)
     }
 
     void loadAccountAccess()
@@ -276,13 +292,13 @@ export default function AttendancePageUI() {
       setSelectedItem(updatedItem)
       setActionMessage({
         type: 'success',
-        text: `Koreksi absensi ${selectedItem.full_name} berhasil ${status === 'APPROVED' ? 'disetujui dan diterapkan' : 'ditolak'}.`,
+        text: interpolate(status === 'APPROVED' ? copy.correctionApproved : copy.correctionRejected, { name: selectedItem.full_name }),
       })
       setTimeout(() => setActionMessage(null), 4000)
     } catch (err: unknown) {
       setActionMessage({
         type: 'error',
-        text: `Gagal memperbarui koreksi: ${err instanceof Error ? err.message : 'Terjadi kesalahan'}`,
+        text: `${copy.updateFailed}: ${err instanceof Error ? err.message : copy.unknownError}`,
       })
       setTimeout(() => setActionMessage(null), 4000)
     }
@@ -309,7 +325,7 @@ export default function AttendancePageUI() {
       .single()
 
     if (error) {
-      setActionMessage({ type: 'error', text: error.message || 'Pengajuan koreksi gagal disimpan.' })
+      setActionMessage({ type: 'error', text: error.message || copy.requestFailed })
       setIsSubmittingCorrection(false)
       return
     }
@@ -320,13 +336,13 @@ export default function AttendancePageUI() {
         .update({ notes: incentiveNote.trim() })
         .eq('id', selectedItem.id)
       if (noteError) {
-        setActionMessage({ type: 'error', text: `Koreksi tersimpan, tetapi catatan insentif gagal disimpan: ${noteError.message}` })
+        setActionMessage({ type: 'error', text: `${copy.noteFailed}: ${noteError.message}` })
       }
     }
 
     const correction: AttendanceCorrection = {
       ...data,
-      created_at: new Date(data.created_at).toLocaleString('id-ID'),
+      created_at: new Date(data.created_at).toLocaleString(locale),
     }
     const updated = attendances.map((item) => item.id === selectedItem.id ? { ...item, correction } : item)
     setAttendances(updated)
@@ -336,20 +352,20 @@ export default function AttendancePageUI() {
     setProposedClockIn('')
     setProposedClockOut('')
     setIncentiveNote('')
-    setActionMessage({ type: 'success', text: 'Koreksi berhasil diajukan dan menunggu persetujuan HR.' })
+    setActionMessage({ type: 'success', text: copy.requestSuccess })
     setIsSubmittingCorrection(false)
     setTimeout(() => setActionMessage(null), 4000)
   }
 
   // Helper perhitungan durasi kerja dengan batas minimum 7 jam.
   const calculateDuration = (clockIn: string, clockOut: string | null) => {
-    if (!clockOut) return { text: 'Incomplete', isUnderMin: true }
+    if (!clockOut) return { text: copy.incomplete, isUnderMin: true }
     const start = new Date(clockIn).getTime()
     const end = new Date(clockOut).getTime()
-    if (isNaN(start) || isNaN(end)) return { text: 'Incomplete', isUnderMin: true }
+    if (isNaN(start) || isNaN(end)) return { text: copy.incomplete, isUnderMin: true }
     const diffHours = (end - start) / (1000 * 60 * 60)
     return {
-      text: `${diffHours.toFixed(1)} Jam`,
+      text: `${diffHours.toFixed(1)} ${copy.hours}`,
       isUnderMin: diffHours < 7.0,
     }
   }
@@ -374,58 +390,43 @@ export default function AttendancePageUI() {
 
     return (
       <>
-        <div className="min-h-screen bg-[#f7f8ff] text-[#121b2e]">
-          <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#d9e2fc] bg-white px-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6">
-            <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
-              <div className="hidden items-center gap-3 sm:flex"><span className="font-bold">ANDIMA HRMS</span><span className="h-5 border-l border-[#d9e2fc]" /><span className="text-xs font-semibold text-[#3f4940]">HRMS</span><ChevronRight size={13} className="text-[#4d5f81]/50" /><span className="text-xs font-semibold text-[#006838]">My Attendance</span></div>
-              <span className="text-sm font-bold sm:hidden">Attendance</span>
-              <div className="flex items-center gap-2 sm:gap-3"><button type="button" onClick={fetchAttendanceData} className="grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label="Refresh"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></button><button type="button" className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81]" aria-label="Notifikasi"><Bell size={17} /><span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" /></button><HeaderAccount /></div>
+        <div className="min-h-screen bg-[#eaf2fc] text-[#121b2e]">
+          <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 px-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:px-6">
+            <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-3">
+              <div className="hidden min-w-0 items-center gap-3 sm:flex"><span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span><span className="h-5 border-l border-[#BCD4EE]" /><span className="text-xs font-semibold text-[#3f4940]">HRMS</span><ChevronRight size={13} className="shrink-0 text-[#52749B]/60" /><span className="truncate text-xs font-semibold text-[#0C68D5]">{t('myAttendance')}</span></div>
+              <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">{t('myAttendance')}</span>
+              <div className="flex items-center gap-2 sm:gap-3"><HeaderAccount /></div>
             </div>
           </header>
-          <section className="border-b border-[#d9e2fc] bg-white px-4 py-5 sm:px-6"><div className="mx-auto max-w-[1600px]"><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#006838]">Employee self service</p><h1 className="mt-1 text-2xl font-bold tracking-[-0.4px]">Riwayat Presensi Saya</h1><p className="mt-1 text-sm text-[#4d5f81]">Halo, {viewerName || 'Employee'}. Tinjau detail kehadiran dan ajukan koreksi bila ada data yang perlu diperbaiki.</p></div></section>
+          <section className="border-b border-[#d9e2fc] bg-white px-4 py-5 sm:px-6"><div className="mx-auto max-w-[1600px]"><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#006838]">{copy.selfService}</p><h1 className="mt-1 text-2xl font-bold tracking-[-0.4px]">{copy.myHistory}</h1><p className="mt-1 text-sm text-[#4d5f81]">{copy.greeting}, {viewerName || copy.employee}. {copy.reviewMy}</p></div></section>
           {actionMessage && <div className={`mx-4 mt-4 flex items-center gap-2 rounded-lg border p-3 text-xs font-semibold sm:mx-6 ${actionMessage.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}><CheckCircle2 size={16} />{actionMessage.text}</div>}
           {errorMessage && <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 sm:mx-6"><AlertCircle size={16} />{errorMessage}</div>}
           <main className="mx-auto grid max-w-[1600px] gap-5 px-4 py-6 xl:grid-cols-[minmax(0,1fr)_390px] sm:px-6">
-            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center justify-between border-b border-[#becabd]/35 px-5 py-4"><div><h2 className="text-sm font-bold">Riwayat kehadiran</h2><p className="mt-1 text-xs text-[#4d5f81]">{attendances.length} catatan presensi tercatat</p></div><span className="rounded-full bg-[#edf6ff] px-2.5 py-1 text-[10px] font-bold text-[#1971c2]">{pendingCount} koreksi pending</span></div>{loading ? <div className="flex min-h-[260px] items-center justify-center text-xs text-[#4d5f81]"><RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />Memuat riwayat presensi...</div> : attendances.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">Belum ada riwayat presensi.</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead><tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><th className="px-4 py-3">Tanggal</th><th className="px-3 py-3">Clock in / out</th><th className="px-3 py-3">Durasi</th><th className="px-3 py-3">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{attendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selected ? 'bg-[#eaf7f0]' : ''}`}><td className="px-4 py-3.5 font-semibold">{row.date}</td><td className="px-3 py-3.5 text-[#4d5f81]">{new Date(row.clock_in).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB <span className="mx-1 text-[#becabd]">/</span> {row.clock_out ? `${new Date(row.clock_out).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB` : '-'}</td><td className="px-3 py-3.5"><span className={duration.isUnderMin ? 'font-semibold text-[#b7791f]' : 'font-semibold'}>{duration.text}</span></td><td className="px-3 py-3.5"><div className="flex flex-wrap gap-1"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'}`}>{duration.isUnderMin ? 'DI BAWAH 7 JAM' : 'MEMENUHI 7 JAM'}</span>{row.correction && <span className="rounded bg-[#edf6ff] px-2 py-0.5 text-[10px] font-bold text-[#1971c2]">Koreksi: {row.correction.status}</span>}</div></td></tr> })}</tbody></table></div>}</section>
-            {employeeItem && <aside className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3"><div><span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">Detail presensi</span><h2 className="mt-1 text-sm font-bold">{employeeItem.date}</h2><p className="text-xs text-[#4d5f81]">{employeeItem.employee_id} • {employeeItem.department}</p></div><Clock3 size={18} className="text-[#006838]" /></div><div className="mt-4 space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs"><div className="flex justify-between text-[#4d5f81]"><span>Clock In</span><strong>{new Date(employeeItem.clock_in).toLocaleTimeString('id-ID')} WIB</strong></div><div className="flex justify-between text-[#4d5f81]"><span>Clock Out</span><strong>{employeeItem.clock_out ? `${new Date(employeeItem.clock_out).toLocaleTimeString('id-ID')} WIB` : 'Belum ada scan'}</strong></div><div className="flex justify-between border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span>Sumber</span><strong className="text-[#1971c2]">{employeeItem.source}</strong></div>{employeeItem.notes && <div className="border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span className="font-semibold">Catatan insentif/lembur:</span><p className="mt-1 text-[#121b2e]">{employeeItem.notes}</p></div>}</div><LocationMapPreview className="mt-4" clockIn={{ latitude: employeeItem.clock_in_latitude, longitude: employeeItem.clock_in_longitude, accuracyMeters: employeeItem.clock_in_accuracy_meters }} clockOut={{ latitude: employeeItem.clock_out_latitude, longitude: employeeItem.clock_out_longitude, accuracyMeters: employeeItem.clock_out_accuracy_meters }} />{employeeItem.correction ? <div className="mt-4 rounded-xl border border-[#b9d6ff] bg-[#edf6ff] p-3.5 text-xs"><div className="flex justify-between font-bold text-[#1e3765]"><span>Pengajuan koreksi</span><span>{employeeItem.correction.status}</span></div><p className="mt-2 text-[#4d5f81]">{employeeItem.correction.reason}</p></div> : <p className="mt-4 rounded-xl border border-dashed border-[#becabd] p-3 text-center text-xs italic text-[#4d5f81]">Belum ada pengajuan koreksi untuk tanggal ini.</p>}<button type="button" disabled={!!employeeItem.correction || isSubmittingCorrection} onClick={() => { setCorrectionType('CLOCK_IN'); setIsCorrectionOpen(true) }} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#16834b] py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:cursor-not-allowed disabled:opacity-50"><FilePlus2 size={14} />{employeeItem.correction ? 'Koreksi sudah diajukan' : 'Ajukan koreksi'}</button></aside>}
+            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center justify-between border-b border-[#becabd]/35 px-5 py-4"><div><h2 className="text-sm font-bold">{copy.attendanceHistory}</h2><p className="mt-1 text-xs text-[#4d5f81]">{attendances.length} {copy.recorded}</p></div><span className="rounded-full bg-[#edf6ff] px-2.5 py-1 text-[10px] font-bold text-[#1971c2]">{pendingCount} {copy.pendingCorrections}</span></div>{loading ? <div className="flex min-h-[260px] items-center justify-center text-xs text-[#4d5f81]"><RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />{copy.loadingHistory}</div> : attendances.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.noHistory}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead><tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.clock}</th><th className="px-3 py-3">{copy.duration}</th><th className="px-3 py-3">{copy.status}</th></tr></thead><tbody className="divide-y divide-slate-100">{attendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selected ? 'bg-[#eaf7f0]' : ''}`}><td className="px-4 py-3.5 font-semibold">{row.date}</td><td className="px-3 py-3.5 text-[#4d5f81]">{new Date(row.clock_in).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB <span className="mx-1 text-[#becabd]">/</span> {row.clock_out ? `${new Date(row.clock_out).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB` : '-'}</td><td className="px-3 py-3.5"><span className={duration.isUnderMin ? 'font-semibold text-[#b7791f]' : 'font-semibold'}>{duration.text}</span></td><td className="px-3 py-3.5"><div className="flex flex-wrap gap-1"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'}`}>{duration.isUnderMin ? copy.underSeven : copy.meetsSeven}</span>{row.correction && <span className="rounded bg-[#edf6ff] px-2 py-0.5 text-[10px] font-bold text-[#1971c2]">{copy.correction}: {correctionStatusLabel(row.correction.status)}</span>}</div></td></tr> })}</tbody></table></div>}</section>
+            {employeeItem && <aside className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3"><div><span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.attendanceDetail}</span><h2 className="mt-1 text-sm font-bold">{employeeItem.date}</h2><p className="text-xs text-[#4d5f81]">{employeeItem.employee_id} • {employeeItem.department}</p></div><Clock3 size={18} className="text-[#006838]" /></div><div className="mt-4 space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs"><div className="flex justify-between text-[#4d5f81]"><span>Clock In</span><strong>{new Date(employeeItem.clock_in).toLocaleTimeString(locale)} WIB</strong></div><div className="flex justify-between text-[#4d5f81]"><span>Clock Out</span><strong>{employeeItem.clock_out ? `${new Date(employeeItem.clock_out).toLocaleTimeString(locale)} WIB` : copy.noScan}</strong></div><div className="flex justify-between border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span>{copy.source}</span><strong className="text-[#1971c2]">{employeeItem.source}</strong></div>{employeeItem.notes && <div className="border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span className="font-semibold">{copy.incentiveNotes}:</span><p className="mt-1 text-[#121b2e]">{employeeItem.notes}</p></div>}</div><LocationMapPreview className="mt-4" clockIn={{ latitude: employeeItem.clock_in_latitude, longitude: employeeItem.clock_in_longitude, accuracyMeters: employeeItem.clock_in_accuracy_meters }} clockOut={{ latitude: employeeItem.clock_out_latitude, longitude: employeeItem.clock_out_longitude, accuracyMeters: employeeItem.clock_out_accuracy_meters }} />{employeeItem.correction ? <div className="mt-4 rounded-xl border border-[#b9d6ff] bg-[#edf6ff] p-3.5 text-xs"><div className="flex justify-between font-bold text-[#1e3765]"><span>{copy.correctionRequest}</span><span>{correctionStatusLabel(employeeItem.correction.status)}</span></div><p className="mt-2 text-[#4d5f81]">{employeeItem.correction.reason}</p></div> : <p className="mt-4 rounded-xl border border-dashed border-[#becabd] p-3 text-center text-xs italic text-[#4d5f81]">{copy.noCorrectionForDate}</p>}<button type="button" disabled={!!employeeItem.correction || isSubmittingCorrection} onClick={() => { setCorrectionType('CLOCK_IN'); setIsCorrectionOpen(true) }} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#16834b] py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:cursor-not-allowed disabled:opacity-50"><FilePlus2 size={14} />{employeeItem.correction ? copy.correctionSubmitted : copy.submitCorrection}</button></aside>}
           </main>
         </div>
-        {isCorrectionOpen && employeeItem && <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f2342]/45 p-4"><section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#d9e2fc] px-5 py-4"><div><h2 className="text-lg font-bold">Ajukan koreksi presensi</h2><p className="mt-1 text-xs text-[#4d5f81]">Tanggal {employeeItem.date} akan dikirim ke HR untuk ditinjau.</p></div><button type="button" onClick={() => setIsCorrectionOpen(false)} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label="Tutup"><X size={18} /></button></div><form onSubmit={handleSubmitCorrection} className="space-y-4 p-5"><label className="block text-xs font-bold text-[#121b2e]">Tipe koreksi<select value={correctionType} onChange={(event) => setCorrectionType(event.target.value as CorrectionType)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] bg-white px-3 py-2.5 text-xs font-normal outline-none focus:border-[#069494]"><option value="CLOCK_IN">Perbaikan Clock In</option><option value="CLOCK_OUT">Perbaikan Clock Out</option><option value="FULL_DAY">Perbaikan satu hari penuh</option></select></label><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">Clock In yang benar<input type="time" value={proposedClockIn} onChange={(event) => setProposedClockIn(event.target.value)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] px-3 py-2.5 text-xs font-normal" /></label><label className="text-xs font-bold">Clock Out yang benar<input type="time" value={proposedClockOut} onChange={(event) => setProposedClockOut(event.target.value)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] px-3 py-2.5 text-xs font-normal" /></label></div><label className="block text-xs font-bold">Catatan lembur / insentif (opsional)<textarea value={incentiveNote} onChange={(event) => setIncentiveNote(event.target.value)} className="mt-1 min-h-16 w-full resize-y rounded-lg border border-[#d9e2fc] p-3 text-xs font-normal outline-none focus:border-[#069494]" placeholder="Isi jika jam kerja melebihi jam formal dan membutuhkan catatan insentif" /></label><label className="block text-xs font-bold">Alasan pengajuan<textarea required minLength={10} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} className="mt-1 min-h-24 w-full resize-y rounded-lg border border-[#d9e2fc] p-3 text-xs font-normal outline-none focus:border-[#069494]" placeholder="Jelaskan alasan koreksi (minimal 10 karakter)" /></label><div className="flex justify-end gap-2 border-t border-[#d9e2fc] pt-4"><button type="button" onClick={() => setIsCorrectionOpen(false)} className="rounded-lg px-3 py-2 text-xs font-bold text-[#4d5f81] hover:bg-[#f1f3ff]">Batal</button><button type="submit" disabled={isSubmittingCorrection || correctionReason.trim().length < 10} className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"><FilePlus2 size={14} />{isSubmittingCorrection ? 'Mengirim...' : 'Kirim pengajuan'}</button></div></form></section></div>}
+        {isCorrectionOpen && employeeItem && <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f2342]/45 p-4"><section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#d9e2fc] px-5 py-4"><div><h2 className="text-lg font-bold">{copy.submitAttendanceCorrection}</h2><p className="mt-1 text-xs text-[#4d5f81]">{interpolate(copy.sentToHr, { date: employeeItem.date })}</p></div><button type="button" onClick={() => setIsCorrectionOpen(false)} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label={copy.close}><X size={18} /></button></div><form onSubmit={handleSubmitCorrection} className="space-y-4 p-5"><label className="block text-xs font-bold text-[#121b2e]">{copy.correctionType}<select value={correctionType} onChange={(event) => setCorrectionType(event.target.value as CorrectionType)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] bg-white px-3 py-2.5 text-xs font-normal outline-none focus:border-[#069494]"><option value="CLOCK_IN">{copy.correctClockIn}</option><option value="CLOCK_OUT">{copy.correctClockOut}</option><option value="FULL_DAY">{copy.correctFullDay}</option></select></label><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">{copy.correctClockInLabel}<input type="time" value={proposedClockIn} onChange={(event) => setProposedClockIn(event.target.value)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] px-3 py-2.5 text-xs font-normal" /></label><label className="text-xs font-bold">{copy.correctClockOutLabel}<input type="time" value={proposedClockOut} onChange={(event) => setProposedClockOut(event.target.value)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] px-3 py-2.5 text-xs font-normal" /></label></div><label className="block text-xs font-bold">{copy.overtimeNote}<textarea value={incentiveNote} onChange={(event) => setIncentiveNote(event.target.value)} className="mt-1 min-h-16 w-full resize-y rounded-lg border border-[#d9e2fc] p-3 text-xs font-normal outline-none focus:border-[#069494]" placeholder={copy.overtimePlaceholder} /></label><label className="block text-xs font-bold">{copy.requestReason}<textarea required minLength={10} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} className="mt-1 min-h-24 w-full resize-y rounded-lg border border-[#d9e2fc] p-3 text-xs font-normal outline-none focus:border-[#069494]" placeholder={copy.reasonPlaceholder} /></label><div className="flex justify-end gap-2 border-t border-[#d9e2fc] pt-4"><button type="button" onClick={() => setIsCorrectionOpen(false)} className="rounded-lg px-3 py-2 text-xs font-bold text-[#4d5f81] hover:bg-[#f1f3ff]">{copy.cancel}</button><button type="submit" disabled={isSubmittingCorrection || correctionReason.trim().length < 10} className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"><FilePlus2 size={14} />{isSubmittingCorrection ? copy.sending : copy.sendRequest}</button></div></form></section></div>}
       </>
     )
   }
 
   return (
     <>
-      <div className="min-h-screen bg-[#f7f8ff] text-[#121b2e]">
+      <div className="min-h-screen bg-[#eaf2fc] text-[#121b2e]">
         {/* HEADER */}
-        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#d9e2fc] bg-white px-4 shadow-[0_1px_1px_rgba(0,0,0,0.05)] sm:px-6">
-          <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-3">
+        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 px-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:px-6">
+          <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-3">
             <div className="hidden min-w-0 items-center gap-3 sm:flex">
-              <span className="font-bold text-[#121b2e]">ANDIMA HRMS</span>
-              <span className="h-5 border-l border-[#d9e2fc]" />
+              <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span>
+              <span className="h-5 border-l border-[#BCD4EE]" />
               <span className="text-xs font-semibold text-[#3f4940]">HRMS</span>
-              <ChevronRight size={13} className="text-[#4d5f81]/50" />
-              <span className="truncate text-xs font-semibold text-[#006838]">Attendance & Correction</span>
+              <ChevronRight size={13} className="shrink-0 text-[#52749B]/60" />
+              <span className="truncate text-xs font-semibold text-[#0C68D5]">{t('attendanceHistoryCorrection')}</span>
             </div>
-            <span className="text-sm font-bold text-[#121b2e] sm:hidden">Attendance</span>
+            <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">{t('attendanceHistoryCorrection')}</span>
 
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* <button
-                type="button"
-                onClick={fetchAttendanceData}
-                title="Refresh Data dari Supabase"
-                className="grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]"
-              >
-                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              </button> */}
-
-              {/* <button type="button" className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] transition hover:bg-[#f1f3ff]" aria-label="Notifikasi">
-                <Bell size={17} />
-                <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[#d64545]" />
-              </button> */}
-              <HeaderAccount />
-            </div>
+            <div className="flex items-center gap-2 sm:gap-3"><HeaderAccount /></div>
           </div>
         </header>
 
@@ -433,9 +434,9 @@ export default function AttendancePageUI() {
         <section className="border-b border-[#d9e2fc] bg-white px-4 py-5 sm:px-6">
           <div className="mx-auto flex max-w-[1600px] flex-col justify-between gap-4 sm:flex-row sm:items-start">
             <div>
-              <h1 className="text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">Attendance & Correction Management</h1>
+              <h1 className="text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{copy.managementTitle}</h1>
               <p className="mt-1 text-sm text-[#4d5f81]">
-                Kelola riwayat presensi, validasi minimum 7 jam kerja, dan persetujuan koreksi absensi yang terhubung ke database Supabase.
+                {copy.managementDescription}
               </p>
             </div>
             {/* <span className="inline-flex w-fit items-center rounded-full border border-[#006838]/25 bg-[#eaf7f0] px-3 py-1.5 text-xs font-bold text-[#006838]">
@@ -473,7 +474,7 @@ export default function AttendancePageUI() {
                     : 'text-[#4d5f81] hover:text-[#121b2e]'
                 }`}
               >
-                Semua ({attendances.length})
+                {copy.all} ({attendances.length})
               </button>
               <button
                 onClick={() => setActiveTab('PENDING')}
@@ -483,7 +484,7 @@ export default function AttendancePageUI() {
                     : 'text-[#4d5f81] hover:text-[#121b2e]'
                 }`}
               >
-                Menunggu Persetujuan ({attendances.filter((i) => i.correction?.status === 'PENDING').length})
+                {copy.awaitingApproval} ({attendances.filter((i) => i.correction?.status === 'PENDING').length})
               </button>
               <button
                 onClick={() => setActiveTab('APPROVED')}
@@ -493,13 +494,13 @@ export default function AttendancePageUI() {
                     : 'text-[#4d5f81] hover:text-[#121b2e]'
                 }`}
               >
-                Disetujui ({attendances.filter((i) => i.correction?.status === 'APPROVED').length})
+                {copy.approved} ({attendances.filter((i) => i.correction?.status === 'APPROVED').length})
               </button>
             </div>
 
             <input
               type="text"
-              placeholder="Cari nama, NIP, atau divisi..."
+              placeholder={copy.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs outline-none transition placeholder:text-[#4d5f81]/70 focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15 sm:w-64"
@@ -513,24 +514,24 @@ export default function AttendancePageUI() {
             {loading ? (
               <div className="flex min-h-[300px] items-center justify-center text-xs text-[#4d5f81]">
                 <RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />
-                <span>Memuat data kehadiran karyawan dari Supabase...</span>
+                <span>{copy.loadingData}</span>
               </div>
             ) : filteredData.length === 0 ? (
               <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center text-xs text-[#4d5f81]">
                 <AlertCircle size={32} className="text-[#becabd]" />
-                <p className="mt-2 font-bold text-[#121b2e]">Tidak ada data presensi</p>
-                <p className="mt-1">Tidak ada data yang cocok dengan kriteria filter atau pencarian Anda.</p>
+                <p className="mt-2 font-bold text-[#121b2e]">{copy.noAttendance}</p>
+                <p className="mt-1">{copy.noResults}</p>
               </div>
             ) : (
               <div className="overflow-x-auto flex-1">
                 <table className="w-full min-w-[720px] text-left text-xs">
                   <thead>
                     <tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                      <th className="px-4 py-3">Employee</th>
-                      <th className="px-3 py-3">Tanggal</th>
-                      <th className="px-3 py-3">Clock In / Out</th>
-                      <th className="px-3 py-3">Durasi Kerja</th>
-                      <th className="px-3 py-3">Status</th>
+                      <th className="px-4 py-3">{copy.employee}</th>
+                      <th className="px-3 py-3">{copy.date}</th>
+                      <th className="px-3 py-3">{copy.clock}</th>
+                      <th className="px-3 py-3">{copy.workDuration}</th>
+                      <th className="px-3 py-3">{copy.status}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -556,16 +557,16 @@ export default function AttendancePageUI() {
                           <td className="px-3 py-3.5 font-medium text-[#3f4940]">{row.date}</td>
                           <td className="px-3 py-3.5 text-[#4d5f81]">
                             <div>
-                              In:{' '}
+                              {copy.in}:{' '}
                               {!isNaN(clockInTime.getTime())
-                                ? clockInTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                                ? clockInTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
                                 : '-'}{' '}
                               WIB
                             </div>
                             <div>
-                              Out:{' '}
+                              {copy.out}:{' '}
                               {clockOutTime && !isNaN(clockOutTime.getTime())
-                                ? `${clockOutTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`
+                                ? `${clockOutTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB`
                                 : '-'}
                             </div>
                           </td>
@@ -574,7 +575,7 @@ export default function AttendancePageUI() {
                               {duration.text}
                             </span>
                             {duration.isUnderMin && (
-                              <span className="mt-0.5 block text-[9px] font-bold text-[#b7791f]">&lt; 7 Jam Kerja</span>
+                              <span className="mt-0.5 block text-[9px] font-bold text-[#b7791f]">{copy.lessThanSeven}</span>
                             )}
                           </td>
                           <td className="px-3 py-3.5">
@@ -584,7 +585,7 @@ export default function AttendancePageUI() {
                                   duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'
                                 }`}
                               >
-                                {duration.isUnderMin ? 'DI BAWAH 7 JAM' : 'MEMENUHI 7 JAM'}
+                                {duration.isUnderMin ? copy.underSeven : copy.meetsSeven}
                               </span>
                               {row.correction && (
                                 <span
@@ -596,7 +597,7 @@ export default function AttendancePageUI() {
                                       : 'bg-[#edf6ff] text-[#1971c2]'
                                   }`}
                                 >
-                                  Koreksi: {row.correction.status}
+                                  {copy.correction}: {correctionStatusLabel(row.correction.status)}
                                 </span>
                               )}
                             </div>
@@ -617,35 +618,35 @@ export default function AttendancePageUI() {
                 <div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                      Detail Presensi & Audit
+                      {copy.detailAudit}
                     </span>
                     <h3 className="mt-0.5 text-sm font-bold text-[#121b2e]">
                       {selectedItem.full_name}
                     </h3>
-                    <p className="text-xs text-[#4d5f81]">{selectedItem.employee_id} • Tanggal {selectedItem.date}</p>
+                    <p className="text-xs text-[#4d5f81]">{selectedItem.employee_id} • {copy.date} {selectedItem.date}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs">
                   <div className="border-b border-[#becabd]/35 pb-1 font-bold text-[#121b2e]">
-                    Data Log Original (Raw Fingerprint)
+                    {copy.originalLog}
                   </div>
                   <div className="flex justify-between text-[#4d5f81]">
                     <span>Clock In:</span>
                     <span className="font-mono font-semibold">
-                      {new Date(selectedItem.clock_in).toLocaleTimeString('id-ID')} WIB
+                      {new Date(selectedItem.clock_in).toLocaleTimeString(locale)} WIB
                     </span>
                   </div>
                   <div className="flex justify-between text-[#4d5f81]">
                     <span>Clock Out:</span>
                     <span className="font-mono font-semibold">
                       {selectedItem.clock_out
-                        ? `${new Date(selectedItem.clock_out).toLocaleTimeString('id-ID')} WIB`
-                        : 'Tidak ada scan'}
+                        ? `${new Date(selectedItem.clock_out).toLocaleTimeString(locale)} WIB`
+                        : copy.noScan}
                     </span>
                   </div>
                   <div className="flex justify-between border-t border-[#becabd]/35 pt-1 text-[11px] text-[#4d5f81]">
-                    <span>Sumber Data:</span>
+                    <span>{copy.dataSource}:</span>
                     <span className="font-semibold text-[#1971c2]">{selectedItem.source}</span>
                   </div>
                 </div>
@@ -674,7 +675,7 @@ export default function AttendancePageUI() {
                     }`}
                   >
                     <div className="flex items-center justify-between font-bold text-[#1e3765]">
-                      <span>Pengajuan Koreksi Absensi</span>
+                      <span>{copy.correctionRequest}</span>
                       <span
                         className={`rounded px-2 py-0.5 text-[10px] font-bold ${
                           selectedItem.correction.status === 'APPROVED'
@@ -684,28 +685,28 @@ export default function AttendancePageUI() {
                             : 'bg-[#b9d6ff] text-[#1971c2]'
                         }`}
                       >
-                        {selectedItem.correction.status}
+                        {correctionStatusLabel(selectedItem.correction.status)}
                       </span>
                     </div>
 
                     <div className="space-y-1 text-[#4d5f81]">
                       <div>
-                        <span className="font-semibold">Tipe Koreksi:</span> {selectedItem.correction.correction_type}
+                        <span className="font-semibold">{copy.correctionTypeLabel}:</span> {selectedItem.correction.correction_type}
                       </div>
                       {selectedItem.correction.proposed_clock_in && (
                         <div>
-                          <span className="font-semibold">Clock In Diajukan:</span> {selectedItem.correction.proposed_clock_in} WIB
+                          <span className="font-semibold">{copy.proposedClockIn}:</span> {selectedItem.correction.proposed_clock_in} WIB
                         </div>
                       )}
                       {selectedItem.correction.proposed_clock_out && (
                         <div>
-                          <span className="font-semibold">Clock Out Diajukan:</span> {selectedItem.correction.proposed_clock_out} WIB
+                          <span className="font-semibold">{copy.proposedClockOut}:</span> {selectedItem.correction.proposed_clock_out} WIB
                         </div>
                       )}
                     </div>
 
                     <div className="border-t border-black/10 pt-2">
-                      <span className="block font-semibold text-[#4d5f81]">Alasan Pengajuan (Wajib):</span>
+                      <span className="block font-semibold text-[#4d5f81]">{copy.reasonRequired}:</span>
                       <p className="mt-1 rounded border border-black/10 bg-white p-2 text-[11px] italic text-[#121b2e]">
                         &quot;{selectedItem.correction.reason}&quot;
                       </p>
@@ -713,24 +714,24 @@ export default function AttendancePageUI() {
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-[#becabd] bg-[#f7f8ff] p-3 text-center text-xs italic text-[#4d5f81]">
-                    Tidak ada pengajuan koreksi aktif untuk tanggal ini.
+                    {copy.activeCorrectionNone}
                   </div>
                 )}
 
                 <div className="space-y-2 pt-2">
-                  <div className="text-xs font-bold text-[#121b2e]">Progress & History Trail</div>
+                  <div className="text-xs font-bold text-[#121b2e]">{copy.progressTrail}</div>
                   <div className="space-y-3 border-l-2 border-[#d9e2fc] pl-3 text-xs">
                     <div className="relative">
                       <div className="w-2 h-2 rounded-full bg-emerald-500 absolute -left-[17px] top-1"></div>
-                      <div className="font-semibold text-[#121b2e]">Log Presensi Diterima</div>
-                      <div className="text-[10px] text-[#4d5f81]">Sistem Fingerprint • {selectedItem.date}</div>
+                      <div className="font-semibold text-[#121b2e]">{copy.attendanceReceived}</div>
+                      <div className="text-[10px] text-[#4d5f81]">{copy.fingerprintSystem} • {selectedItem.date}</div>
                     </div>
                     {selectedItem.correction && (
                       <div className="relative">
                         <div className="absolute -left-[17px] top-1 size-2 rounded-full bg-[#1971c2]"></div>
-                        <div className="font-semibold text-[#1971c2]">Pengajuan Koreksi Dibuat</div>
+                        <div className="font-semibold text-[#1971c2]">{copy.correctionCreated}</div>
                         <div className="text-[10px] text-[#4d5f81]">
-                          Oleh Pegawai • {selectedItem.correction.created_at}
+                          {copy.byEmployee} • {selectedItem.correction.created_at}
                         </div>
                       </div>
                     )}
@@ -746,9 +747,9 @@ export default function AttendancePageUI() {
                             selectedItem.correction.status === 'APPROVED' ? 'text-emerald-700' : 'text-red-700'
                           }`}
                         >
-                          Koreksi {selectedItem.correction.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}
+                          {selectedItem.correction.status === 'APPROVED' ? copy.correctionApprovedTrail : copy.correctionRejectedTrail}
                         </div>
-                        <div className="text-[10px] text-[#4d5f81]">Oleh HR Admin</div>
+                        <div className="text-[10px] text-[#4d5f81]">{copy.byHr}</div>
                       </div>
                     )}
                   </div>
@@ -762,14 +763,14 @@ export default function AttendancePageUI() {
                     onClick={() => handleUpdateCorrectionStatus('APPROVED')}
                     className="flex-1 rounded-lg bg-[#16834b] py-2 text-xs font-bold text-white transition hover:bg-[#006838]"
                   >
-                    Approve
+                    {copy.approve}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleUpdateCorrectionStatus('REJECTED')}
                     className="flex-1 rounded-lg bg-[#d64545] py-2 text-xs font-bold text-white transition hover:bg-[#b4232b]"
                   >
-                    Reject
+                    {copy.reject}
                   </button>
                 </div>
               )}

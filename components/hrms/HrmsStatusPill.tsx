@@ -1,3 +1,7 @@
+"use client";
+
+import { useLanguage } from "@/components/i18n/LanguageProvider";
+
 interface HrmsStatusPillProps {
   value: string | null;
 }
@@ -13,7 +17,13 @@ function statusClass(value: string) {
 }
 
 export default function HrmsStatusPill({ value }: HrmsStatusPillProps) {
-  const label = value || "Belum tersedia";
+  const { language } = useLanguage();
+  const fallback = language === "id" ? "Belum tersedia" : "Not available";
+  const labels = language === "id"
+    ? { PERMANENT: "Tetap", CONTRACT: "Kontrak", PROBATION: "Masa percobaan", INTERN: "Magang", RESIGNED: "Mengundurkan diri", TERMINATED: "Diberhentikan", VALID: "Valid", PRESENT: "Hadir", LATE: "Terlambat", ABSENT: "Tidak hadir", EXPIRING: "Akan berakhir", EXPIRED: "Kedaluwarsa" }
+    : { PERMANENT: "Permanent", CONTRACT: "Contract", PROBATION: "Probation", INTERN: "Intern", RESIGNED: "Resigned", TERMINATED: "Terminated", VALID: "Valid", PRESENT: "Present", LATE: "Late", ABSENT: "Absent", EXPIRING: "Expiring", EXPIRED: "Expired" };
+  const normalized = value?.toUpperCase() ?? "";
+  const label = labels[normalized as keyof typeof labels] ?? value ?? fallback;
 
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] ${statusClass(label)}`}>{label}</span>;
 }

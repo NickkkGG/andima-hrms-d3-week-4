@@ -150,16 +150,16 @@ export const UserInput = forwardRef<HTMLInputElement, UserInputProps>(
         case "error":
           return "bg-white border border-[#DC2626] text-[#DC2626] focus-within:ring-1 focus-within:ring-[#DC2626]";
         case "success":
-          return "bg-white border border-[#334155] text-[#334155] focus-within:ring-1 focus-within:ring-[#334155]";
+          return "bg-white border border-[#0C68D5] text-[#0B2548] focus-within:ring-2 focus-within:ring-[#0C68D5]/15";
         case "focus":
-          return "bg-white border-2 border-black text-black shadow-sm";
+          return "bg-white border-2 border-[#0C68D5] text-[#0B2548] shadow-sm";
         case "hover":
           return "bg-white border border-[#64748B] text-gray-900";
         case "filled":
-          return "bg-white border border-gray-300 text-gray-900";
+          return "bg-white border border-[#BCD4EE] text-[#172033]";
         case "default":
         default:
-          return "bg-white border border-gray-300 text-gray-900 hover:border-[#64748B] focus-within:border-2 focus-within:border-black";
+          return "bg-white border border-[#BCD4EE] text-[#172033] hover:border-[#7FA9D7] focus-within:border-2 focus-within:border-[#0C68D5]";
       }
     };
 

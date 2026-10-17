@@ -1,0 +1,73 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { createFeedbackReward } from "@/app/feedback-reward/actions";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
+import type { EmployeeIdentity, Feedback, FeedbackRewardNotification, Reward } from "@/types/feedback-reward";
+
+const statusClasses: Record<string, string> = { NEW: "bg-slate-100 text-slate-700", READ: "bg-blue-50 text-blue-700", IN_PROGRESS: "bg-amber-50 text-amber-700", COMPLETED: "bg-emerald-50 text-emerald-700", SUBMITTED: "bg-amber-50 text-amber-700", APPROVED: "bg-emerald-50 text-emerald-700", PUBLISHED: "bg-blue-50 text-blue-700", REJECTED: "bg-rose-50 text-rose-700" };
+
+function useStatusLabels() {
+  const { t } = useLanguage();
+  return { NEW: t("new"), READ: t("read"), IN_PROGRESS: t("inProgress"), COMPLETED: t("completed"), SUBMITTED: t("submitted"), APPROVED: t("approved"), PUBLISHED: t("published"), REJECTED: t("rejected") } as Record<string, string>;
+}
+
+export function StatusBadge({ status }: { status: string }) {
+  const statusLabels = useStatusLabels();
+  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${statusClasses[status] ?? "bg-slate-100 text-slate-700"}`}>{statusLabels[status] ?? status}</span>;
+}
+
+export function WorkflowStepper({ status, steps }: { status: string; steps: string[] }) {
+  const statusLabels = useStatusLabels();
+  const current = Math.max(0, steps.indexOf(status));
+  return <div className="flex flex-wrap items-center gap-2" aria-label="Status workflow">{steps.map((step, index) => <div key={step} className="flex items-center gap-2"><span className={`grid size-7 place-items-center rounded-full text-xs font-bold ${index <= current ? "bg-[#155cfd] text-white" : "bg-slate-100 text-slate-500"}`}>{index + 1}</span><span className={`text-xs font-semibold ${index <= current ? "text-[#1e3765]" : "text-slate-400"}`}>{statusLabels[step]}</span>{index < steps.length - 1 && <span className="mx-1 text-slate-300">→</span>}</div>)}</div>;
+}
+
+export function EmptyState({ title = "Belum ada data", description = "Data akan muncul setelah ada aktivitas." }: { title?: string; description?: string }) {
+  const { t } = useLanguage();
+  const resolvedTitle = title === "Belum ada data" ? t("noData") : title;
+  const resolvedDescription = description === "Data akan muncul setelah ada aktivitas." ? (t("language") === "Bahasa" ? "Data akan muncul setelah ada aktivitas." : "Data will appear after activity is recorded.") : description;
+  return <div className="rounded-2xl border border-dashed border-[#BCD4EE] bg-white px-6 py-10 text-center shadow-[0_8px_24px_rgba(31,77,130,0.06)]"><div className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#EAF2FC] text-xl text-[#0C68D5]">○</div><h3 className="mt-3 font-bold text-[#172033]">{resolvedTitle}</h3><p className="mt-1 text-sm text-[#4D5F81]">{resolvedDescription}</p></div>;
+}
+
+export function FeedbackTimeline({ records }: { records: Feedback[] }) {
+  const { language, t } = useLanguage();
+  if (!records.length) return <EmptyState title={t("noFeedback")} description={language === "id" ? "Umpan balik perkembangan akan tampil di sini." : "Growth feedback will appear here."} />;
+  return <div className="relative space-y-4 before:absolute before:bottom-3 before:left-3 before:top-3 before:w-px before:bg-[#BCD4EE]">{records.map((record) => <article key={record.id} className="relative pl-9"><span className="absolute left-0 top-4 size-6 rounded-full border-4 border-white bg-[#0C68D5] shadow-[0_3px_10px_rgba(12,104,213,0.25)]" /><div className="rounded-2xl border border-[#BCD4EE] bg-white p-4 shadow-[0_6px_18px_rgba(31,77,130,0.06)] transition hover:border-[#8CB9E7]"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wide text-[#0C68D5]">{record.feedback_type} · {record.category}</p><h3 className="mt-1 font-bold text-[#172033]">{record.title}</h3></div><StatusBadge status={record.follow_up_status} /></div><p className="mt-3 line-clamp-3 text-sm leading-6 text-[#4D5F81]">{record.feedback_text}</p><div className="mt-3 flex flex-wrap gap-3 text-xs text-[#4D5F81]"><span>{record.giver?.full_name ?? t("feedbackGiver")}</span><span>•</span><span>{record.date}</span>{record.target_date && <><span>•</span><span>{t("target")} {record.target_date}</span></>}</div></div></article>)}</div>;
+}
+
+export function RewardCards({ records }: { records: Reward[] }) {
+  const { language, t } = useLanguage();
+  if (!records.length) return <EmptyState title={t("noReward")} description={language === "id" ? "Kartu apresiasi akan tampil setelah apresiasi diterima." : "Recognition cards will appear after a reward is received."} />;
+  return <div className="grid grid-cols-1 gap-4">{records.map((record) => <article key={record.id} className="relative min-w-0 overflow-hidden rounded-2xl border border-[#BCD4EE] bg-white p-5 shadow-[0_6px_18px_rgba(31,77,130,0.06)] transition hover:-translate-y-0.5 hover:border-[#8CB9E7] hover:shadow-[0_12px_24px_rgba(31,77,130,0.12)]"><div className="absolute right-0 top-0 h-1 w-20 bg-[#0B2548]" /><div className="flex flex-wrap items-start justify-between gap-2"><span className="max-w-full truncate rounded-full bg-[#EAF2FC] px-3 py-1 text-xs font-bold text-[#0C68D5]" title={record.reward_type}>{record.reward_type}</span>{record.is_legacy && <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">Data Legacy</span>}</div><h3 className="mt-4 break-words font-bold text-[#172033]">{record.title}</h3><p className="mt-2 line-clamp-3 break-words text-sm leading-6 text-[#4D5F81]">{record.reason}</p><div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-[#4D5F81]"><span className="whitespace-nowrap">{record.date}</span><StatusBadge status={record.status} /></div></article>)}</div>;
+}
+
+export function NotificationPanel({ notifications }: { notifications: FeedbackRewardNotification[] }) {
+  const { language, t } = useLanguage();
+  const unread = notifications.filter((item) => !item.read_at).length;
+  return <section className="rounded-2xl border border-[#BCD4EE] bg-white p-5 shadow-[0_6px_18px_rgba(31,77,130,0.06)]"><div className="flex items-center justify-between"><div><h2 className="font-bold text-[#172033]">{t("notifications")}</h2><p className="mt-1 text-xs text-[#4D5F81]">{unread} {t("unread")}</p></div><span className="grid size-9 place-items-center rounded-xl bg-[#EAF2FC] text-sm font-bold text-[#0C68D5]">{unread}</span></div>{notifications.length ? <div className="mt-4 divide-y divide-[#E7EEF7]">{notifications.slice(0, 5).map((item) => <div key={item.id} className="py-3"><p className={`text-sm ${item.read_at ? "text-[#4D5F81]" : "font-semibold text-[#172033]"}`}>{item.message}</p><p className="mt-1 text-xs text-slate-400">{new Date(item.created_at).toLocaleDateString(language === "id" ? "id-ID" : "en-GB")}</p></div>)}</div> : <p className="mt-4 text-sm text-[#4D5F81]">{t("noNotifications")}</p>}</section>;
+}
+
+export function CreateRecordWizard({ kind, employees }: { kind: "feedback" | "reward"; employees: EmployeeIdentity[] }) {
+  const router = useRouter();
+  const { language, t } = useLanguage();
+  const [step, setStep] = useState(1);
+  const [employeeId, setEmployeeId] = useState("");
+  const [feedbackType, setFeedbackType] = useState("PERFORMANCE_NOTE");
+  const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const title = kind === "feedback" ? t("feedback") : t("reward");
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    startTransition(async () => {
+      const result = await createFeedbackReward(kind, form);
+      if ("error" in result) setMessage({ type: "error", text: result.error ?? t("saveFailed") });
+      else { setMessage({ type: "success", text: kind === "feedback" ? t("feedbackSaved") : t("rewardSaved") }); formElement.reset(); setEmployeeId(""); setStep(1); router.refresh(); }
+    });
+  }
+  const copy = language === "id" ? { step: "Langkah", of: "dari", employee: "Pegawai", chooseEmployee: "Pilih pegawai", type: "Tipe", category: "Kategori", rewardType: "Jenis apresiasi", title: "Judul", date: "Tanggal", targetDate: "Target tanggal", content: "Isi umpan balik", reason: "Alasan / pencapaian", followUp: "Tindak lanjut" } : { step: "Step", of: "of", employee: "Employee", chooseEmployee: "Choose an employee", type: "Type", category: "Category", rewardType: "Reward type", title: "Title", date: "Date", targetDate: "Target date", content: "Feedback details", reason: "Reason / achievement", followUp: "Follow-up" };
+  return <section className="rounded-xl border border-[#d9e2fc] bg-white p-5 shadow-[0_4px_16px_rgba(15,35,66,0.04)]"><div className="flex items-center justify-between gap-3"><div><h2 className="font-bold text-[#121b2e]">{kind === "feedback" ? t("giveFeedback") : t("submitReward")}</h2><p className="mt-1 text-xs text-slate-500">{copy.step} {step} {copy.of} 2</p></div><div className="flex gap-1" aria-label={`${copy.step} ${step} ${copy.of} 2`}><span className={`h-1.5 w-10 rounded-full ${step >= 1 ? "bg-[#155cfd]" : "bg-slate-200"}`} /><span className={`h-1.5 w-10 rounded-full ${step >= 2 ? "bg-[#155cfd]" : "bg-slate-200"}`} /></div></div><form onSubmit={submit} className="mt-5 grid gap-4 sm:grid-cols-2">{step === 1 ? <><label className="grid gap-1 text-sm font-semibold text-[#1e3765] sm:col-span-2">{copy.employee}<select name="employee_id" required value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} className="h-11 rounded-lg border border-[#cbd6ee] bg-white px-3 font-normal outline-none focus:border-[#155cfd] focus:ring-2 focus:ring-[#155cfd]/20"><option value="" disabled>{copy.chooseEmployee}</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.full_name} · {employee.employee_id}</option>)}</select></label>{kind === "feedback" ? <><label className="grid gap-1 text-sm font-semibold text-[#1e3765]">{copy.type}<select name="feedback_type" value={feedbackType} onChange={(event) => setFeedbackType(event.target.value)} className="h-11 rounded-lg border border-[#cbd6ee] bg-white px-3 font-normal"><option value="APPRECIATION">{language === "id" ? "Apresiasi" : "Appreciation"}</option><option value="IMPROVEMENT">{language === "id" ? "Coaching / Perbaikan" : "Coaching / Improvement"}</option><option value="PERFORMANCE_NOTE">{language === "id" ? "Catatan Kinerja" : "Performance note"}</option></select></label><label className="grid gap-1 text-sm font-semibold text-[#1e3765]">{copy.category}<select name="category" defaultValue="OTHER" className="h-11 rounded-lg border border-[#cbd6ee] bg-white px-3 font-normal"><option value="DISCIPLINE">{language === "id" ? "Disiplin" : "Discipline"}</option><option value="TEAMWORK">{language === "id" ? "Kerja sama" : "Teamwork"}</option><option value="COMMUNICATION">{language === "id" ? "Komunikasi" : "Communication"}</option><option value="WORKPLACE_SAFETY">{language === "id" ? "Keselamatan kerja" : "Workplace safety"}</option><option value="QUALITY">{language === "id" ? "Kualitas kerja" : "Work quality"}</option><option value="SERVICE">{language === "id" ? "Pelayanan" : "Service"}</option><option value="OTHER">{language === "id" ? "Lainnya" : "Other"}</option></select></label></> : <label className="grid gap-1 text-sm font-semibold text-[#1e3765] sm:col-span-2">{copy.rewardType}<select name="reward_type" defaultValue="OTHER" className="h-11 rounded-lg border border-[#cbd6ee] bg-white px-3 font-normal"><option value="EMPLOYEE_OF_THE_MONTH">{language === "id" ? "Karyawan teladan" : "Employee of the month"}</option><option value="SAFETY_CHAMPION">Safety Champion</option><option value="SERVICE_EXCELLENCE">Service Excellence</option><option value="BEST_ATTENDANCE">{language === "id" ? "Kehadiran terbaik" : "Best attendance"}</option><option value="SPECIAL_CONTRIBUTION">{language === "id" ? "Kontribusi khusus" : "Special contribution"}</option><option value="OTHER">{language === "id" ? "Lainnya" : "Other"}</option></select></label>}</> : <><input type="hidden" name="employee_id" value={employeeId} /><label className="grid gap-1 text-sm font-semibold text-[#1e3765] sm:col-span-2">{copy.title}<input name="title" required className="h-11 rounded-lg border border-[#cbd6ee] px-3 font-normal outline-none focus:border-[#155cfd]" /></label><label className="grid gap-1 text-sm font-semibold text-[#1e3765]">{copy.date}<input type="date" name="date" required className="h-11 rounded-lg border border-[#cbd6ee] px-3 font-normal" /></label>{kind === "feedback" && feedbackType === "IMPROVEMENT" && <label className="grid gap-1 text-sm font-semibold text-[#1e3765]">{copy.targetDate}<input type="date" name="target_date" className="h-11 rounded-lg border border-[#cbd6ee] px-3 font-normal" /></label>}<label className="grid gap-1 text-sm font-semibold text-[#1e3765] sm:col-span-2">{kind === "feedback" ? copy.content : copy.reason}<textarea name="content" required className="min-h-28 rounded-lg border border-[#cbd6ee] p-3 font-normal outline-none focus:border-[#155cfd]" /></label>{kind === "feedback" && feedbackType === "IMPROVEMENT" && <label className="grid gap-1 text-sm font-semibold text-[#1e3765] sm:col-span-2">{copy.followUp}<textarea name="follow_up_text" className="min-h-20 rounded-lg border border-[#cbd6ee] p-3 font-normal" /></label>}<input type="hidden" name="feedback_type" value={feedbackType} /></>}{message && <p role="status" className={`rounded-lg px-3 py-2 text-sm sm:col-span-2 ${message.type === "success" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{message.text}</p>}<div className="flex justify-end gap-2 sm:col-span-2">{step === 2 && <button type="button" onClick={() => setStep(1)} className="h-11 rounded-lg border border-[#cbd6ee] px-4 text-sm font-bold text-[#1e3765]">{t("back")}</button>}{step === 1 ? <button type="button" disabled={!employeeId} onClick={() => setStep(2)} className="h-11 rounded-lg bg-[#155cfd] px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{t("next")}</button> : <button type="submit" disabled={isPending} className="h-11 rounded-lg bg-[#155cfd] px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300">{isPending ? t("saving") : `${t("save")} ${title}`}</button>}</div></form></section>;
+}

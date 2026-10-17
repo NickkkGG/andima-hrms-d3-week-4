@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { setEmployeeDirectoryVisibility } from "@/app/employees/actions";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface EmployeeDirectoryVisibilityButtonProps {
   employeeUuid: string;
@@ -13,12 +14,16 @@ export default function EmployeeDirectoryVisibilityButton({
   employeeUuid,
   initiallyHidden,
 }: EmployeeDirectoryVisibilityButtonProps) {
+  const { language, t } = useLanguage();
+  const copy = language === "id" ? { restore: "menampilkan kembali pegawai di Direktori Pegawai", hide: "menyembunyikan pegawai dari Direktori Pegawai", confirm: "Yakin ingin", more: "Tindakan lainnya", show: "Tampilkan di Direktori Pegawai", hideButton: "Sembunyikan dari Direktori Pegawai" } : { restore: "restore this employee to the Employee Directory", hide: "hide this employee from the Employee Directory", confirm: "Are you sure you want to", more: "More actions", show: "Show in Employee Directory", hideButton: "Hide from Employee Directory" };
   const router = useRouter();
   const [isHidden, setIsHidden] = useState(initiallyHidden);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function handleClick() {
+    const action = isHidden ? copy.restore : copy.hide;
+    if (!window.confirm(`${copy.confirm} ${action}?`)) return;
     setIsSubmitting(true);
     setMessage(null);
 
@@ -33,8 +38,10 @@ export default function EmployeeDirectoryVisibilityButton({
   }
 
   return (
-    <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
-      <button
+    <details className="relative flex flex-col items-stretch gap-1.5 sm:items-end">
+      <summary className="inline-flex h-11 cursor-pointer list-none items-center justify-center rounded-[15px] border border-slate-300 bg-white px-4 text-sm font-bold text-[#1E3765] transition hover:border-[#155DFC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]">⋯ {copy.more}</summary>
+      <div className="absolute right-0 top-12 z-10 min-w-64 rounded-xl border border-[#D9E2FC] bg-white p-2 shadow-lg">
+        <button
         className={`inline-flex h-11 items-center justify-center rounded-[15px] border px-5 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
           isHidden
             ? "border-[#16A37A] bg-[#ECFDF5] text-[#117A5A] hover:bg-[#DDF8EF]"
@@ -45,12 +52,13 @@ export default function EmployeeDirectoryVisibilityButton({
         type="button"
       >
         {isSubmitting
-          ? "Menyimpan…"
+          ? t("saving")
           : isHidden
-            ? "Tampilkan di Employee Directory"
-            : "Sembunyikan dari Employee Directory"}
+            ? copy.show
+            : copy.hideButton}
       </button>
+      </div>
       {message && <p aria-live="polite" className={`max-w-72 text-right text-xs font-medium ${isHidden ? "text-[#117A5A]" : "text-rose-700"}`}>{message}</p>}
-    </div>
+    </details>
   );
 }

@@ -12,6 +12,7 @@ import {
   ScanFace,
   X,
 } from "lucide-react";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 function HrmsLink({ label, href }: { label: string; href: string }) {
   const pathname = usePathname();
@@ -30,6 +31,7 @@ function HrmsLink({ label, href }: { label: string; href: string }) {
 }
 
 export default function Sidebar() {
+  const { t } = useLanguage();
   const pathname = usePathname();
   const router = useRouter();
   const isPublicRoute = pathname === "/login" || pathname === "/register" || pathname.startsWith("/auth/");
@@ -99,7 +101,7 @@ export default function Sidebar() {
   return (
     <>
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col bg-[#0f2342] px-4 py-5 text-[#d9e2fc] shadow-lg transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-[min(260px,calc(100vw-2rem))] flex-col bg-[#0f2342] px-4 py-5 text-[#d9e2fc] shadow-[8px_0_28px_rgba(11,37,72,0.18)] transition-transform duration-200 lg:w-[260px] lg:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -112,20 +114,20 @@ export default function Sidebar() {
             />
           </div>
           <div><p className="text-xl font-bold tracking-[-0.5px] text-white">ANDIMA</p><p className="text-xs text-[#d9e2fc]/80">Logistics Suite</p></div>
-          <button type="button" onClick={() => setIsSidebarOpen(false)} className="ml-auto rounded p-1 text-[#d9e2fc] lg:hidden" aria-label="Tutup navigasi"><X size={18} /></button>
+          <button type="button" onClick={() => setIsSidebarOpen(false)} className="ml-auto rounded p-1 text-[#d9e2fc] lg:hidden" aria-label={t("closeNavigation")}><X size={18} /></button>
         </div>
 
         <nav className="mt-8 space-y-1.5 text-sm font-semibold">
           <Link href="/face-biometric-attendance" className="flex w-full items-center gap-3 rounded-lg border border-[#49d6bf]/25 bg-[#16834b] px-3 py-2.5 text-white shadow-sm transition hover:bg-[#006838]">
-            <ScanFace size={17} /> Attendance
+            <ScanFace size={17} /> {t("attendance")}
           </Link>
           <div>
             <button
               type="button"
               onClick={() => setIsHrmsOpen((value) => !value)}
-              className="flex w-full items-center justify-between rounded-lg bg-[#155cfd] px-3 py-2.5 text-white shadow-sm"
+              className="flex w-full items-center justify-between rounded-lg bg-[#155cfd] px-3 py-2.5 text-white shadow-sm transition hover:bg-[#124bd0]"
             >
-              <span className="flex items-center gap-3"><ClipboardList size={17} /> HRMS</span>
+              <span className="flex items-center gap-3"><ClipboardList size={17} /> {t("hrms")}</span>
               <ChevronDown size={16} className={`transition-transform ${isHrmsOpen ? "rotate-0" : "-rotate-90"}`} />
             </button>
             {isHrmsOpen && (
@@ -139,19 +141,19 @@ export default function Sidebar() {
                     }`}
                     aria-expanded={isD3Expanded}
                   >
-                    <span className="flex items-center gap-2"><Layers3 size={14} /> D3</span>
+                    <span className="flex items-center gap-2"><Layers3 size={14} /> {t("d3")}</span>
                     <ChevronDown size={14} className={`transition-transform ${isD3Expanded ? "rotate-0" : "-rotate-90"}`} />
                   </button>
                   {isD3Expanded && (
                     <div className="ml-4 mt-1 border-l border-[#d9e2fc]/15 pl-2">
-                      <HrmsLink label="Employee Profile Management" href="/employees" />
-                      <HrmsLink label="Biometric Registration" href="/biometric-enrollment" />
-                      <HrmsLink label="Attendance History & Correction" href="/attendance" />
+                      <HrmsLink label={t("employeeProfileManagement")} href="/employees" />
+                      <HrmsLink label={t("biometricRegistration")} href="/biometric-enrollment" />
+                      <HrmsLink label={t("attendanceHistoryCorrection")} href="/attendance" />
                       {canViewAttendanceProductivity && (
-                        <HrmsLink label="Attendance & Productivity Dashboard" href="/attendance-productivity" />
+                        <HrmsLink label={t("attendanceProductivity")} href="/attendance-productivity" />
                       )}
-                      <HrmsLink label="Feedback & Reward" href="/feedback-reward" />
-                      <HrmsLink label="Employee Report & Ticket" href="/employee-report-ticket" />
+                      <HrmsLink label={t("feedbackReward")} href="/feedback-reward" />
+                      <HrmsLink label={t("employeeReportTicket")} href="/employee-report-ticket" />
                     </div>
                   )}
                 </div>
@@ -162,7 +164,7 @@ export default function Sidebar() {
 
         <div className="mt-auto space-y-3">
           <button type="button" onClick={() => void handleSignOut()} disabled={isInternalSigningOut} className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-red-600 px-3 py-1.5 text-sm font-bold text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Logout">
-            {isInternalSigningOut ? "Keluar..." : "Logout"}
+            {isInternalSigningOut ? t("signingOut") : t("logout")}
           </button>
         </div>
       </aside>
@@ -170,8 +172,8 @@ export default function Sidebar() {
       <button
         type="button"
         onClick={() => setIsSidebarOpen(true)}
-        className="fixed left-4 top-4 z-30 rounded-lg bg-[#0f2342] p-2 text-white lg:hidden"
-        aria-label="Buka navigasi"
+        className="fixed left-4 top-4 z-30 rounded-lg bg-[#0f2342] p-2 text-white shadow-lg lg:hidden"
+        aria-label={t("openNavigation")}
       >
         <Menu size={20} />
       </button>

@@ -5,8 +5,9 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/CustomButton";
 import HrmsStatusPill from "@/components/hrms/HrmsStatusPill";
+import { updateEmployeeEmploymentStatus } from "@/app/employees/actions";
 import { employmentStatuses, type EmploymentStatus } from "@/types/employee";
-import { createClient } from "@/utils/supabase/client";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface EmployeeStatusFormProps {
   employee: {
@@ -17,16 +18,13 @@ interface EmployeeStatusFormProps {
   };
 }
 
-interface EmployeeStatusUpdateResult {
-  employee_id: string;
-  employment_status: EmploymentStatus;
-}
-
 function isEmploymentStatus(value: string | null): value is EmploymentStatus {
   return employmentStatuses.includes(value as EmploymentStatus);
 }
 
 export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps) {
+  const { language, t } = useLanguage();
+  const copy = language === "id" ? { title: "Ubah status kepegawaian", name: "Nama pegawai", current: "Status saat ini", new: "Status baru", select: "Pilih status kepegawaian", unchanged: "Status belum berubah.", invalid: "Status kepegawaian tidak valid.", updateFailed: "Status kepegawaian belum dapat diperbarui. Silakan coba lagi.", redirect: "Mengarahkan ke profil pegawai...", cancel: "Batal", save: "Simpan status" } : { title: "Change employment status", name: "Employee name", current: "Current status", new: "New status", select: "Select employment status", unchanged: "Status has not changed.", invalid: "Invalid employment status.", updateFailed: "Employment status could not be updated. Please try again.", redirect: "Redirecting to the employee profile...", cancel: "Cancel", save: "Save status" };
   const currentStatus = isEmploymentStatus(employee.employment_status) ? employee.employment_status : "";
   const [selectedStatus, setSelectedStatus] = useState<EmploymentStatus | "">(currentStatus);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -34,6 +32,10 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const profileUrl = `/employees/${encodeURIComponent(employee.employee_id)}`;
+  const selectableStatuses = currentStatus === "PERMANENT"
+    ? employmentStatuses.filter((status) => status === "PERMANENT" || status === "RESIGNED" || status === "TERMINATED")
+    : employmentStatuses;
+  const isUnchanged = selectedStatus === currentStatus;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -41,78 +43,60 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
     setSuccessMessage(null);
 
     if (!isEmploymentStatus(selectedStatus)) {
-      setErrorMessage("Employment Status tidak valid.");
+      setErrorMessage(copy.invalid);
       return;
     }
 
     if (selectedStatus === employee.employment_status) {
-      setSuccessMessage("Employment Status belum berubah.");
+      setSuccessMessage(copy.unchanged);
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("d3_employee")
-        .update({ employment_status: selectedStatus })
-        .eq("id", employee.id)
-        .select("employee_id, employment_status")
-        .maybeSingle()
-        .returns<EmployeeStatusUpdateResult>();
-
-      if (error) {
-        if (error.code === "42501") {
-          setErrorMessage("Anda tidak memiliki izin untuk mengubah employment status pegawai.");
-        } else {
-          setErrorMessage("Employment Status belum dapat diperbarui. Silakan coba lagi.");
-        }
-
+      const result = await updateEmployeeEmploymentStatus(employee.id, selectedStatus);
+      if (!result.ok || !result.employeeId) {
+        setErrorMessage(result.message);
         setIsSubmitting(false);
         return;
       }
 
-      if (!data) {
-        setErrorMessage("Anda tidak memiliki izin untuk mengubah employment status pegawai.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      setSuccessMessage("Employment Status berhasil diperbarui. Mengarahkan ke profil pegawai...");
+      const updatedEmployeeId = result.employeeId;
+      setSuccessMessage(`${result.message} ${copy.redirect}`);
       window.setTimeout(() => {
-        router.replace(`/employees/${encodeURIComponent(data.employee_id)}`);
+        router.replace(`/employees/${encodeURIComponent(updatedEmployeeId)}`);
         router.refresh();
       }, 500);
     } catch {
-      setErrorMessage("Employment Status belum dapat diperbarui. Silakan coba lagi.");
+      setErrorMessage(copy.updateFailed);
       setIsSubmitting(false);
     }
   };
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-      <section className="rounded-[18px] border border-[#1E3765]/55 bg-white p-5 shadow-[3px_3px_20px_rgba(87,138,252,0.24)] sm:p-7">
-        <h2 className="text-xl font-extrabold tracking-tight text-[#121B2E]">Employment Status</h2>
-        <dl className="mt-5 grid gap-4 rounded-[15px] border border-[#D9E2FC] bg-[#155DFC]/10 p-4 sm:grid-cols-3">
+      <section className="rounded-2xl border border-[#BCD4EE] bg-white p-5 shadow-[0_8px_24px_rgba(31,77,130,0.08)] sm:p-7">
+        <h2 className="text-xl font-extrabold tracking-tight text-[#121B2E]">{copy.title}</h2>
+        <dl className="mt-5 grid gap-4 rounded-xl border border-[#DCE7F3] bg-[#F8FBFF] p-4 sm:grid-cols-3">
           <div>
             <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Employee ID</dt>
             <dd className="mt-1 text-sm font-semibold text-slate-900">{employee.employee_id}</dd>
           </div>
           <div>
-            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Nama Employee</dt>
+            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{copy.name}</dt>
             <dd className="mt-1 text-sm font-semibold text-slate-900">{employee.full_name}</dd>
           </div>
           <div>
-            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Status Saat Ini</dt>
+            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{copy.current}</dt>
             <dd className="mt-1"><HrmsStatusPill value={employee.employment_status} /></dd>
           </div>
         </dl>
 
         <label className="mt-6 block text-sm font-semibold text-[#121B2E]">
-          Employment Status Baru <span className="text-[#E5484D]">*</span>
+          {copy.new} <span className="text-[#E5484D]">*</span>
           <select
-            className={`mt-2 h-11 w-full rounded-[15px] border bg-[#155DFC]/10 px-3.5 text-sm font-medium text-[#121B2E] outline-none transition focus:bg-white focus:ring-2 ${
+            className={`mt-2 h-11 w-full rounded-[15px] border bg-[#155DFC]/10 px-3.5 text-sm font-medium text-[#121B2E] outline-none transition focus:bg-white focus:ring-2 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 ${
               errorMessage ? "border-red-500 focus:border-red-600 focus:ring-red-600" : "border-[#D9E2FC] focus:border-[#1E3765] focus:ring-[#1E3765]"
             }`}
             value={selectedStatus}
@@ -120,13 +104,14 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
             disabled={isSubmitting}
             required
           >
-            <option value="">Pilih employment status</option>
-            {employmentStatuses.map((status) => (
+            <option value="">{copy.select}</option>
+            {selectableStatuses.map((status) => (
               <option key={status} value={status}>
                 {status}
               </option>
             ))}
           </select>
+          {isUnchanged && <p className="mt-2 text-xs font-medium text-slate-500">{copy.unchanged}</p>}
         </label>
       </section>
 
@@ -146,10 +131,10 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
           className="inline-flex h-11 items-center justify-center rounded-[15px] border border-[#155DFC] bg-[#EEF4FF] px-5 text-sm font-bold text-[#155DFC] transition hover:bg-[#DCE8FF]"
           href={profileUrl}
         >
-          Cancel
+          {copy.cancel}
         </Link>
-        <CustomButton type="submit" fullWidth={false} disabled={isSubmitting}>
-          {isSubmitting ? "Menyimpan..." : "Save Status"}
+        <CustomButton type="submit" fullWidth={false} disabled={isSubmitting || isUnchanged}>
+          {isSubmitting ? t("saving") : copy.save}
         </CustomButton>
       </div>
     </form>

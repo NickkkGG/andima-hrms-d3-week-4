@@ -1,27 +1,32 @@
+"use client";
+
 import Link from "next/link";
 import { dateLabel } from "@/utils/feedback-reward-format";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 import type { AuditEntry, EmployeeIdentity, Feedback, Reward } from "@/types/feedback-reward";
 
-function identity(employee: EmployeeIdentity | null) {
-  return employee ? `${employee.full_name} · ${employee.employee_id}` : "Identity unavailable";
+function identity(employee: EmployeeIdentity | null, unavailable = "Identity unavailable") { return employee ? `${employee.full_name} · ${employee.employee_id}` : unavailable; }
+
+const rewardStatusLabels: Record<string, string> = { SUBMITTED: "Diajukan", APPROVED: "Disetujui HR", PUBLISHED: "Dipublikasikan", REJECTED: "Ditolak" };
+
+export function RewardList({ records }: { records: Reward[] }) {
+  const { language } = useLanguage();
+  const copy = language === "id" ? { empty: "Belum ada reward yang sesuai filter.", employee: "Pegawai", type: "Jenis reward", title: "Judul", proposer: "Pengaju", date: "Tanggal", status: "Status", action: "Aksi", unavailable: "Identitas tidak tersedia", view: "Lihat detail" } : { empty: "No rewards match the current filter.", employee: "Employee", type: "Reward type", title: "Title", proposer: "Proposed by", date: "Date", status: "Status", action: "Action", unavailable: "Identity unavailable", view: "View details" };
+  const labels = language === "id" ? rewardStatusLabels : { SUBMITTED: "Submitted", APPROVED: "HR approved", PUBLISHED: "Published", REJECTED: "Rejected" };
+  if (!records.length) return <p className="rounded-xl border border-dashed border-[#cbd6ee] bg-white px-4 py-10 text-center text-sm text-slate-500">{copy.empty}</p>;
+  return <div className="w-full overflow-x-auto rounded-xl border border-[#d9e2fc] bg-white shadow-[0_4px_16px_rgba(15,35,66,0.04)]"><table className="min-w-[900px] w-full text-left text-sm"><thead className="border-b bg-[#f7f9fc] text-xs font-semibold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">{copy.employee}</th><th className="px-4 py-3">{copy.type}</th><th className="px-4 py-3">{copy.title}</th><th className="px-4 py-3">{copy.proposer}</th><th className="px-4 py-3">{copy.date}</th><th className="px-4 py-3">{copy.status}</th><th className="px-4 py-3">{copy.action}</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{records.map((record) => <tr key={record.id}><td className="px-4 py-3 font-medium">{identity(record.employee, copy.unavailable)}</td><td className="px-4 py-3">{record.reward_type}</td><td className="max-w-xs px-4 py-3">{record.title}</td><td className="px-4 py-3">{identity(record.proposer, copy.unavailable)}</td><td className="whitespace-nowrap px-4 py-3">{dateLabel(record.date, false, language)}</td><td className="px-4 py-3"><span className="inline-flex rounded-full bg-[#eef4ff] px-2.5 py-1 text-xs font-bold text-[#155cfd]">{labels[record.status] ?? record.status}</span></td><td className="px-4 py-3"><Link className="font-semibold text-[#155cfd] hover:underline" href={`/feedback-reward/reward/${record.id}`}>{copy.view}</Link></td></tr>)}</tbody></table></div>;
 }
 
 export function RecordList({ records, audit = false }: { records: (Feedback | Reward | AuditEntry)[]; audit?: boolean }) {
-  if (!records.length) return <p className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">Belum ada data yang tersedia.</p>;
-  return <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="min-w-full text-left text-sm"><thead className="border-b bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500"><tr>{audit ? <><th className="px-4 py-3">Waktu</th><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Modul</th><th className="px-4 py-3">Aktor</th></> : <><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Ringkasan</th><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Aksi</th></>}</tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{records.map((record) => {
-    if ("entity_type" in record) return <tr key={record.id}><td className="px-4 py-3">{dateLabel(record.created_at, true)}</td><td className="px-4 py-3">{identity(record.employee)}</td><td className="px-4 py-3">{record.entity_type === "FEEDBACK" ? "Feedback" : "Reward"}</td><td className="px-4 py-3">{identity(record.actor)}</td></tr>;
-    const feedback = "feedback_text" in record;
-    const kind = feedback ? "feedback" : "reward";
-    const summary = feedback ? record.feedback_text : record.reward_name;
-    return <tr key={record.id}><td className="px-4 py-3 font-medium">{identity(record.employee)}</td><td className="max-w-sm px-4 py-3">{summary}</td><td className="px-4 py-3 whitespace-nowrap">{dateLabel(record.date)}</td><td className="px-4 py-3"><Link className="font-semibold text-[#155cfd] hover:underline" href={`/feedback-reward/${kind}/${record.id}`}>View</Link></td></tr>;
-  })}</tbody></table></div>;
+  const { language } = useLanguage();
+  const copy = language === "id" ? { empty: "Belum ada data yang tersedia.", time: "Waktu", employee: "Pegawai", module: "Modul", action: "Aksi", actor: "Aktor", summary: "Ringkasan", date: "Tanggal", view: "Lihat", unavailable: "Identitas tidak tersedia" } : { empty: "No data is available yet.", time: "Time", employee: "Employee", module: "Module", action: "Action", actor: "Actor", summary: "Summary", date: "Date", view: "View", unavailable: "Identity unavailable" };
+  if (!records.length) return <p className="rounded-xl border border-dashed border-[#cbd6ee] bg-white px-4 py-10 text-center text-sm text-slate-500">{copy.empty}</p>;
+  return <div className="w-full overflow-x-auto rounded-xl border border-[#d9e2fc] bg-white shadow-[0_4px_16px_rgba(15,35,66,0.04)]"><table className="min-w-[620px] w-full text-left text-sm"><thead className="border-b bg-[#f7f9fc] text-xs font-semibold uppercase tracking-wide text-slate-500"><tr>{audit ? <><th className="px-4 py-3">{copy.time}</th><th className="px-4 py-3">{copy.employee}</th><th className="px-4 py-3">{copy.module}</th><th className="px-4 py-3">{copy.action}</th><th className="px-4 py-3">{copy.actor}</th></> : <><th className="px-4 py-3">{copy.employee}</th><th className="px-4 py-3">{copy.summary}</th><th className="px-4 py-3">{copy.date}</th><th className="px-4 py-3">{copy.action}</th></>}</tr></thead><tbody className="divide-y divide-slate-100 text-slate-700">{records.map((record) => { if ("entity_type" in record) return <tr key={record.id}><td className="whitespace-nowrap px-4 py-3">{dateLabel(record.created_at, true, language)}</td><td className="px-4 py-3">{identity(record.employee, copy.unavailable)}</td><td className="px-4 py-3">{record.entity_type}</td><td className="px-4 py-3"><span className="rounded-full bg-[#eef4ff] px-2 py-1 text-xs font-bold text-[#155cfd]">{record.action}</span></td><td className="px-4 py-3">{identity(record.actor, copy.unavailable)}</td></tr>; const feedback = "feedback_text" in record; const kind = feedback ? "feedback" : "reward"; return <tr key={record.id}><td className="px-4 py-3 font-medium">{identity(record.employee, copy.unavailable)}</td><td className="max-w-sm px-4 py-3">{record.title}</td><td className="whitespace-nowrap px-4 py-3">{dateLabel(record.date, false, language)}</td><td className="px-4 py-3"><Link className="font-semibold text-[#155cfd] hover:underline" href={`/feedback-reward/${kind}/${record.id}`}>{copy.view}</Link></td></tr>; })}</tbody></table></div>;
 }
 
 export function RecordCards({ records }: { records: (Feedback | Reward)[] }) {
-  if (!records.length) return <p className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">Belum ada data yang tersedia.</p>;
-  return <div className="space-y-3">{records.map((record) => {
-    const feedback = "feedback_text" in record;
-    const kind = feedback ? "feedback" : "reward";
-    return <Link key={record.id} href={`/feedback-reward/${kind}/${record.id}`} className="block rounded-lg border border-slate-200 p-4 transition hover:border-[#155cfd] hover:bg-slate-50"><p className="font-semibold text-slate-900">{record.employee?.full_name ?? "Identity unavailable"}</p><p className="mt-1 text-sm text-slate-600">{feedback ? record.feedback_text : record.reward_name}</p><p className="mt-2 text-xs text-slate-500">{dateLabel(record.date)}</p></Link>;
-  })}</div>;
+  const { language } = useLanguage();
+  const copy = language === "id" ? { empty: "Belum ada data yang tersedia.", unavailable: "Identitas tidak tersedia" } : { empty: "No data is available yet.", unavailable: "Identity unavailable" };
+  if (!records.length) return <p className="rounded-xl border border-dashed border-[#cbd6ee] bg-white px-4 py-10 text-center text-sm text-slate-500">{copy.empty}</p>;
+  return <div className="space-y-3">{records.map((record) => { const feedback = "feedback_text" in record; const kind = feedback ? "feedback" : "reward"; return <Link key={record.id} href={`/feedback-reward/${kind}/${record.id}`} className="block rounded-xl border border-[#d9e2fc] bg-white p-4 transition hover:border-[#155cfd] hover:bg-[#f7f9fc]"><p className="font-bold text-[#121b2e]">{record.employee?.full_name ?? copy.unavailable}</p><p className="mt-1 text-sm text-slate-600">{record.title}</p><p className="mt-2 text-xs text-slate-500">{dateLabel(record.date, false, language)}</p></Link>; })}</div>;
 }

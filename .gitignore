@@ -33,6 +33,15 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Local AI assistant state (never commit assistant memories, sessions, or user-local rules)
+/.claude/
+/.claude.local/
+/.codex/
+/.cursor/
+/.windsurf/
+/AGENTS.local.md
+/CLAUDE.local.md
+
 # vercel
 .vercel
 

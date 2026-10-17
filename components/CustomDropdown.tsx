@@ -78,8 +78,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={`w-full bg-white border ${
-          isOpen ? "border-slate-800 ring-1 ring-slate-800" : "border-slate-300 hover:border-slate-400"
-        } rounded-lg px-4 py-3 text-left flex items-center justify-between shadow-xs transition-all duration-150`}
+          isOpen ? "border-[#0C68D5] ring-2 ring-[#0C68D5]/15" : "border-[#BCD4EE] hover:border-[#7FA9D7]"
+        } rounded-lg px-4 py-3 text-left flex items-center justify-between shadow-sm transition-all duration-150`}
       >
         <span className="text-[15px] font-semibold text-slate-900 truncate">
           {placeholder}
@@ -109,7 +109,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
 
       {/* Dropdown Menu Panel */}
       {isOpen && (
-        <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden animate-in fade-in duration-100">
+        <div className="absolute left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-lg border border-[#BCD4EE] bg-white shadow-lg animate-in fade-in duration-100">
           {/* Header Row: Category & Active Count */}
           {(categoryTitle || categoryBadge) && (
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 text-xs">
@@ -131,8 +131,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                   onClick={() => handleSelect(item)}
                   className={`w-full px-4 py-2.5 text-left flex items-center justify-between text-sm transition-colors ${
                     isSelected
-                      ? "bg-[#ECEEF2] text-slate-900 font-semibold"
-                      : "text-slate-800 hover:bg-slate-50 font-semibold"
+                      ? "bg-[#EAF2FC] text-[#0B2548] font-semibold"
+                      : "text-slate-800 hover:bg-[#F4F8FD] font-semibold"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">

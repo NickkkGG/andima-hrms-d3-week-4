@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import LanguageToggle from "@/components/i18n/LanguageToggle";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 type Account = {
   initials: string;
@@ -20,14 +22,15 @@ const fallbackAccount: Account = {
   role: "HRMS User",
 };
 
-function roleLabel(role: AccountAccess["app_role"]) {
+function roleLabel(role: AccountAccess["app_role"], t: ReturnType<typeof useLanguage>["t"]) {
   if (role === "HR") return "HR";
-  if (role === "MANAGER") return "Manager";
-  if (role === "EMPLOYEE") return "Employee";
-  return "HRMS User";
+  if (role === "MANAGER") return t("manager");
+  if (role === "EMPLOYEE") return t("employee");
+  return t("hrmsUser");
 }
 
 export default function HeaderAccount() {
+  const { language, t } = useLanguage();
   const [account, setAccount] = useState<Account>(fallbackAccount);
 
   useEffect(() => {
@@ -60,7 +63,7 @@ export default function HeaderAccount() {
         .toUpperCase() || fallbackAccount.initials;
 
       if (isMounted) {
-        setAccount({ initials, name, role: roleLabel(accountAccess?.app_role ?? null) });
+        setAccount({ initials, name, role: roleLabel(accountAccess?.app_role ?? null, t) });
       }
     }
 
@@ -68,16 +71,19 @@ export default function HeaderAccount() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [language, t]);
 
   return (
-    <div className="hidden items-center gap-2 border-l border-[#d9e2fc] pl-3 sm:flex">
-      <span className="grid size-8 place-items-center rounded-full border border-[#006838]/30 bg-[#16834b]/15 text-xs font-bold text-[#006838]">
-        {account.initials}
-      </span>
-      <div className="text-left">
-        <p className="text-xs font-bold">{account.name}</p>
-        <p className="text-[10px] text-[#4d5f81]">{account.role}</p>
+    <div className="flex items-center gap-2 sm:gap-3">
+      <LanguageToggle />
+      <div className="hidden items-center gap-2 border-l border-[#BCD4EE] pl-3 sm:flex">
+        <span className="grid size-8 place-items-center rounded-full border border-[#0C68D5]/25 bg-[#E6F1FF] text-xs font-bold text-[#0C68D5]">
+          {account.initials}
+        </span>
+        <div className="min-w-0 text-left">
+          <p className="max-w-40 truncate text-xs font-bold text-[#172033]">{account.name}</p>
+          <p className="text-[10px] text-[#4d5f81]">{account.role}</p>
+        </div>
       </div>
     </div>
   );
