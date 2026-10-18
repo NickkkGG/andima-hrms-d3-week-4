@@ -6,17 +6,17 @@
 | --- | --- |
 | Produk / Modul | ANDIMA Logistics Suite - HRMS |
 | Sub-modul | Employee Profile Management, Face Biometric Attendance, Attendance Management, Employee Report & Ticket, Feedback & Reward |
-| Jenis rilis | Feature Release dan Integration Update |
+| Jenis rilis | Feature Release, Integration, dan Stability Update |
 | Disiapkan oleh | Squad D3 |
 | Target pengguna | Employee, HR, dan Manager |
-| Tanggal rilis | 13 Oktober 2026 |
+| Tanggal rilis | 18 Oktober 2026 |
 | Branch rilis | `feature/D3-002-face-biometric-attendance` |
 
 ## 1. Ringkasan Eksekutif
 
 Rilis ini menyatukan fitur-fitur HRMS yang dikerjakan Squad D3 dalam satu aplikasi. Pengguna dapat masuk menggunakan akun yang terdaftar, melihat menu sesuai peran, mengelola profil karyawan, melakukan registrasi serta presensi biometrik wajah, meninjau riwayat presensi, mengajukan koreksi, memantau produktivitas, mengelola ticket pekerjaan, dan mencatat feedback maupun reward.
 
-Data operasional D3 tetap menggunakan Supabase. Autentikasi memakai Supabase Auth dan profil akun B2 (`b2_register`), sedangkan fitur HRMS D3 menggunakan pemetaan akses `d3_user_access` ke data `d3_employee`. Dengan pemetaan ini, halaman dan data yang ditampilkan dapat dibedakan antara Employee, HR, dan Manager.
+Autentikasi memakai Supabase Auth dan profil akun B2 aktif dari `b2_register`. Peran aplikasi untuk navigasi dan tampilan HRMS dibaca dari data B2 tersebut, sehingga akun Squad D3 berperan sebagai HR dan akun B2 aktif lainnya menggunakan tampilan Employee. Relasi legacy D3 tetap dipakai hanya ketika diperlukan oleh data operasional yang masih memiliki foreign key ke data karyawan.
 
 ### Tujuan rilis
 
@@ -38,12 +38,14 @@ Data operasional D3 tetap menggunakan Supabase. Autentikasi memakai Supabase Aut
 | 7 | Attendance & Productivity Dashboard | HR/Manager dapat melihat ringkasan dan tren jam kerja karyawan. |
 | 8 | Employee Report & Ticket | Employee dapat membuat ticket, melampirkan berkas, dan memantau tindak lanjut serta riwayatnya. |
 | 9 | Feedback & Reward | HR/Manager dapat mencatat feedback/reward, sedangkan Employee melihat catatan miliknya. |
+| 10 | Bahasa dan desain bersama | Bahasa Indonesia/Inggris, top navigation, tipografi, warna, serta pola tombol diselaraskan pada modul D3. |
+| 11 | Stabilitas aplikasi | Halaman loading, error, 404, pagination tabel, dan guard rute melindungi alur aplikasi saat data atau halaman sedang dimuat. |
 
 ## 3. Rincian Fitur
 
 ### 3.1 Login, Register, dan Akses Peran
 
-Halaman login dan register menggunakan desain B2. Saat login berhasil, aplikasi membaca profil aktif dari `b2_register`, kemudian pengguna diarahkan ke Face Biometric Attendance. Header dan sidebar membaca pemetaan `d3_user_access` untuk menentukan peran aplikasi.
+Halaman login dan register menggunakan desain B2. Saat login berhasil, aplikasi membaca profil aktif dari `b2_register`, kemudian pengguna diarahkan ke Face Biometric Attendance. Header, sidebar, dan akses menu membaca nama serta peran dari B2 agar identitas yang tampil konsisten dengan akun yang sedang login.
 
 | Peran | Akses utama |
 | --- | --- |
@@ -79,9 +81,9 @@ Dashboard ini hanya tersedia untuk HR dan Manager. Data attendance digunakan unt
 
 ### 3.6 Employee Report & Ticket
 
-Employee dapat membuat ticket dengan judul, kategori, deskripsi, waktu kejadian, dan lampiran opsional. Lampiran disimpan pada bucket privat dan dibuka melalui signed URL berumur terbatas.
+Employee dapat membuat ticket dengan judul, kategori, deskripsi, waktu kejadian, prioritas, dan lampiran opsional. Lampiran disimpan pada bucket privat dan dibuka melalui signed URL berumur terbatas.
 
-HR/Manager dapat memantau ticket sesuai cakupan akses, memperbarui status, dan menambah follow-up. Riwayat perubahan serta catatan follow-up ditampilkan kembali pada detail ticket sehingga Employee dapat melihat perkembangan permintaannya.
+HR/Manager dapat memantau ticket sesuai cakupan akses, memperbarui status, due date, prioritas, dan menambah follow-up. Riwayat perubahan serta catatan follow-up ditampilkan kembali pada detail ticket sehingga Employee dapat melihat perkembangan permintaannya. Badge notifikasi ticket pada sidebar mengikuti notifikasi yang belum dibaca, dan halaman ticket menyediakan aksi untuk menandai seluruh notifikasi sebagai sudah dibaca.
 
 ### 3.7 Feedback & Reward
 
@@ -93,7 +95,7 @@ Halaman Feedback & Reward menampilkan ringkasan jumlah catatan feedback dan rewa
 | --- | --- | --- |
 | Autentikasi | Supabase Auth | Login, session, logout, dan identitas pengguna. |
 | Profil B2 | `b2_register` | Memastikan akun B2 yang login memiliki profil aktif. |
-| Akses aplikasi | `d3_user_access` | Memetakan user Auth ke karyawan dan peran aplikasi. |
+| Akses aplikasi | `b2_register` | Sumber profil aktif, nama, dan peran aplikasi untuk akun yang login. |
 | Data karyawan | `d3_employee`, `d3_departments`, `d3_positions` | Employee Profile Management dan konteks data pada fitur D3. |
 | Presensi | `d3_attendances`, `d3_attendance_corrections` | Clock-in/out, riwayat, lokasi, dan koreksi presensi. |
 | Biometrik | `d3_face_biometric_templates`, `d3_face_biometric_events`, bucket `d3-biometric-face-samples` | Template pengenalan wajah, event verifikasi, serta sampel audit privat. |
@@ -112,12 +114,16 @@ Verifikasi teknis dilakukan pada kode branch rilis:
 - Sidebar membedakan menu Attendance & Productivity untuk HR/Manager dan Employee.
 - Attendance History menampilkan detail lokasi yang tersimpan dan tautan peta.
 - Biometric Attendance menyediakan alur registrasi, verifikasi, clock-in, dan clock-out.
+- Halaman D3 memiliki pagination pada daftar data utama agar tabel tetap stabil saat jumlah data bertambah.
+- Guard rute mengarahkan pengguna tanpa sesi ke login dan mencegah pengguna yang sudah memiliki sesi kembali ke halaman login/register.
+- Halaman loading, error, dan 404 tersedia secara global dengan identitas visual Andima.
+- `npm run lint -- --quiet` dan `npm run typecheck` berhasil pada pembaruan 18 Oktober 2026.
 
 ## 6. Batasan dan Tindak Lanjut
 
-- Registrasi akun B2 belum otomatis membuat pemetaan `d3_employee` dan `d3_user_access`. Akun baru masih memerlukan proses provisioning data operasional oleh HR/Admin sampai mekanisme otomatis disepakati bersama.
+- Registrasi akun B2 belum otomatis membuat data operasional legacy yang masih dibutuhkan oleh beberapa relasi fitur D3. Akun baru tetap memerlukan proses provisioning oleh HR/Admin sampai mekanisme otomatis disepakati bersama.
 - Kualitas verifikasi wajah dipengaruhi kamera, pencahayaan, dan kemampuan perangkat. Fitur ini digunakan sebagai implementasi pembelajaran dan perlu pengujian lintas perangkat sebelum diperlakukan sebagai sistem presensi produksi.
-- Perubahan tabel, foreign key, atau RLS pada database bersama tetap perlu koordinasi dengan pemilik database dan tim terkait.
+- Perubahan tabel, foreign key, RLS, maupun kebijakan Supabase pada database bersama berada dalam koordinasi tim MID/pemilik database.
 - Uji end-to-end Employee ke HR/Manager perlu didokumentasikan lebih lanjut oleh QA untuk setiap perubahan rilis berikutnya.
 
 ## 7. Referensi Teknis
