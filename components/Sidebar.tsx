@@ -40,6 +40,7 @@ export default function Sidebar() {
     "/attendance",
     "/attendance-productivity",
     "/biometric-enrollment",
+    "/face-biometric-attendance",
     "/employee-report-ticket",
     "/feedback-reward",
   ].includes(pathname);
