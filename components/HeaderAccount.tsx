@@ -13,7 +13,7 @@ type Account = {
 
 type AccountAccess = {
   app_role: "EMPLOYEE" | "HR" | "MANAGER" | null;
-  d3_employee: { full_name: string } | null;
+  full_name: string | null;
 };
 
 const fallbackAccount: Account = {
@@ -43,9 +43,10 @@ export default function HeaderAccount() {
       if (!user || !isMounted) return;
 
       const { data: access } = await supabase
-        .from("d3_user_access")
-        .select("app_role, d3_employee!d3_user_access_employee_id_fkey(full_name)")
+        .from("b2_register")
+        .select("app_role, full_name")
         .eq("auth_user_id", user.id)
+        .eq("is_active", true)
         .maybeSingle();
 
       const accountAccess = access as unknown as AccountAccess | null;
@@ -53,7 +54,7 @@ export default function HeaderAccount() {
       const registeredName = typeof metadataName === "string" && metadataName.trim()
         ? metadataName.trim()
         : user.email?.split("@")[0] ?? fallbackAccount.name;
-      const name = accountAccess?.d3_employee?.full_name?.trim() || registeredName;
+      const name = accountAccess?.full_name?.trim() || registeredName;
       const initials = name
         .split(" ")
         .filter(Boolean)

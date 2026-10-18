@@ -16,6 +16,7 @@ import { createClient } from "@/utils/supabase/client";
 import HeaderAccount from "@/components/HeaderAccount";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import LocationMapPreview from "@/components/attendance/LocationMapPreview";
+import TablePagination from "@/components/hrms/TablePagination";
 
 type AttendanceStatus = "PRESENT" | "UNDER_MINIMUM" | "ABSENT" | "LEAVE" | string;
 type AppRole = "EMPLOYEE" | "HR" | "MANAGER";
@@ -95,6 +96,7 @@ export default function AttendanceProductivityPage() {
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
   const [selectedItem, setSelectedItem] = useState<AttendanceRecord | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [tablePage, setTablePage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [appRole, setAppRole] = useState<AppRole | null>(null);
@@ -248,9 +250,10 @@ export default function AttendanceProductivityPage() {
       }
 
       const { data: access, error: accessError } = await supabase
-        .from("d3_user_access")
-        .select("app_role, employee_id")
+        .from("b2_register")
+        .select("app_role")
         .eq("auth_user_id", userData.user.id)
+        .eq("is_active", true)
         .maybeSingle();
 
       if (!mounted) return;
@@ -304,6 +307,10 @@ export default function AttendanceProductivityPage() {
       return matchesSearch && matchesDate;
     });
   }, [attendances, searchQuery, startDate, endDate]);
+  const tablePageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / tablePageSize));
+  const currentPage = Math.min(tablePage, totalPages);
+  const paginatedData = filteredData.slice((currentPage - 1) * tablePageSize, currentPage * tablePageSize);
 
   const summary = useMemo(() => {
     const present = filteredData.filter(
@@ -442,9 +449,7 @@ export default function AttendanceProductivityPage() {
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(e) =>
-                      setStartDate(e.target.value)
-                    }
+                    onChange={(e) => { setStartDate(e.target.value); setTablePage(1); }}
                     className="rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15"
                   />
                 </div>
@@ -464,9 +469,7 @@ export default function AttendanceProductivityPage() {
                   <input
                     type="date"
                     value={endDate}
-                    onChange={(e) =>
-                      setEndDate(e.target.value)
-                    }
+                    onChange={(e) => { setEndDate(e.target.value); setTablePage(1); }}
                     className="rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15"
                   />
                 </div>
@@ -483,9 +486,7 @@ export default function AttendanceProductivityPage() {
                 type="text"
                 placeholder={copy.search}
                 value={searchQuery}
-                onChange={(e) =>
-                  setSearchQuery(e.target.value)
-                }
+                onChange={(e) => { setSearchQuery(e.target.value); setTablePage(1); }}
                 className="w-full rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] py-2 pl-9 pr-3 text-xs outline-none transition placeholder:text-[#4d5f81]/70 focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15"
               />
             </div>
@@ -692,7 +693,7 @@ export default function AttendanceProductivityPage() {
                   </thead>
 
                   <tbody className="divide-y divide-slate-100">
-                    {filteredData.map((row) => {
+                    {paginatedData.map((row) => {
                       const isSelected = selectedItem?.id === row.id;
 
                       const status = statusConfig(row.status, language);
@@ -753,6 +754,7 @@ export default function AttendanceProductivityPage() {
                 </table>
               </div>
             )}
+            <TablePagination page={currentPage} pageSize={tablePageSize} totalItems={filteredData.length} onPageChange={setTablePage} />
           </div>
 
           {/* DETAIL */}

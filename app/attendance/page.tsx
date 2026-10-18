@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import HeaderAccount from '@/components/HeaderAccount'
 import { useLanguage } from '@/components/i18n/LanguageProvider'
 import LocationMapPreview from '@/components/attendance/LocationMapPreview'
+import TablePagination from '@/components/hrms/TablePagination'
 
 type CorrectionType = 'CLOCK_IN' | 'CLOCK_OUT' | 'FULL_DAY' | string
 type CorrectionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | string
@@ -86,6 +87,7 @@ export default function AttendancePageUI() {
   const [selectedItem, setSelectedItem] = useState<AttendanceItem | null>(null)
   const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
+  const [tablePage, setTablePage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -224,17 +226,21 @@ export default function AttendancePageUI() {
       const { data: userData, error: userError } = await supabase.auth.getUser()
       if (userError || !userData.user) return
 
-      const { data: access, error: accessError } = await supabase
-        .from('d3_user_access')
-        .select('app_role, employee_id')
-        .eq('auth_user_id', userData.user.id)
-        .maybeSingle()
+      const [{ data: access, error: accessError }, { data: legacyEmployeeId, error: legacyEmployeeError }] = await Promise.all([
+        supabase
+          .from('b2_register')
+          .select('app_role, full_name')
+          .eq('auth_user_id', userData.user.id)
+          .eq('is_active', true)
+          .maybeSingle(),
+        supabase.rpc('d3_current_legacy_employee_uuid'),
+      ])
 
-      if (!mounted || accessError || !access) return
+      if (!mounted || accessError || legacyEmployeeError || !access || !legacyEmployeeId) return
       const name = userData.user.user_metadata?.full_name
       setAppRole(access.app_role as AppRole)
-      setViewerEmployeeId(access.employee_id)
-      setViewerName(typeof name === 'string' && name.trim() ? name.trim() : userData.user.email?.split('@')[0] || copy.employee)
+      setViewerEmployeeId(legacyEmployeeId)
+      setViewerName(access.full_name?.trim() || (typeof name === 'string' && name.trim() ? name.trim() : userData.user.email?.split('@')[0] || copy.employee))
     }
 
     void loadAccountAccess()
@@ -383,6 +389,13 @@ export default function AttendancePageUI() {
       return item.correction?.status === activeTab
     })
   }, [attendances, searchQuery, activeTab])
+  const tablePageSize = 10
+  const employeeTotalPages = Math.max(1, Math.ceil(attendances.length / tablePageSize))
+  const employeeCurrentPage = Math.min(tablePage, employeeTotalPages)
+  const paginatedAttendances = attendances.slice((employeeCurrentPage - 1) * tablePageSize, employeeCurrentPage * tablePageSize)
+  const managementTotalPages = Math.max(1, Math.ceil(filteredData.length / tablePageSize))
+  const managementCurrentPage = Math.min(tablePage, managementTotalPages)
+  const paginatedFilteredData = filteredData.slice((managementCurrentPage - 1) * tablePageSize, managementCurrentPage * tablePageSize)
 
   if (appRole === 'EMPLOYEE') {
     const employeeItem = selectedItem || attendances[0]
@@ -402,7 +415,7 @@ export default function AttendancePageUI() {
           {actionMessage && <div className={`mx-4 mt-4 flex items-center gap-2 rounded-lg border p-3 text-xs font-semibold sm:mx-6 ${actionMessage.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}><CheckCircle2 size={16} />{actionMessage.text}</div>}
           {errorMessage && <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 sm:mx-6"><AlertCircle size={16} />{errorMessage}</div>}
           <main className="mx-auto grid max-w-[1600px] gap-5 px-4 py-6 xl:grid-cols-[minmax(0,1fr)_390px] sm:px-6">
-            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center justify-between border-b border-[#becabd]/35 px-5 py-4"><div><h2 className="text-sm font-bold">{copy.attendanceHistory}</h2><p className="mt-1 text-xs text-[#4d5f81]">{attendances.length} {copy.recorded}</p></div><span className="rounded-full bg-[#edf6ff] px-2.5 py-1 text-[10px] font-bold text-[#1971c2]">{pendingCount} {copy.pendingCorrections}</span></div>{loading ? <div className="flex min-h-[260px] items-center justify-center text-xs text-[#4d5f81]"><RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />{copy.loadingHistory}</div> : attendances.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.noHistory}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead><tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.clock}</th><th className="px-3 py-3">{copy.duration}</th><th className="px-3 py-3">{copy.status}</th></tr></thead><tbody className="divide-y divide-slate-100">{attendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selected ? 'bg-[#eaf7f0]' : ''}`}><td className="px-4 py-3.5 font-semibold">{row.date}</td><td className="px-3 py-3.5 text-[#4d5f81]">{new Date(row.clock_in).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB <span className="mx-1 text-[#becabd]">/</span> {row.clock_out ? `${new Date(row.clock_out).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB` : '-'}</td><td className="px-3 py-3.5"><span className={duration.isUnderMin ? 'font-semibold text-[#b7791f]' : 'font-semibold'}>{duration.text}</span></td><td className="px-3 py-3.5"><div className="flex flex-wrap gap-1"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'}`}>{duration.isUnderMin ? copy.underSeven : copy.meetsSeven}</span>{row.correction && <span className="rounded bg-[#edf6ff] px-2 py-0.5 text-[10px] font-bold text-[#1971c2]">{copy.correction}: {correctionStatusLabel(row.correction.status)}</span>}</div></td></tr> })}</tbody></table></div>}</section>
+            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center justify-between border-b border-[#becabd]/35 px-5 py-4"><div><h2 className="text-sm font-bold">{copy.attendanceHistory}</h2><p className="mt-1 text-xs text-[#4d5f81]">{attendances.length} {copy.recorded}</p></div><span className="rounded-full bg-[#edf6ff] px-2.5 py-1 text-[10px] font-bold text-[#1971c2]">{pendingCount} {copy.pendingCorrections}</span></div>{loading ? <div className="flex min-h-[260px] items-center justify-center text-xs text-[#4d5f81]"><RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />{copy.loadingHistory}</div> : attendances.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.noHistory}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead><tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.clock}</th><th className="px-3 py-3">{copy.duration}</th><th className="px-3 py-3">{copy.status}</th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedAttendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selected ? 'bg-[#eaf7f0]' : ''}`}><td className="px-4 py-3.5 font-semibold">{row.date}</td><td className="px-3 py-3.5 text-[#4d5f81]">{new Date(row.clock_in).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB <span className="mx-1 text-[#becabd]">/</span> {row.clock_out ? `${new Date(row.clock_out).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB` : '-'}</td><td className="px-3 py-3.5"><span className={duration.isUnderMin ? 'font-semibold text-[#b7791f]' : 'font-semibold'}>{duration.text}</span></td><td className="px-3 py-3.5"><div className="flex flex-wrap gap-1"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'}`}>{duration.isUnderMin ? copy.underSeven : copy.meetsSeven}</span>{row.correction && <span className="rounded bg-[#edf6ff] px-2 py-0.5 text-[10px] font-bold text-[#1971c2]">{copy.correction}: {correctionStatusLabel(row.correction.status)}</span>}</div></td></tr> })}</tbody></table></div>}<TablePagination page={employeeCurrentPage} pageSize={tablePageSize} totalItems={attendances.length} onPageChange={setTablePage} /></section>
             {employeeItem && <aside className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3"><div><span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.attendanceDetail}</span><h2 className="mt-1 text-sm font-bold">{employeeItem.date}</h2><p className="text-xs text-[#4d5f81]">{employeeItem.employee_id} • {employeeItem.department}</p></div><Clock3 size={18} className="text-[#006838]" /></div><div className="mt-4 space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs"><div className="flex justify-between text-[#4d5f81]"><span>Clock In</span><strong>{new Date(employeeItem.clock_in).toLocaleTimeString(locale)} WIB</strong></div><div className="flex justify-between text-[#4d5f81]"><span>Clock Out</span><strong>{employeeItem.clock_out ? `${new Date(employeeItem.clock_out).toLocaleTimeString(locale)} WIB` : copy.noScan}</strong></div><div className="flex justify-between border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span>{copy.source}</span><strong className="text-[#1971c2]">{employeeItem.source}</strong></div>{employeeItem.notes && <div className="border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span className="font-semibold">{copy.incentiveNotes}:</span><p className="mt-1 text-[#121b2e]">{employeeItem.notes}</p></div>}</div><LocationMapPreview className="mt-4" clockIn={{ latitude: employeeItem.clock_in_latitude, longitude: employeeItem.clock_in_longitude, accuracyMeters: employeeItem.clock_in_accuracy_meters }} clockOut={{ latitude: employeeItem.clock_out_latitude, longitude: employeeItem.clock_out_longitude, accuracyMeters: employeeItem.clock_out_accuracy_meters }} />{employeeItem.correction ? <div className="mt-4 rounded-xl border border-[#b9d6ff] bg-[#edf6ff] p-3.5 text-xs"><div className="flex justify-between font-bold text-[#1e3765]"><span>{copy.correctionRequest}</span><span>{correctionStatusLabel(employeeItem.correction.status)}</span></div><p className="mt-2 text-[#4d5f81]">{employeeItem.correction.reason}</p></div> : <p className="mt-4 rounded-xl border border-dashed border-[#becabd] p-3 text-center text-xs italic text-[#4d5f81]">{copy.noCorrectionForDate}</p>}<button type="button" disabled={!!employeeItem.correction || isSubmittingCorrection} onClick={() => { setCorrectionType('CLOCK_IN'); setIsCorrectionOpen(true) }} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#16834b] py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:cursor-not-allowed disabled:opacity-50"><FilePlus2 size={14} />{employeeItem.correction ? copy.correctionSubmitted : copy.submitCorrection}</button></aside>}
           </main>
         </div>
@@ -467,7 +480,7 @@ export default function AttendancePageUI() {
           <div className="mx-auto mt-5 flex max-w-[1600px] flex-col justify-between gap-3 sm:flex-row sm:items-end">
             <div className="flex flex-wrap gap-1 border-b border-[#d9e2fc] text-xs font-semibold">
               <button
-                onClick={() => setActiveTab('ALL')}
+                onClick={() => { setActiveTab('ALL'); setTablePage(1) }}
                 className={`pb-2 px-3 transition ${
                   activeTab === 'ALL'
                     ? 'border-b-2 border-[#069494] text-[#006838] font-bold'
@@ -477,7 +490,7 @@ export default function AttendancePageUI() {
                 {copy.all} ({attendances.length})
               </button>
               <button
-                onClick={() => setActiveTab('PENDING')}
+                onClick={() => { setActiveTab('PENDING'); setTablePage(1) }}
                 className={`pb-2 px-3 transition ${
                   activeTab === 'PENDING'
                     ? 'border-b-2 border-[#069494] text-[#006838] font-bold'
@@ -487,7 +500,7 @@ export default function AttendancePageUI() {
                 {copy.awaitingApproval} ({attendances.filter((i) => i.correction?.status === 'PENDING').length})
               </button>
               <button
-                onClick={() => setActiveTab('APPROVED')}
+                onClick={() => { setActiveTab('APPROVED'); setTablePage(1) }}
                 className={`pb-2 px-3 transition ${
                   activeTab === 'APPROVED'
                     ? 'border-b-2 border-[#069494] text-[#006838] font-bold'
@@ -502,7 +515,7 @@ export default function AttendancePageUI() {
               type="text"
               placeholder={copy.searchPlaceholder}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setTablePage(1) }}
               className="w-full rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs outline-none transition placeholder:text-[#4d5f81]/70 focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15 sm:w-64"
             />
           </div>
@@ -535,7 +548,7 @@ export default function AttendancePageUI() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredData.map((row) => {
+                    {paginatedFilteredData.map((row) => {
                       const duration = calculateDuration(row.clock_in, row.clock_out)
                       const isSelected = selectedItem?.id === row.id
 
@@ -609,6 +622,7 @@ export default function AttendancePageUI() {
                 </table>
               </div>
             )}
+            <TablePagination page={managementCurrentPage} pageSize={tablePageSize} totalItems={filteredData.length} onPageChange={setTablePage} />
           </div>
 
           {/* DRAWER PANEL DETAIL (KANAN) */}

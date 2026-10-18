@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import HeaderAccount from "@/components/HeaderAccount";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import TablePagination from "@/components/hrms/TablePagination";
 
 type TicketStatus = "PENDING" | "TODO" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
 type TicketPriority = "LOW" | "NORMAL" | "HIGH";
@@ -134,6 +135,17 @@ function currentLocalDateTime() {
   return new Date(now.getTime() - offset).toISOString().slice(0, 16);
 }
 
+function readTicketNotificationIds(authUserId: string) {
+  if (!authUserId || typeof window === "undefined") return [];
+  try {
+    const saved = window.localStorage.getItem(`d3-ticket-read-notifications:${authUserId}`);
+    const ids = saved ? JSON.parse(saved) : [];
+    return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function toDateTimeLocal(value?: string) {
   if (!value) return "";
   const date = new Date(value);
@@ -157,6 +169,7 @@ export default function EmployeeReportTicketPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | TicketStatus>("ALL");
+  const [tablePage, setTablePage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [followUp, setFollowUp] = useState("");
   const [followUpAt, setFollowUpAt] = useState(currentLocalDateTime);
@@ -260,15 +273,18 @@ export default function EmployeeReportTicketPage() {
           return;
         }
 
-        const { data: access, error: accessError } = await supabase
-          .from("d3_user_access")
-          .select("app_role, employee_id")
-          .eq("auth_user_id", userData.user.id)
-          .maybeSingle();
+        const [{ data: access, error: accessError }, { data: legacyEmployeeId, error: legacyEmployeeError }] = await Promise.all([
+          supabase
+            .from("b2_register")
+            .select("app_role, full_name")
+            .eq("auth_user_id", userData.user.id)
+            .eq("is_active", true)
+            .maybeSingle(),
+          supabase.rpc("d3_current_legacy_employee_uuid"),
+        ]);
 
-        if (accessError || !access) {
-          await supabase.auth.signOut();
-          router.replace("/login");
+        if (accessError || legacyEmployeeError || !access || !legacyEmployeeId) {
+          if (isMounted) showNotice(copy.accessUnavailable);
           return;
         }
 
@@ -276,15 +292,16 @@ export default function EmployeeReportTicketPage() {
         const role = access.app_role as AppRole;
         const metadataName = userData.user.user_metadata?.full_name;
         const fallbackName = userData.user.email?.split("@")[0] ?? "User Andima";
-        const accountName = typeof metadataName === "string" && metadataName.trim() ? metadataName.trim() : fallbackName;
+        const accountName = access.full_name?.trim() || (typeof metadataName === "string" && metadataName.trim() ? metadataName.trim() : fallbackName);
         setViewerName(accountName);
         setAppRole(role);
         setViewRole(role === "EMPLOYEE" ? "employee" : "manager");
-        setViewerEmployeeId(access.employee_id);
+        setViewerEmployeeId(legacyEmployeeId);
+        setReadNotificationIds(readTicketNotificationIds(userData.user.id));
         setAuthUserId(userData.user.id);
-        await loadTickets(access.employee_id, accountName);
+        await loadTickets(legacyEmployeeId, accountName);
       } catch {
-        router.replace("/login");
+        if (isMounted) showNotice(copy.accessUnavailable);
       } finally {
         if (isMounted) setIsAccountLoading(false);
       }
@@ -306,6 +323,10 @@ export default function EmployeeReportTicketPage() {
       return isMatchingStatus && (!normalizedQuery || searchable.includes(normalizedQuery));
     });
   }, [accessibleTickets, query, statusFilter]);
+  const tablePageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(visibleTickets.length / tablePageSize));
+  const currentPage = Math.min(tablePage, totalPages);
+  const paginatedTickets = visibleTickets.slice((currentPage - 1) * tablePageSize, currentPage * tablePageSize);
 
   const selectedTicket = visibleTickets.find((ticket) => ticket.id === selectedId);
 
@@ -343,19 +364,8 @@ export default function EmployeeReportTicketPage() {
       }
       return [];
     }));
-    return notifications.sort((first, second) => second.at.localeCompare(first.at)).slice(0, 8);
+    return notifications.sort((first, second) => second.at.localeCompare(first.at));
   }, [accessibleTickets, viewRole, viewerEmployeeId, copy]);
-
-  useEffect(() => {
-    if (!authUserId) return;
-    try {
-      const saved = window.localStorage.getItem(`d3-ticket-read-notifications:${authUserId}`);
-      const ids = saved ? JSON.parse(saved) : [];
-      setReadNotificationIds(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : []);
-    } catch {
-      setReadNotificationIds([]);
-    }
-  }, [authUserId]);
 
   const unreadTicketNotifications = useMemo(() => {
     const readIds = new Set(readNotificationIds);
@@ -365,7 +375,10 @@ export default function EmployeeReportTicketPage() {
   function saveReadNotifications(ids: string[]) {
     const nextIds = Array.from(new Set(ids)).slice(-200);
     setReadNotificationIds(nextIds);
-    if (authUserId) window.localStorage.setItem(`d3-ticket-read-notifications:${authUserId}`, JSON.stringify(nextIds));
+    if (authUserId) {
+      window.localStorage.setItem(`d3-ticket-read-notifications:${authUserId}`, JSON.stringify(nextIds));
+      window.dispatchEvent(new CustomEvent("d3-ticket-notifications-read"));
+    }
   }
 
   function markAllTicketNotificationsRead() {
@@ -513,8 +526,8 @@ export default function EmployeeReportTicketPage() {
         <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 px-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:px-6">
           <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3"><div className="hidden min-w-0 items-center gap-3 sm:flex"><span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span><span className="h-5 border-l border-[#BCD4EE]" /><span className="text-xs font-semibold text-[#3f4940]">HRMS</span><ChevronRight size={13} className="shrink-0 text-[#52749B]/60" /><span className="truncate text-xs font-semibold text-[#0C68D5]">{t("employeeReportTicket")}</span></div><span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">{t("reportTicket")}</span></div>
-            <label className="hidden w-64 items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:flex"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none placeholder:text-[#4d5f81]/70" placeholder={copy.search} /></label>
-            <div className="relative flex items-center gap-2 sm:gap-3"><button onClick={() => setIsNotificationOpen((current) => !current)} className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label={copy.notifications} aria-expanded={isNotificationOpen}><Bell size={17} />{unreadTicketNotifications.length > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-[#d64545] px-1 text-[9px] font-bold leading-4 text-white">{unreadTicketNotifications.length > 9 ? "9+" : unreadTicketNotifications.length}</span>}</button>{isNotificationOpen && <TicketNotificationPanel notifications={unreadTicketNotifications} isLoading={isTicketLoading} onRefresh={refreshTickets} onReadAll={markAllTicketNotificationsRead} onSelect={openTicketNotification} />}<HeaderAccount /></div>
+            <label className="hidden w-64 items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:flex"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => { setQuery(event.target.value); setTablePage(1); }} className="w-full bg-transparent text-xs outline-none placeholder:text-[#4d5f81]/70" placeholder={copy.search} /></label>
+            <div className="relative flex items-center gap-2 sm:gap-3"><button onClick={() => setIsNotificationOpen((current) => !current)} className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label={copy.notifications} aria-expanded={isNotificationOpen}><Bell size={17} />{unreadTicketNotifications.length > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-[#d64545] px-1 text-[9px] font-bold leading-4 text-white">{unreadTicketNotifications.length > 99 ? "99+" : unreadTicketNotifications.length}</span>}</button>{isNotificationOpen && <TicketNotificationPanel notifications={unreadTicketNotifications} isLoading={isTicketLoading} onRefresh={refreshTickets} onReadAll={markAllTicketNotificationsRead} onSelect={openTicketNotification} />}<HeaderAccount /></div>
           </div>
         </header>
 
@@ -526,9 +539,10 @@ export default function EmployeeReportTicketPage() {
 
           <div className="mt-5 flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(0,1fr)_420px]">
             <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-              <div className="flex flex-col gap-3 border-b border-[#becabd]/35 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"><label className="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-[#d9e2fc] bg-[#f7f8ff] px-2.5 text-[#1e3765]"><Filter size={14} aria-hidden="true" /><span className="sr-only">{language === "id" ? "Filter status tiket" : "Filter ticket status"}</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "ALL" | TicketStatus)} className="min-w-30 bg-transparent text-[11px] font-semibold outline-none"><option value="ALL">{copy.all} ({accessibleTickets.length})</option>{(["PENDING", "TODO", "IN_PROGRESS", "RESOLVED", "REJECTED"] as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select></label><label className="flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:hidden"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none" placeholder={copy.search} /></label></div>
-              <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.ticket}</th><th className="px-3 py-3">{copy.submitted}</th><th className="px-3 py-3">{copy.dueDate}</th><th className="px-3 py-3">{copy.priority}</th><th className="px-3 py-3">{copy.status}</th><th className="w-16 px-3 py-3">{copy.action}</th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{isTicketLoading ? <tr><td colSpan={7} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.loadingTickets}</td></tr> : visibleTickets.map((ticket) => <tr key={ticket.id} onClick={() => setSelectedId(ticket.id)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selectedTicket?.id === ticket.id ? "bg-[#eaf7f0]" : "bg-white"}`}><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="text-xs font-semibold">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {ticket.category}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt, language)}</td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</td><td className="px-3 py-3.5"><PriorityBadge priority={ticket.priority} /></td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5"><button onClick={(event) => { event.stopPropagation(); setSelectedId(ticket.id); }} className="rounded-md bg-[#f1f3ff] px-2.5 py-1.5 text-[11px] font-bold text-[#1e3765] transition hover:bg-[#d9e2fc]" aria-label={`${copy.view} ${ticket.id}`}>{copy.view}</button></td></tr>)}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={7} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.noTickets}</td></tr>}</tbody></table></div>
-              <div className="border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81]">{copy.showing} <b className="text-[#121b2e]">{visibleTickets.length}</b> {copy.of} <b className="text-[#121b2e]">{accessibleTickets.length}</b> {copy.tickets}.</div>
+              <div className="flex flex-col gap-3 border-b border-[#becabd]/35 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"><label className="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-[#d9e2fc] bg-[#f7f8ff] px-2.5 text-[#1e3765]"><Filter size={14} aria-hidden="true" /><span className="sr-only">{language === "id" ? "Filter status tiket" : "Filter ticket status"}</span><select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as "ALL" | TicketStatus); setTablePage(1); }} className="min-w-30 bg-transparent text-[11px] font-semibold outline-none"><option value="ALL">{copy.all} ({accessibleTickets.length})</option>{(["PENDING", "TODO", "IN_PROGRESS", "RESOLVED", "REJECTED"] as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select></label><label className="flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:hidden"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => { setQuery(event.target.value); setTablePage(1); }} className="w-full bg-transparent text-xs outline-none" placeholder={copy.search} /></label></div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.ticket}</th><th className="px-3 py-3">{copy.submitted}</th><th className="px-3 py-3">{copy.dueDate}</th><th className="px-3 py-3">{copy.priority}</th><th className="px-3 py-3">{copy.status}</th><th className="w-16 px-3 py-3">{copy.action}</th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{isTicketLoading ? <tr><td colSpan={7} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.loadingTickets}</td></tr> : paginatedTickets.map((ticket) => <tr key={ticket.id} onClick={() => setSelectedId(ticket.id)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selectedTicket?.id === ticket.id ? "bg-[#eaf7f0]" : "bg-white"}`}><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="text-xs font-semibold">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {ticket.category}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt, language)}</td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</td><td className="px-3 py-3.5"><PriorityBadge priority={ticket.priority} /></td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5"><button onClick={(event) => { event.stopPropagation(); setSelectedId(ticket.id); }} className="rounded-md bg-[#f1f3ff] px-2.5 py-1.5 text-[11px] font-bold text-[#1e3765] transition hover:bg-[#d9e2fc]" aria-label={`${copy.view} ${ticket.id}`}>{copy.view}</button></td></tr>)}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={7} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.noTickets}</td></tr>}</tbody></table></div>
+              <div className="border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81]">{copy.showing} <b className="text-[#121b2e]">{paginatedTickets.length}</b> {copy.of} <b className="text-[#121b2e]">{visibleTickets.length}</b> {copy.tickets}.</div>
+              <TablePagination page={currentPage} pageSize={tablePageSize} totalItems={visibleTickets.length} onPageChange={setTablePage} />
             </section>
 
             <TicketDetail ticket={selectedTicket} role={viewRole} followUp={followUp} followUpAt={followUpAt} isSaving={isSaving} onFollowUpChange={setFollowUp} onFollowUpAtChange={setFollowUpAt} onAddFollowUp={addFollowUp} onUpdateWorkflow={updateTicketWorkflow} onOpenAttachment={openAttachment} onClose={() => setSelectedId("")} />

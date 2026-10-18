@@ -24,14 +24,28 @@ export const getFeedbackContext = cache(async () => {
   if (userError || !user) redirect("/login");
 
   const { data: access, error } = await supabase
-    .from("d3_user_access")
-    .select("employee_id, app_role")
+    .from("b2_register")
+    .select("app_role")
     .eq("auth_user_id", user.id)
+    .eq("is_active", true)
     .maybeSingle<OrganizationAccess>();
 
   if (error) queryError("access", error);
   if (!access || !roles.includes(access.app_role)) notFound();
-  return { supabase, user, access, canCreate: access.app_role !== "EMPLOYEE" };
+
+  const { data: legacyEmployeeId, error: legacyEmployeeError } = await supabase
+    .rpc("d3_current_legacy_employee_uuid");
+
+  if (legacyEmployeeError || !legacyEmployeeId) {
+    queryError("legacy employee compatibility", legacyEmployeeError ?? { message: "B2 account does not have a D3 operational record yet." });
+  }
+
+  return {
+    supabase,
+    user,
+    access: { ...access, employee_id: legacyEmployeeId },
+    canCreate: access.app_role !== "EMPLOYEE",
+  };
 });
 
 export function param(params: SearchParams, key: string) {

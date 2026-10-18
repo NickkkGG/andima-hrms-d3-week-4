@@ -214,25 +214,22 @@ function requestAttendanceLocation(): Promise<AttendanceLocationPayload> {
 
 function RealtimeAttendanceClock({ variant = "header", frozenAt = null }: { variant?: "header" | "inline"; frozenAt?: Date | null }) {
   const { language } = useLanguage();
-  const [now, setNow] = useState<Date | null>(frozenAt);
+  const [now, setNow] = useState<Date>(() => new Date());
 
   useEffect(() => {
-    if (frozenAt) {
-      setNow(frozenAt);
-      return;
-    }
+    if (frozenAt) return;
 
     const updateClock = () => setNow(new Date());
-    updateClock();
     const timer = window.setInterval(updateClock, 1000);
     return () => window.clearInterval(timer);
   }, [frozenAt]);
 
-  const time = now
-    ? new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(now)
+  const displayTime = frozenAt ?? now;
+  const time = displayTime
+    ? new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(displayTime)
     : "--:--:--";
-  const date = now
-    ? new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", { timeZone: "Asia/Jakarta", weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(now)
+  const date = displayTime
+    ? new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", { timeZone: "Asia/Jakarta", weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(displayTime)
     : language === "id" ? "Memuat waktu…" : "Loading time…";
 
   if (variant === "inline") {
@@ -372,9 +369,12 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
       return;
     }
 
-    const lockedAt = new Date();
-    verificationLockedAtRef.current = lockedAt.getTime();
-    setVerificationLockedAt(lockedAt);
+    const timer = window.setTimeout(() => {
+      const lockedAt = new Date();
+      verificationLockedAtRef.current = lockedAt.getTime();
+      setVerificationLockedAt(lockedAt);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [allChallengesCompleted, identityVerified, isEnrollment, scanState, verificationLockedAt]);
 
   const stopCamera = useCallback(() => {

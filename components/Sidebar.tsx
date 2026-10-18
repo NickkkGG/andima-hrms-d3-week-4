@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -14,18 +14,23 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
-function HrmsLink({ label, href }: { label: string; href: string }) {
+function HrmsLink({ label, href, badge }: { label: ReactNode; href: string; badge?: number }) {
   const pathname = usePathname();
   const isActive = pathname === href || (href === "/employees" && pathname.startsWith("/employees"));
 
   return (
     <Link
       href={href}
-      className={`flex w-full items-center rounded-md px-3 py-2 text-xs transition-colors ${
+      className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-xs transition-colors ${
         isActive ? "bg-[#1e3765] text-white" : "text-[#d9e2fc]/80 hover:bg-[#1e3765] hover:text-white"
       }`}
     >
-      {label}
+      <span>{label}</span>
+      {badge && badge > 0 ? (
+        <span className="grid min-w-4 place-items-center rounded-full bg-[#ff4d62] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm" aria-label={`${badge} unread ticket notifications`}>
+          {badge > 99 ? "99+" : badge}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -50,31 +55,65 @@ export default function Sidebar() {
   const [d3ClosedOnPath, setD3ClosedOnPath] = useState<string | null>(null);
   const [isInternalSigningOut, setIsInternalSigningOut] = useState(false);
   const [appRole, setAppRole] = useState<"EMPLOYEE" | "HR" | "MANAGER" | null>(null);
+  const [unreadTicketCount, setUnreadTicketCount] = useState(0);
   const isD3Expanded = isD3Route ? d3ClosedOnPath !== pathname : isD3Open;
   const canViewAttendanceProductivity = appRole === "HR" || appRole === "MANAGER";
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadRole() {
+    async function loadAccountNavigation() {
       const supabase = createClient();
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 
       const { data: access } = await supabase
-        .from("d3_user_access")
+        .from("b2_register")
         .select("app_role")
         .eq("auth_user_id", userData.user.id)
+        .eq("is_active", true)
         .maybeSingle();
 
-      if (isMounted && access?.app_role) {
-        setAppRole(access.app_role as "EMPLOYEE" | "HR" | "MANAGER");
+      const role = access?.app_role as "EMPLOYEE" | "HR" | "MANAGER" | undefined;
+      if (!isMounted || !role) return;
+
+      setAppRole(role);
+      const [{ data: legacyEmployeeId }, { data: createdHistory, error: historyError }] = await Promise.all([
+        supabase.rpc("d3_current_legacy_employee_uuid"),
+        supabase
+          .from("d3_ticket_history")
+          .select("id, actor_employee_id, event_type, created_at")
+          .in("event_type", role === "EMPLOYEE" ? ["STATUS_CHANGED"] : ["CREATED", "STATUS_CHANGED"])
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (!isMounted || historyError || !legacyEmployeeId) return;
+      try {
+        const rawReadIds = window.localStorage.getItem(`d3-ticket-read-notifications:${userData.user.id}`);
+        const readIds = new Set<string>(rawReadIds ? JSON.parse(rawReadIds) : []);
+        // The badge and ticket page use the entire same notification set.
+        const unread = (createdHistory ?? [])
+          .filter((history) => history.actor_employee_id !== legacyEmployeeId)
+          .sort((first, second) => second.created_at.localeCompare(first.created_at))
+          .filter((history) => {
+            const notificationPrefix = history.event_type === "STATUS_CHANGED" ? "status" : "submitted";
+            return !readIds.has(`${notificationPrefix}-${history.id}`);
+          })
+          .length;
+        setUnreadTicketCount(unread);
+      } catch {
+        setUnreadTicketCount(0);
       }
     }
 
-    void loadRole();
+    void loadAccountNavigation();
+    const refreshTicketBadge = () => { void loadAccountNavigation(); };
+    const refreshInterval = window.setInterval(refreshTicketBadge, 15_000);
+    window.addEventListener("d3-ticket-notifications-read", refreshTicketBadge);
     return () => {
       isMounted = false;
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("d3-ticket-notifications-read", refreshTicketBadge);
     };
   }, []);
 
@@ -154,7 +193,7 @@ export default function Sidebar() {
                         <HrmsLink label={t("attendanceProductivity")} href="/attendance-productivity" />
                       )}
                       <HrmsLink label={t("feedbackReward")} href="/feedback-reward" />
-                      <HrmsLink label={t("employeeReportTicket")} href="/employee-report-ticket" />
+                      <HrmsLink label={t("employeeReportTicket")} href="/employee-report-ticket" badge={unreadTicketCount} />
                     </div>
                   )}
                 </div>
