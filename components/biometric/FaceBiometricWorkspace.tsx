@@ -72,6 +72,7 @@ type AttendanceLocationPayload = {
 type CurrentUser = {
   id: string;
   email: string | null;
+  b2RegisterId: string;
   employeeId: string;
   employeeCode: string;
   fullName: string;
@@ -849,6 +850,10 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
 
   const saveEnrollment = useCallback(async () => {
     if (!currentUser) return;
+    if (!currentUser.employeeId) {
+      setErrorMessage(localized("Profil lama untuk template biometrik belum tersedia. Data absensi tetap memakai akun B2; hubungi HR Admin untuk melengkapi template biometrik.", "The legacy profile required by the biometric template is not available yet. Attendance continues to use the B2 account; contact an HR administrator to complete biometric setup."));
+      return;
+    }
     if (faceSamplePhotosRef.current.length < REQUIRED_FACE_SAMPLES || !qualityPassedRef.current || completedChallengesRef.current.length !== challengeOrderRef.current.length) {
       setErrorMessage(localized(`Selesaikan liveness lalu hadap lurus ke kamera sampai ${REQUIRED_FACE_SAMPLES} sampel wajah otomatis terkumpul.`, `Complete liveness, then face the camera until ${REQUIRED_FACE_SAMPLES} face samples are collected automatically.`));
       return;
@@ -1004,6 +1009,8 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
 
   useEffect(() => {
     if (!isEnrollment || !canFinalize || isSavingTemplate || scanState !== "scanning") return;
+    // The controlled enrollment flow commits exactly once when all samples pass.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void saveEnrollment();
   }, [canFinalize, isEnrollment, isSavingTemplate, saveEnrollment, scanState]);
 
@@ -1025,7 +1032,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
       const { data: existingAttendance, error: lookupError } = await supabase
         .from("d3_attendances")
         .select("id, clock_in, clock_out")
-        .eq("employee_id", currentUser.employeeId)
+        .eq("b2_register_id", currentUser.b2RegisterId)
         .eq("date", attendanceDate)
         .maybeSingle();
 
@@ -1040,7 +1047,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
         const { error } = await supabase
           .from("d3_attendances")
           .insert({
-            employee_id: currentUser.employeeId,
+            b2_register_id: currentUser.b2RegisterId,
             date: attendanceDate,
             clock_in: recordedAt,
             clock_in_latitude: location.latitude,
@@ -1079,15 +1086,17 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
 
       // This is an audit trail for the biometric verification. The attendance
       // source of truth remains d3_attendances, owned by the attendance feature.
-      const { error: eventError } = await supabase
-        .from("d3_face_biometric_events")
-        .insert({
-          employee_id: currentUser.employeeId,
-          auth_user_id: currentUser.id,
-          event_type: type,
-          similarity: matchScoreRef.current,
-          liveness_score: livenessScore ?? null,
-        });
+      const eventError = currentUser.employeeId
+        ? (await supabase
+          .from("d3_face_biometric_events")
+          .insert({
+            employee_id: currentUser.employeeId,
+            auth_user_id: currentUser.id,
+            event_type: type,
+            similarity: matchScoreRef.current,
+            liveness_score: livenessScore ?? null,
+          })).error
+        : { message: "Biometric audit requires a legacy employee mapping." };
 
       setScanState("complete");
       setActionMessage(language === "id" ? `${type === "CLOCK_IN" ? "Clock-in" : "Clock-out"} dan lokasi berhasil dicatat di Riwayat & Koreksi Presensi.${eventError ? " Audit biometrik belum tersimpan, tetapi data presensi sudah tercatat." : ""}` : `${type === "CLOCK_IN" ? "Clock-in" : "Clock-out"} and location were recorded in Attendance History & Correction.${eventError ? " The biometric audit was not saved, but attendance was recorded." : ""}`);
@@ -1111,26 +1120,33 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
           router.replace("/login");
           return;
         }
-        const { data: accountContext, error: accountContextError } = await supabase
-          .rpc("d3_current_b2_employee_context")
+        const { data: account, error: accountError } = await supabase
+          .from("b2_register")
+          .select("id, employee_id, full_name, email")
+          .eq("auth_user_id", data.user.id)
+          .eq("is_active", true)
           .maybeSingle();
-        if (accountContextError || !accountContext) {
+        if (accountError || !account) {
           if (isMounted) setErrorMessage(localized("Profil B2 aktif belum dapat dimuat. Hubungi HR Admin.", "The active B2 profile could not be loaded. Contact an HR administrator."));
           return;
         }
-        const b2Context = accountContext as B2EmployeeContext;
+        const { data: accountContext } = await supabase
+          .rpc("d3_current_b2_employee_context")
+          .maybeSingle();
+        const b2Context = accountContext as B2EmployeeContext | null;
 
         const user: CurrentUser = {
           id: data.user.id,
           email: data.user.email ?? null,
-          employeeId: b2Context.employee_uuid,
-          employeeCode: b2Context.employee_code ?? "—",
-          fullName: b2Context.full_name ?? b2Context.email ?? data.user.email ?? "Employee",
+          b2RegisterId: account.id,
+          employeeId: b2Context?.employee_uuid ?? "",
+          employeeCode: account.employee_id ?? b2Context?.employee_code ?? "—",
+          fullName: account.full_name ?? b2Context?.full_name ?? account.email ?? b2Context?.email ?? data.user.email ?? "Employee",
         };
         const { data: existingAttendance } = await supabase
           .from("d3_attendances")
           .select("id, clock_in, clock_out")
-          .eq("employee_id", b2Context.employee_uuid)
+          .eq("b2_register_id", account.id)
           .eq("date", getJakartaDate())
           .maybeSingle();
         const { data: storedTemplate, error: templateError } = await supabase

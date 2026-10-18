@@ -42,13 +42,13 @@ type AttendanceRecord = {
 type AttendanceEmployee = {
   employee_id: string;
   full_name: string;
-  department_id: string | null;
+  departement_id: string | null;
   d3_departments: { name: string } | null;
 };
 
 type AttendanceQueryRow = {
   id: string;
-  employee_id: string;
+  b2_register_id: string;
   date: string;
   clock_in: string | null;
   clock_out: string | null;
@@ -59,7 +59,7 @@ type AttendanceQueryRow = {
   clock_out_longitude: number | null;
   clock_out_accuracy_meters: number | null;
   status: AttendanceStatus | null;
-  d3_employee: AttendanceEmployee | null;
+  b2_register: AttendanceEmployee | null;
 };
 
 function statusConfig(status: AttendanceStatus, language: "id" | "en") {
@@ -124,7 +124,7 @@ export default function AttendanceProductivityPage() {
         .from("d3_attendances")
         .select(`
           id,
-          employee_id,
+          b2_register_id,
           date,
           clock_in,
           clock_out,
@@ -135,11 +135,11 @@ export default function AttendanceProductivityPage() {
           clock_out_longitude,
           clock_out_accuracy_meters,
           status,
-          d3_employee!fk_d3_attendances_d3_employee (
+          b2_register!d3_attendances_b2_register_id_fkey (
             employee_id,
             full_name,
-            department_id,
-            d3_departments!fk_d3_employee_d3_departments (
+            departement_id,
+            d3_departments!b2_register_departement_id_fkey (
               name
             )
           )
@@ -167,7 +167,7 @@ export default function AttendanceProductivityPage() {
 
       if (data) {
         const formatted: AttendanceRecord[] = (data as unknown as AttendanceQueryRow[]).map((item) => {
-          const emp = item.d3_employee;
+          const emp = item.b2_register;
 
           let clockInStr: string | null = null;
           if (item.clock_in) {
@@ -201,8 +201,8 @@ export default function AttendanceProductivityPage() {
                 : "ABSENT";
 
           return {
-            id: item.id || `ATT-${item.employee_id}`,
-            employee_id: emp?.employee_id || item.employee_id || "EMP-AND-000",
+            id: item.id || `ATT-${item.b2_register_id}`,
+            employee_id: emp?.employee_id || "EMP-AND-000",
             full_name: emp?.full_name || copy.employee,
             department: emp?.d3_departments?.name || "-",
             date: item.date || new Date().toISOString().split("T")[0],

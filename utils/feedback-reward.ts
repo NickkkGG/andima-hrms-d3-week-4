@@ -103,17 +103,20 @@ export async function getEmployeeOptions(): Promise<EmployeeIdentity[]> {
   return data ?? [];
 }
 
-export async function getOverview() {
+export async function getOverview(params: SearchParams = {}) {
   const { supabase } = await getFeedbackContext();
   const b2EmployeeIds = await getB2EmployeeIds(supabase);
-  if (!b2EmployeeIds.length) return { feedback: [], rewards: [], feedbackCount: 0, rewardCount: 0 };
+  const pageSize = 3;
+  const feedbackPage = Math.max(1, Math.min(100000, Number.parseInt(param(params, "feedback_page"), 10) || 1));
+  const rewardPage = Math.max(1, Math.min(100000, Number.parseInt(param(params, "reward_page"), 10) || 1));
+  if (!b2EmployeeIds.length) return { feedback: [], rewards: [], feedbackCount: 0, rewardCount: 0, feedbackPage, rewardPage, pageSize };
   const [feedback, rewards] = await Promise.all([
-    supabase.from("d3_employee_feedback").select(feedbackFields, { count: "exact" }).in("employee_id", b2EmployeeIds).order("date", { ascending: false }).order("id", { ascending: false }).limit(3).returns<Feedback[]>(),
-    supabase.from("d3_employee_rewards").select(rewardFields, { count: "exact" }).in("employee_id", b2EmployeeIds).order("date", { ascending: false }).order("id", { ascending: false }).limit(3).returns<Reward[]>(),
+    supabase.from("d3_employee_feedback").select(feedbackFields, { count: "exact" }).in("employee_id", b2EmployeeIds).order("date", { ascending: false }).order("id", { ascending: false }).range((feedbackPage - 1) * pageSize, feedbackPage * pageSize - 1).returns<Feedback[]>(),
+    supabase.from("d3_employee_rewards").select(rewardFields, { count: "exact" }).in("employee_id", b2EmployeeIds).order("date", { ascending: false }).order("id", { ascending: false }).range((rewardPage - 1) * pageSize, rewardPage * pageSize - 1).returns<Reward[]>(),
   ]);
   if (feedback.error) queryError("recent feedback", feedback.error);
   if (rewards.error) queryError("recent rewards", rewards.error);
-  return { feedback: feedback.data ?? [], rewards: rewards.data ?? [], feedbackCount: feedback.count ?? 0, rewardCount: rewards.count ?? 0 };
+  return { feedback: feedback.data ?? [], rewards: rewards.data ?? [], feedbackCount: feedback.count ?? 0, rewardCount: rewards.count ?? 0, feedbackPage, rewardPage, pageSize };
 }
 
 export async function getRecords(kind: "feedback" | "reward", params: SearchParams) {

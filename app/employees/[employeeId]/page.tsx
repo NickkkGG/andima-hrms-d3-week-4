@@ -244,6 +244,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
   }
 
   const d3EmployeeId = employee.d3_employee_id;
+  const b2RegisterId = employee.b2_register_id;
   const [skillsResult, certificationsResult, attendancesResult, feedbackRewardsResult] = await Promise.all([
     d3EmployeeId
       ? supabase
@@ -259,11 +260,11 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
       .eq("employee_id", d3EmployeeId)
       .returns<EmployeeCertification[]>()
       : Promise.resolve({ data: [] as EmployeeCertification[], error: null }),
-    d3EmployeeId
+    b2RegisterId
       ? supabase
       .from("d3_attendances")
       .select("date, clock_in, clock_out, status, notes")
-      .eq("employee_id", d3EmployeeId)
+      .eq("b2_register_id", b2RegisterId)
       .order("date", { ascending: false })
       .returns<EmployeeAttendance[]>()
       : Promise.resolve({ data: [] as EmployeeAttendance[], error: null }),

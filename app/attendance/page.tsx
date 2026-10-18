@@ -44,13 +44,13 @@ export type AttendanceItem = {
 type AttendanceEmployee = {
   employee_id: string
   full_name: string
-  department_id: string | null
+  departement_id: string | null
   d3_departments: { name: string } | null
 }
 
 type AttendanceQueryRow = {
   id: string
-  employee_id: string
+  b2_register_id: string
   date: string
   clock_in: string | null
   clock_out: string | null
@@ -63,7 +63,7 @@ type AttendanceQueryRow = {
   work_duration_minutes: number | null
   status: string | null
   notes: string | null
-  d3_employee: AttendanceEmployee | null
+  b2_register: AttendanceEmployee | null
   d3_attendance_corrections: AttendanceCorrection[] | null
 }
 
@@ -106,7 +106,7 @@ export default function AttendancePageUI() {
   const [errorMessage, setErrorMessage] = useState('')
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [appRole, setAppRole] = useState<AppRole | null>(null)
-  const [viewerEmployeeId, setViewerEmployeeId] = useState('')
+  const [viewerB2RegisterId, setViewerB2RegisterId] = useState('')
   const [viewerName, setViewerName] = useState('')
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false)
   const [isSubmittingCorrection, setIsSubmittingCorrection] = useState(false)
@@ -127,7 +127,7 @@ export default function AttendancePageUI() {
         .from('d3_attendances')
         .select(`
           id,
-          employee_id,
+          b2_register_id,
           date,
           clock_in,
           clock_out,
@@ -139,11 +139,11 @@ export default function AttendancePageUI() {
           clock_out_accuracy_meters,
           status,
           notes,
-          d3_employee!fk_d3_attendances_d3_employee (
+          b2_register!d3_attendances_b2_register_id_fkey (
             employee_id,
             full_name,
-            department_id,
-            d3_departments!fk_d3_employee_d3_departments (
+            departement_id,
+            d3_departments!b2_register_departement_id_fkey (
               name
             )
           ),
@@ -159,8 +159,8 @@ export default function AttendancePageUI() {
         `)
         .order('date', { ascending: false })
 
-      if (appRole === 'EMPLOYEE' && viewerEmployeeId) {
-        query = query.eq('employee_id', viewerEmployeeId)
+      if (appRole === 'EMPLOYEE' && viewerB2RegisterId) {
+        query = query.eq('b2_register_id', viewerB2RegisterId)
       }
 
       const { data, error } = await query
@@ -179,13 +179,13 @@ export default function AttendancePageUI() {
 
       if (data) {
         const formatted: AttendanceItem[] = (data as unknown as AttendanceQueryRow[]).map((item) => {
-          const emp = item.d3_employee
+          const emp = item.b2_register
           const corrList = item.d3_attendance_corrections || []
           const corr = corrList.length > 0 ? corrList[0] : null
 
           return {
-            id: item.id || `ATT-${item.employee_id}`,
-            employee_id: emp?.employee_id || item.employee_id || 'EMP-AND-000',
+            id: item.id || `ATT-${item.b2_register_id}`,
+            employee_id: emp?.employee_id || 'EMP-AND-000',
             full_name: emp?.full_name || copy.employee,
             department: emp?.d3_departments?.name || copy.general,
             date: item.date || new Date().toISOString().split('T')[0],
@@ -240,20 +240,17 @@ export default function AttendancePageUI() {
       const { data: userData, error: userError } = await supabase.auth.getUser()
       if (userError || !userData.user) return
 
-      const [{ data: access, error: accessError }, { data: legacyEmployeeId, error: legacyEmployeeError }] = await Promise.all([
-        supabase
-          .from('b2_register')
-          .select('app_role, full_name')
-          .eq('auth_user_id', userData.user.id)
-          .eq('is_active', true)
-          .maybeSingle(),
-        supabase.rpc('d3_current_legacy_employee_uuid'),
-      ])
+      const { data: access, error: accessError } = await supabase
+        .from('b2_register')
+        .select('id, app_role, full_name')
+        .eq('auth_user_id', userData.user.id)
+        .eq('is_active', true)
+        .maybeSingle()
 
-      if (!mounted || accessError || legacyEmployeeError || !access || !legacyEmployeeId) return
+      if (!mounted || accessError || !access) return
       const name = userData.user.user_metadata?.full_name
       setAppRole(access.app_role as AppRole)
-      setViewerEmployeeId(legacyEmployeeId)
+      setViewerB2RegisterId(access.id)
       setViewerName(access.full_name?.trim() || (typeof name === 'string' && name.trim() ? name.trim() : userData.user.email?.split('@')[0] || copy.employee))
     }
 
@@ -267,7 +264,7 @@ export default function AttendancePageUI() {
     if (appRole) void fetchAttendanceData()
     // fetchAttendanceData reads the authenticated session and active role.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appRole, viewerEmployeeId])
+  }, [appRole, viewerB2RegisterId])
 
   // Action Handler Persetujuan / Penolakan Koreksi
   async function handleUpdateCorrectionStatus(status: 'APPROVED' | 'REJECTED') {
@@ -302,9 +299,9 @@ export default function AttendancePageUI() {
         }
       }
 
-      const correctionUpdate: { status: string; reviewed_by?: string } = {
+      const correctionUpdate: { status: string; reviewed_by_b2_register_id?: string } = {
         status,
-        reviewed_by: viewerEmployeeId || undefined,
+        reviewed_by_b2_register_id: viewerB2RegisterId || undefined,
       }
       const { error: correctionError } = await supabase
         .from('d3_attendance_corrections')
@@ -337,7 +334,7 @@ export default function AttendancePageUI() {
 
   async function handleSubmitCorrection(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!selectedItem || !viewerEmployeeId || correctionReason.trim().length < 10) return
+    if (!selectedItem || !viewerB2RegisterId || correctionReason.trim().length < 10) return
 
     setIsSubmittingCorrection(true)
     const supabase = createClient()
@@ -345,7 +342,7 @@ export default function AttendancePageUI() {
       .from('d3_attendance_corrections')
       .insert({
         attendance_id: selectedItem.id,
-        requested_by: viewerEmployeeId,
+        requested_by_b2_register_id: viewerB2RegisterId,
         correction_type: correctionType,
         proposed_clock_in: proposedClockIn ? `${selectedItem.date}T${proposedClockIn}:00+07:00` : null,
         proposed_clock_out: proposedClockOut ? `${selectedItem.date}T${proposedClockOut}:00+07:00` : null,
