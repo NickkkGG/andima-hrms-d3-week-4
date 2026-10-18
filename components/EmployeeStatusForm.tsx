@@ -12,6 +12,7 @@ import { useLanguage } from "@/components/i18n/LanguageProvider";
 interface EmployeeStatusFormProps {
   employee: {
     id: string;
+    b2_register_id: string;
     employee_id: string;
     full_name: string;
     employment_status: string | null;
@@ -24,7 +25,7 @@ function isEmploymentStatus(value: string | null): value is EmploymentStatus {
 
 export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps) {
   const { language, t } = useLanguage();
-  const copy = language === "id" ? { title: "Ubah status kepegawaian", name: "Nama pegawai", current: "Status saat ini", new: "Status baru", select: "Pilih status kepegawaian", unchanged: "Status belum berubah.", invalid: "Status kepegawaian tidak valid.", updateFailed: "Status kepegawaian belum dapat diperbarui. Silakan coba lagi.", redirect: "Mengarahkan ke profil pegawai...", cancel: "Batal", save: "Simpan status" } : { title: "Change employment status", name: "Employee name", current: "Current status", new: "New status", select: "Select employment status", unchanged: "Status has not changed.", invalid: "Invalid employment status.", updateFailed: "Employment status could not be updated. Please try again.", redirect: "Redirecting to the employee profile...", cancel: "Cancel", save: "Save status" };
+  const copy = language === "id" ? { title: "Ubah status kepegawaian", name: "Nama pegawai", current: "Status saat ini", new: "Status baru", select: "Pilih status kepegawaian", unchanged: "Status belum berubah.", finalized: "Status RESIGNED atau TERMINATED bersifat final dan tidak dapat diubah kembali.", invalid: "Status kepegawaian tidak valid.", updateFailed: "Status kepegawaian belum dapat diperbarui. Silakan coba lagi.", redirect: "Mengarahkan ke profil pegawai...", cancel: "Batal", save: "Simpan status" } : { title: "Change employment status", name: "Employee name", current: "Current status", new: "New status", select: "Select employment status", unchanged: "Status has not changed.", finalized: "RESIGNED and TERMINATED are final statuses and cannot be changed.", invalid: "Invalid employment status.", updateFailed: "Employment status could not be updated. Please try again.", redirect: "Redirecting to the employee profile...", cancel: "Cancel", save: "Save status" };
   const currentStatus = isEmploymentStatus(employee.employment_status) ? employee.employment_status : "";
   const [selectedStatus, setSelectedStatus] = useState<EmploymentStatus | "">(currentStatus);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -32,7 +33,10 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const profileUrl = `/employees/${encodeURIComponent(employee.employee_id)}`;
-  const selectableStatuses = currentStatus === "PERMANENT"
+  const isFinalStatus = currentStatus === "RESIGNED" || currentStatus === "TERMINATED";
+  const selectableStatuses = isFinalStatus
+    ? [currentStatus]
+    : currentStatus === "PERMANENT"
     ? employmentStatuses.filter((status) => status === "PERMANENT" || status === "RESIGNED" || status === "TERMINATED")
     : employmentStatuses;
   const isUnchanged = selectedStatus === currentStatus;
@@ -41,6 +45,11 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
     event.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+
+    if (isFinalStatus) {
+      setErrorMessage(copy.finalized);
+      return;
+    }
 
     if (!isEmploymentStatus(selectedStatus)) {
       setErrorMessage(copy.invalid);
@@ -55,7 +64,7 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
     setIsSubmitting(true);
 
     try {
-      const result = await updateEmployeeEmploymentStatus(employee.id, selectedStatus);
+      const result = await updateEmployeeEmploymentStatus(employee.b2_register_id, selectedStatus);
       if (!result.ok || !result.employeeId) {
         setErrorMessage(result.message);
         setIsSubmitting(false);
@@ -101,7 +110,7 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
             }`}
             value={selectedStatus}
             onChange={(event) => setSelectedStatus(event.target.value as EmploymentStatus | "")}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isFinalStatus}
             required
           >
             <option value="">{copy.select}</option>
@@ -111,7 +120,9 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
               </option>
             ))}
           </select>
-          {isUnchanged && <p className="mt-2 text-xs font-medium text-slate-500">{copy.unchanged}</p>}
+          {isFinalStatus
+            ? <p className="mt-2 text-xs font-medium text-amber-700">{copy.finalized}</p>
+            : isUnchanged && <p className="mt-2 text-xs font-medium text-slate-500">{copy.unchanged}</p>}
         </label>
       </section>
 
@@ -133,7 +144,7 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
         >
           {copy.cancel}
         </Link>
-        <CustomButton type="submit" fullWidth={false} disabled={isSubmitting || isUnchanged}>
+        <CustomButton type="submit" fullWidth={false} disabled={isSubmitting || isUnchanged || isFinalStatus}>
           {isSubmitting ? t("saving") : copy.save}
         </CustomButton>
       </div>

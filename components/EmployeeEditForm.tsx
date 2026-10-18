@@ -101,17 +101,15 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
     try {
       const supabase = createClient();
       const { data, error } = await supabase
-        .from("d3_employee")
-        .update({
-          full_name: formData.fullName.trim(),
-          email: formData.email.trim(),
-          phone: formData.phone.trim() || null,
-          position_id: formData.positionId,
-          department_id: formData.departmentId,
-          work_location: formData.workLocation.trim(),
+        .rpc("d3_update_b2_employee_profile", {
+          p_b2_register_id: employee.b2_register_id,
+          p_full_name: formData.fullName.trim(),
+          p_email: formData.email.trim(),
+          p_phone: formData.phone.trim() || null,
+          p_position_id: formData.positionId,
+          p_department_id: formData.departmentId,
+          p_work_location: formData.workLocation.trim(),
         })
-        .eq("id", employee.id)
-        .select("employee_id")
         .maybeSingle()
         .returns<EmployeeUpdateResult>();
 

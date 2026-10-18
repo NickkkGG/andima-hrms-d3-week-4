@@ -14,6 +14,24 @@ interface EmployeeSyncEvent {
   created_at: string;
 }
 
+interface B2EmployeeDirectoryRow {
+  id: string;
+  employee_id: string | null;
+  full_name: string | null;
+  email: string | null;
+  employment_status: string | null;
+  position_id: string | null;
+  departement_id: string | null;
+  created_at: string;
+  is_active: boolean | null;
+}
+
+interface EmployeeReference {
+  id: string;
+  title?: string;
+  name?: string;
+}
+
 export default async function EmployeesPage() {
   const language = await getServerLanguage();
   const copy = language === "id" ? { directory: "Direktori Pegawai", loadFailed: "Data pegawai belum dapat dimuat. Silakan coba lagi nanti.", eyebrow: "HRMS · Profil Pegawai", description: "Direktori pegawai yang telah tersinkronisasi dari registrasi B2.", active: "Aktif", syncHistory: "Riwayat sinkronisasi", open: "(buka untuk melihat)", noEmployees: "Belum ada data pegawai", noEmployeesDescription: "Pegawai dari registrasi B2 akan muncul di sini setelah tersedia.", employee: "Karyawan" } : { directory: "Employee Directory", loadFailed: "Employee data could not be loaded. Please try again later.", eyebrow: "HRMS · Employee Profile", description: "Employee directory synchronized from B2 registration.", active: "Active", syncHistory: "Synchronization history", open: "(open to view)", noEmployees: "No employee data yet", noEmployeesDescription: "Employees from B2 registration will appear here when available.", employee: "Employee" };
@@ -27,22 +45,29 @@ export default async function EmployeesPage() {
   }
 
   const userRole = await getD3AppRole(supabase, user.id);
-  const [employeesResult, hiddenEmployeesResult, sourcesResult, eventsResult] = await Promise.all([
+  const [employeesResult, positionsResult, departmentsResult, hiddenEmployeesResult, sourcesResult, eventsResult] = await Promise.all([
     supabase
-      .from("d3_view_employee_360")
-      .select(
-        "id, employee_id, full_name, position_title, department_name, employment_status, work_location, join_date"
-      )
+      .from("b2_register")
+      .select("id, employee_id, full_name, email, employment_status, position_id, departement_id, created_at, is_active")
+      .eq("is_active", true)
       .order("employee_id", { ascending: true })
-      .returns<EmployeeListItem[]>(),
+      .returns<B2EmployeeDirectoryRow[]>(),
+    supabase
+      .from("d3_positions")
+      .select("id, title")
+      .returns<EmployeeReference[]>(),
+    supabase
+      .from("d3_departments")
+      .select("id, name")
+      .returns<EmployeeReference[]>(),
     supabase
       .from("d3_employee_directory_hidden")
       .select("employee_id")
       .returns<Array<{ employee_id: string }>>(),
     supabase
       .from("d3_b2_employee_sources")
-      .select("employee_id")
-      .returns<Array<{ employee_id: string }>>(),
+      .select("b2_register_id, employee_id")
+      .returns<Array<{ b2_register_id: string; employee_id: string }>>(),
     userRole === "HR"
       ? supabase
         .from("d3_employee_sync_events")
@@ -54,13 +79,15 @@ export default async function EmployeesPage() {
   ]);
   const { data, error } = employeesResult;
   const hiddenEmployeesError = hiddenEmployeesResult.error;
+  const positionsError = positionsResult.error;
+  const departmentsError = departmentsResult.error;
   const sourcesError = sourcesResult.error;
   const eventsError = eventsResult.error;
 
-  if (error || hiddenEmployeesError || sourcesError || eventsError) {
+  if (error || positionsError || departmentsError || hiddenEmployeesError || sourcesError || eventsError) {
     console.error("Employee list query failed", {
-      code: error?.code ?? hiddenEmployeesError?.code ?? sourcesError?.code ?? eventsError?.code,
-      message: error?.message ?? hiddenEmployeesError?.message ?? sourcesError?.message ?? eventsError?.message,
+      code: error?.code ?? positionsError?.code ?? departmentsError?.code ?? hiddenEmployeesError?.code ?? sourcesError?.code ?? eventsError?.code,
+      message: error?.message ?? positionsError?.message ?? departmentsError?.message ?? hiddenEmployeesError?.message ?? sourcesError?.message ?? eventsError?.message,
     });
 
     return (
@@ -74,8 +101,22 @@ export default async function EmployeesPage() {
   }
 
   const hiddenEmployeeIds = new Set((hiddenEmployeesResult.data ?? []).map((employee) => employee.employee_id));
-  const b2EmployeeIds = new Set((sourcesResult.data ?? []).map((source) => source.employee_id));
-  const employees = (data ?? []).filter((employee) => b2EmployeeIds.has(employee.id) && !hiddenEmployeeIds.has(employee.id));
+  const b2ToD3EmployeeIds = new Map((sourcesResult.data ?? []).map((source) => [source.b2_register_id, source.employee_id]));
+  const positionNames = new Map((positionsResult.data ?? []).map((position) => [position.id, position.title ?? null]));
+  const departmentNames = new Map((departmentsResult.data ?? []).map((department) => [department.id, department.name ?? null]));
+  const employees: EmployeeListItem[] = (data ?? [])
+    .filter((employee) => employee.employee_id && employee.full_name)
+    .map((employee) => ({
+      id: b2ToD3EmployeeIds.get(employee.id) ?? employee.id,
+      employee_id: employee.employee_id as string,
+      full_name: employee.full_name as string,
+      position_title: employee.position_id ? positionNames.get(employee.position_id) ?? null : null,
+      department_name: employee.departement_id ? departmentNames.get(employee.departement_id) ?? null : null,
+      employment_status: employee.employment_status?.toUpperCase() ?? null,
+      work_location: null,
+      join_date: employee.created_at ? employee.created_at.slice(0, 10) : null,
+    }))
+    .filter((employee) => !hiddenEmployeeIds.has(employee.id));
   const profileName = typeof user.user_metadata.full_name === "string"
     ? user.user_metadata.full_name
     : user.email?.split("@")[0] ?? "HR Manager";

@@ -115,11 +115,11 @@ export async function setEmployeeDirectoryVisibility(
 }
 
 export async function updateEmployeeEmploymentStatus(
-  employeeUuid: string,
+  b2RegisterId: string,
   employmentStatus: string,
 ): Promise<EmployeeStatusChangeResult> {
   const normalizedStatus = employmentStatus.trim().toUpperCase();
-  if (!isUuid(employeeUuid) || !employmentStatuses.has(normalizedStatus)) {
+  if (!isUuid(b2RegisterId) || !employmentStatuses.has(normalizedStatus)) {
     return { ok: false, message: "Employment Status tidak valid." };
   }
 
@@ -127,15 +127,15 @@ export async function updateEmployeeEmploymentStatus(
   if (!user) return { ok: false, message: message ?? "Aksi tidak dapat dijalankan." };
 
   const { data, error } = await supabase
-    .rpc("d3_update_employee_employment_status", {
-      p_employee_uuid: employeeUuid,
+    .rpc("d3_update_b2_employee_employment_status", {
+      p_b2_register_id: b2RegisterId,
       p_employment_status: normalizedStatus,
     })
     .maybeSingle()
     .returns<EmployeeStatusRpcResult>();
 
   if (error || !data) {
-    logActionError("update_employment_status", employeeUuid, error ?? { message: "Status RPC returned no employee." });
+    logActionError("update_employment_status", b2RegisterId, error ?? { message: "Status RPC returned no employee." });
     if (error?.code === "42501") {
       return { ok: false, message: "Anda tidak memiliki izin untuk mengubah employment status pegawai." };
     }
@@ -144,6 +144,8 @@ export async function updateEmployeeEmploymentStatus(
         ok: false,
         message: error.message.toLowerCase().includes("permanent")
           ? "Employee permanent hanya dapat diubah menjadi RESIGNED atau TERMINATED."
+          : error.message.toLowerCase().includes("final")
+            ? "Employee dengan status RESIGNED atau TERMINATED tidak dapat diubah kembali."
           : "Employment Status tidak valid.",
       };
     }

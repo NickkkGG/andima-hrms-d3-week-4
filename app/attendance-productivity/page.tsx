@@ -173,7 +173,7 @@ export default function AttendanceProductivityPage() {
           if (item.clock_in) {
             const inDate = new Date(item.clock_in);
             clockInStr = !isNaN(inDate.getTime())
-              ? inDate.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })
+              ? inDate.toLocaleTimeString(locale, { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit" })
               : String(item.clock_in);
           }
 
@@ -181,7 +181,7 @@ export default function AttendanceProductivityPage() {
           if (item.clock_out) {
             const outDate = new Date(item.clock_out);
             clockOutStr = !isNaN(outDate.getTime())
-              ? outDate.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })
+              ? outDate.toLocaleTimeString(locale, { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit" })
               : String(item.clock_out);
           }
 

@@ -10,6 +10,8 @@ export interface EmployeeListItem {
 }
 
 export interface EmployeeProfile extends EmployeeListItem {
+  b2_register_id: string;
+  d3_employee_id: string | null;
   email: string | null;
   phone: string | null;
   identity_type: string | null;

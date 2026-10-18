@@ -13,6 +13,7 @@ interface EmployeeStatusPageProps {
 
 interface EmployeeStatusProfile {
   id: string;
+  b2_register_id: string;
   employee_id: string;
   full_name: string;
   employment_status: string | null;
@@ -41,12 +42,13 @@ export default async function EmployeeStatusPage({ params }: EmployeeStatusPageP
     );
   }
 
-  const { data: employee, error } = await supabase
-    .from("d3_view_employee_360")
+  const { data: b2Employee, error } = await supabase
+    .from("b2_register")
     .select("id, employee_id, full_name, employment_status")
     .eq("employee_id", employeeId)
+    .eq("is_active", true)
     .maybeSingle()
-    .returns<EmployeeStatusProfile>();
+    .returns<Omit<EmployeeStatusProfile, "b2_register_id">>();
 
   if (error) {
     console.error("Employee status profile query failed", {
@@ -67,7 +69,7 @@ export default async function EmployeeStatusPage({ params }: EmployeeStatusPageP
     );
   }
 
-  if (!employee) {
+  if (!b2Employee) {
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-3xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
@@ -81,32 +83,13 @@ export default async function EmployeeStatusPage({ params }: EmployeeStatusPageP
     );
   }
 
-  const { data: b2Source, error: b2SourceError } = await supabase
-    .from("d3_b2_employee_sources")
-    .select("employee_id")
-    .eq("employee_id", employee.id)
-    .maybeSingle();
-
-  if (b2SourceError) {
-    console.error("Employee status B2 source query failed", {
-      code: b2SourceError.code,
-      message: b2SourceError.message,
-    });
-  }
-
-  if (b2SourceError || !b2Source) {
-    return (
-      <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-3xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">Change Employment Status</h1>
-          <p className="mt-2 text-slate-600">Data employee dari registrasi B2 tidak ditemukan.</p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#155DFC]" href="/employees">
-            ← Kembali ke Daftar Pegawai
-          </Link>
-        </section>
-      </HrmsShell>
-    );
-  }
+  const employee: EmployeeStatusProfile = {
+    id: b2Employee.id,
+    b2_register_id: b2Employee.id,
+    employee_id: b2Employee.employee_id,
+    full_name: b2Employee.full_name,
+    employment_status: b2Employee.employment_status?.toUpperCase() ?? null,
+  };
 
   return (
     <HrmsShell userEmail={user.email} userRole={userRole}>

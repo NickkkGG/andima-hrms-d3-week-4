@@ -19,6 +19,18 @@ interface EmployeeProfilePageProps {
   params: Promise<{ employeeId: string }>;
 }
 
+interface B2EmployeeProfileRow {
+  id: string;
+  employee_id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  employment_status: string | null;
+  position_id: string | null;
+  departement_id: string | null;
+  created_at: string;
+}
+
 function displayValue(value: string | null, language: "id" | "en" = "id") {
   return value || (language === "id" ? "Belum tersedia" : "Not available");
 }
@@ -39,6 +51,18 @@ function formatDate(value: string | null, language: "id" | "en" = "id") {
 
 function formatTime(value: string | null, language: "id" | "en" = "id") {
   if (!value) return language === "id" ? "Belum tersedia" : "Not available";
+
+  if (value.includes("T") || value.endsWith("Z") || /[+-]\d{2}:?\d{2}$/.test(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Jakarta",
+      }).format(date);
+    }
+  }
 
   const match = value.match(/(\d{2}:\d{2})/);
   return match ? match[1] : value;
@@ -101,14 +125,13 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
   const userRole = await getD3AppRole(supabase, user.id);
   const canManageEmployees = canManageEmployeeProfiles(userRole);
 
-  const { data: employee, error: employeeError } = await supabase
-    .from("d3_view_employee_360")
-    .select(
-      "id, employee_id, full_name, email, phone, identity_type, identity_number, join_date, employment_status, work_location, position_id, position_title, department_id, department_name, tenure_years, tenure_months"
-    )
+  const { data: b2Employee, error: employeeError } = await supabase
+    .from("b2_register")
+    .select("id, employee_id, full_name, email, phone, employment_status, position_id, departement_id, created_at")
     .eq("employee_id", employeeId)
+    .eq("is_active", true)
     .maybeSingle()
-    .returns<EmployeeProfile>();
+    .returns<B2EmployeeProfileRow>();
 
   if (employeeError) {
     console.error("Employee profile query failed", {
@@ -129,7 +152,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
     );
   }
 
-  if (!employee) {
+  if (!b2Employee) {
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-7xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
@@ -146,7 +169,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
   const { data: b2Source, error: b2SourceError } = await supabase
     .from("d3_b2_employee_sources")
     .select("employee_id")
-    .eq("employee_id", employee.id)
+    .eq("b2_register_id", b2Employee.id)
     .maybeSingle();
 
   if (b2SourceError) {
@@ -168,26 +191,49 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
     );
   }
 
-  if (!b2Source) {
-    return (
-      <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-7xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">Employee Profile</h1>
-          <p className="mt-2 text-slate-600">Data employee ini bukan berasal dari registrasi B2.</p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Employee Directory
-          </Link>
-        </section>
-      </HrmsShell>
-    );
+  const { data: d3Employee, error: d3EmployeeError } = b2Source
+    ? await supabase
+      .from("d3_view_employee_360")
+      .select("id, identity_type, identity_number, join_date, work_location, position_id, position_title, department_id, department_name, tenure_years, tenure_months")
+      .eq("id", b2Source.employee_id)
+      .maybeSingle()
+      .returns<Pick<EmployeeProfile, "id" | "identity_type" | "identity_number" | "join_date" | "work_location" | "position_id" | "position_title" | "department_id" | "department_name" | "tenure_years" | "tenure_months">>()
+    : { data: null, error: null };
+
+  if (d3EmployeeError) {
+    console.error("Employee profile D3 extension query failed", {
+      code: d3EmployeeError.code,
+      message: d3EmployeeError.message,
+    });
   }
 
+  const employee: EmployeeProfile = {
+    id: d3Employee?.id ?? b2Employee.id,
+    b2_register_id: b2Employee.id,
+    d3_employee_id: d3Employee?.id ?? null,
+    employee_id: b2Employee.employee_id,
+    full_name: b2Employee.full_name,
+    email: b2Employee.email,
+    phone: b2Employee.phone,
+    identity_type: d3Employee?.identity_type ?? null,
+    identity_number: d3Employee?.identity_number ?? null,
+    join_date: d3Employee?.join_date ?? b2Employee.created_at.slice(0, 10),
+    employment_status: b2Employee.employment_status?.toUpperCase() ?? null,
+    work_location: d3Employee?.work_location ?? null,
+    position_id: b2Employee.position_id ?? d3Employee?.position_id ?? null,
+    position_title: d3Employee?.position_title ?? null,
+    department_id: b2Employee.departement_id ?? d3Employee?.department_id ?? null,
+    department_name: d3Employee?.department_name ?? null,
+    tenure_years: d3Employee?.tenure_years ?? null,
+    tenure_months: d3Employee?.tenure_months ?? null,
+  };
+
   let isHiddenFromDirectory = false;
-  if (canManageEmployees) {
+  if (canManageEmployees && employee.d3_employee_id) {
     const { data: visibility, error: visibilityError } = await supabase
       .from("d3_employee_directory_hidden")
       .select("employee_id")
-      .eq("employee_id", employee.id)
+      .eq("employee_id", employee.d3_employee_id ?? "")
       .maybeSingle();
 
     if (visibilityError) {
@@ -197,29 +243,38 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
     }
   }
 
+  const d3EmployeeId = employee.d3_employee_id;
   const [skillsResult, certificationsResult, attendancesResult, feedbackRewardsResult] = await Promise.all([
-    supabase
+    d3EmployeeId
+      ? supabase
       .from("d3_employee_skills")
       .select("competency_id, proficiency_level, evidence_notes, competencies:d3_competencies(name)")
-      .eq("employee_id", employee.id)
-      .returns<EmployeeSkill[]>(),
-    supabase
+      .eq("employee_id", d3EmployeeId)
+      .returns<EmployeeSkill[]>()
+      : Promise.resolve({ data: [] as EmployeeSkill[], error: null }),
+    d3EmployeeId
+      ? supabase
       .from("view_employee_certifications")
       .select("title, issuing_organization, issue_date, expiry_date, credential_id, status")
-      .eq("employee_id", employee.id)
-      .returns<EmployeeCertification[]>(),
-    supabase
+      .eq("employee_id", d3EmployeeId)
+      .returns<EmployeeCertification[]>()
+      : Promise.resolve({ data: [] as EmployeeCertification[], error: null }),
+    d3EmployeeId
+      ? supabase
       .from("d3_attendances")
       .select("date, clock_in, clock_out, status, notes")
-      .eq("employee_id", employee.id)
+      .eq("employee_id", d3EmployeeId)
       .order("date", { ascending: false })
-      .returns<EmployeeAttendance[]>(),
-    supabase
+      .returns<EmployeeAttendance[]>()
+      : Promise.resolve({ data: [] as EmployeeAttendance[], error: null }),
+    d3EmployeeId
+      ? supabase
       .from("feedback_rewards")
       .select("type, category, title, message, points, created_at")
-      .eq("receiver_id", employee.id)
+      .eq("receiver_id", d3EmployeeId)
       .order("created_at", { ascending: false })
-      .returns<EmployeeFeedbackReward[]>(),
+      .returns<EmployeeFeedbackReward[]>()
+      : Promise.resolve({ data: [] as EmployeeFeedbackReward[], error: null }),
   ]);
 
   if (skillsResult.error) logRelatedQueryError("d3_employee_skills", skillsResult.error);
@@ -259,7 +314,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
               <Link className="inline-flex h-11 items-center justify-center rounded-[15px] bg-[#155DFC] px-5 text-sm font-bold text-white shadow-[3px_3px_14px_rgba(87,138,252,0.4)] transition hover:bg-[#0D4FDB]" href={`/employees/${encodeURIComponent(employee.employee_id)}/status`}>
                 {copy.status}
               </Link>
-              <EmployeeDirectoryVisibilityButton employeeUuid={employee.id} initiallyHidden={isHiddenFromDirectory} />
+              {employee.d3_employee_id && <EmployeeDirectoryVisibilityButton employeeUuid={employee.d3_employee_id} initiallyHidden={isHiddenFromDirectory} />}
             </div>
           )}
         </div>
