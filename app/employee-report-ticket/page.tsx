@@ -21,7 +21,8 @@ import { createClient } from "@/utils/supabase/client";
 import HeaderAccount from "@/components/HeaderAccount";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
-type TicketStatus = "SUBMITTED" | "IN_REVIEW" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
+type TicketStatus = "PENDING" | "TODO" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
+type TicketPriority = "LOW" | "NORMAL" | "HIGH";
 type ViewRole = "manager" | "employee";
 type AppRole = "EMPLOYEE" | "HR" | "MANAGER";
 
@@ -48,6 +49,8 @@ type TicketItem = {
   createdAt: string;
   updatedAt: string;
   status: TicketStatus;
+  priority: TicketPriority;
+  dueAt?: string;
   attachment?: { fileName: string; storagePath: string };
   history: Activity[];
 };
@@ -69,19 +72,26 @@ type TicketNotification = {
   kind: "submitted" | "status";
 };
 
-const statusMeta: Record<TicketStatus, { label: string; className: string }> = {
-  SUBMITTED: { label: "Submitted", className: "border-[#d9e2fc] bg-[#f1f3ff] text-[#4d5f81]" },
-  IN_REVIEW: { label: "In review", className: "border-[#b9d6ff] bg-[#edf6ff] text-[#1971c2]" },
-  IN_PROGRESS: { label: "In progress", className: "border-[#fde68a] bg-[#fef9c3] text-[#b7791f]" },
-  RESOLVED: { label: "Resolved", className: "border-[#bbf0d2] bg-[#eaf7f0] text-[#16834b]" },
-  REJECTED: { label: "Rejected", className: "border-[#fecaca] bg-[#fff1f2] text-[#d64545]" },
+const statusMeta: Record<TicketStatus, { className: string }> = {
+  PENDING: { className: "border-[#d9e2fc] bg-[#f1f3ff] text-[#4d5f81]" },
+  TODO: { className: "border-[#b9d6ff] bg-[#edf6ff] text-[#1971c2]" },
+  IN_PROGRESS: { className: "border-[#fde68a] bg-[#fef9c3] text-[#b7791f]" },
+  RESOLVED: { className: "border-[#bbf0d2] bg-[#eaf7f0] text-[#16834b]" },
+  REJECTED: { className: "border-[#fecaca] bg-[#fff1f2] text-[#d64545]" },
 };
 
 function statusLabel(status: TicketStatus, language: "id" | "en") {
   const labels = language === "id"
-    ? { SUBMITTED: "Diajukan", IN_REVIEW: "Ditinjau", IN_PROGRESS: "Diproses", RESOLVED: "Selesai", REJECTED: "Ditolak" }
-    : { SUBMITTED: "Submitted", IN_REVIEW: "In review", IN_PROGRESS: "In progress", RESOLVED: "Resolved", REJECTED: "Rejected" };
+    ? { PENDING: "Menunggu", TODO: "Dikerjakan", IN_PROGRESS: "Diproses", RESOLVED: "Selesai", REJECTED: "Ditolak" }
+    : { PENDING: "Pending", TODO: "To do", IN_PROGRESS: "In progress", RESOLVED: "Resolved", REJECTED: "Rejected" };
   return labels[status];
+}
+
+function priorityLabel(priority: TicketPriority, language: "id" | "en") {
+  const labels = language === "id"
+    ? { LOW: "Rendah", NORMAL: "Normal", HIGH: "Tinggi" }
+    : { LOW: "Low", NORMAL: "Normal", HIGH: "High" };
+  return labels[priority];
 }
 
 const categories = ["Workplace facility", "System access", "Safety", "Work arrangement", "Operational issue", "Other"];
@@ -103,6 +113,12 @@ function StatusBadge({ status }: { status: TicketStatus }) {
   );
 }
 
+function PriorityBadge({ priority }: { priority: TicketPriority }) {
+  const { language } = useLanguage();
+  const className = priority === "HIGH" ? "border-[#fecaca] bg-[#fff1f2] text-[#d64545]" : priority === "LOW" ? "border-[#d9e2fc] bg-[#f7f8ff] text-[#4d5f81]" : "border-[#b9d6ff] bg-[#edf6ff] text-[#1971c2]";
+  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${className}`}>{priorityLabel(priority, language)}</span>;
+}
+
 function formatDate(value: string, language: "id" | "en", withTime = false) {
   return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", {
     day: "2-digit",
@@ -118,9 +134,16 @@ function currentLocalDateTime() {
   return new Date(now.getTime() - offset).toISOString().slice(0, 16);
 }
 
+function toDateTimeLocal(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
 export default function EmployeeReportTicketPage() {
   const { t, language } = useLanguage();
-  const copy = language === "id" ? { loadingAccess: "Memuat akses HRMS...", search: "Cari tiket, pegawai...", notifications: "Notifikasi tiket", ticketList: "Daftar tiket", description: "Catat, tindak lanjuti, dan pantau kebutuhan pekerjaan secara terstruktur.", all: "Semua", loadingTickets: "Memuat tiket dari database...", noTickets: "Belum ada tiket yang sesuai dengan filter.", showing: "Menampilkan", of: "dari", tickets: "tiket", employee: "Karyawan", submitted: "Diajukan", status: "Status", action: "Aksi", view: "Lihat", ticket: "Tiket", create: "Buat tiket", loadError: "Tiket belum dapat dimuat. Silakan coba lagi.", historyError: "Sebagian riwayat tiket belum dapat dimuat.", ticketCreated: "Tiket berhasil diajukan.", followUpAdded: "Tindak lanjut ditambahkan.", newTicket: (name: string) => `Tiket baru diajukan oleh ${name}.`, updateFailed: "Status tiket belum berhasil diperbarui.", updated: "Status tiket diperbarui.", followUpFailed: "Tindak lanjut belum berhasil disimpan.", followUpSaved: "Tindak lanjut tersimpan di riwayat tiket.", accessUnavailable: "Akses karyawan belum siap. Login ulang lalu coba lagi.", imageType: "Lampiran hanya boleh berupa gambar JPG, PNG, atau WebP.", imageSize: "Lampiran gambar maksimal 5 MB.", createFailed: "Tiket belum berhasil dibuat. Periksa kembali data lalu coba lagi.", attachmentUpload: (id: string) => `${id} dibuat, tetapi lampiran belum berhasil diunggah.`, attachmentMetadata: (id: string) => `${id} dibuat, tetapi metadata lampiran belum tersimpan.`, created: (id: string) => `${id} berhasil dibuat.`, attachmentOpen: "Lampiran belum dapat dibuka." } : { loadingAccess: "Loading HRMS access...", search: "Search tickets or employees...", notifications: "Ticket notifications", ticketList: "Ticket list", description: "Record, follow up, and monitor work needs in a structured workflow.", all: "All", loadingTickets: "Loading tickets from the database...", noTickets: "No tickets match the current filter.", showing: "Showing", of: "of", tickets: "tickets", employee: "Employee", submitted: "Submitted", status: "Status", action: "Action", view: "View", ticket: "Ticket", create: "Create ticket", loadError: "Tickets could not be loaded. Please try again.", historyError: "Some ticket history could not be loaded.", ticketCreated: "Ticket submitted successfully.", followUpAdded: "Follow-up added.", newTicket: (name: string) => `A new ticket was submitted by ${name}.`, updateFailed: "Ticket status could not be updated.", updated: "Ticket status updated.", followUpFailed: "Follow-up could not be saved.", followUpSaved: "Follow-up saved in ticket history.", accessUnavailable: "Employee access is not ready. Sign in again and retry.", imageType: "Attachments must be JPG, PNG, or WebP images.", imageSize: "Image attachments must be at most 5 MB.", createFailed: "Ticket could not be created. Check the details and try again.", attachmentUpload: (id: string) => `${id} was created, but the attachment could not be uploaded.`, attachmentMetadata: (id: string) => `${id} was created, but its attachment metadata could not be saved.`, created: (id: string) => `${id} created successfully.`, attachmentOpen: "Attachment could not be opened." };
+  const copy = language === "id" ? { loadingAccess: "Memuat akses HRMS...", search: "Cari tiket, pegawai...", notifications: "Notifikasi tiket", ticketList: "Daftar tiket", description: "Catat, tindak lanjuti, dan pantau kebutuhan pekerjaan secara terstruktur.", all: "Semua", loadingTickets: "Memuat tiket dari database...", noTickets: "Belum ada tiket yang sesuai dengan filter.", showing: "Menampilkan", of: "dari", tickets: "tiket", employee: "Karyawan", submitted: "Diajukan", status: "Status", priority: "Prioritas", dueDate: "Batas waktu", noDueDate: "Belum ditentukan", action: "Aksi", view: "Lihat", ticket: "Tiket", create: "Buat tiket", loadError: "Tiket belum dapat dimuat. Silakan coba lagi.", historyError: "Sebagian riwayat tiket belum dapat dimuat.", ticketCreated: "Tiket berhasil diajukan.", followUpAdded: "Tindak lanjut ditambahkan.", newTicket: (name: string) => `Tiket baru diajukan oleh ${name}.`, updateFailed: "Pengaturan tiket belum berhasil diperbarui.", updated: "Pengaturan tiket diperbarui.", followUpFailed: "Tindak lanjut belum berhasil disimpan.", followUpSaved: "Tindak lanjut tersimpan di riwayat tiket.", accessUnavailable: "Akses karyawan belum siap. Login ulang lalu coba lagi.", imageType: "Lampiran hanya boleh berupa gambar JPG, PNG, atau WebP.", imageSize: "Lampiran gambar maksimal 5 MB.", createFailed: "Tiket belum berhasil dibuat. Periksa kembali data lalu coba lagi.", attachmentUpload: (id: string) => `${id} dibuat, tetapi lampiran belum berhasil diunggah.`, attachmentMetadata: (id: string) => `${id} dibuat, tetapi metadata lampiran belum tersimpan.`, created: (id: string) => `${id} berhasil dibuat.`, attachmentOpen: "Lampiran belum dapat dibuka." } : { loadingAccess: "Loading HRMS access...", search: "Search tickets or employees...", notifications: "Ticket notifications", ticketList: "Ticket list", description: "Record, follow up, and monitor work needs in a structured workflow.", all: "All", loadingTickets: "Loading tickets from the database...", noTickets: "No tickets match the current filter.", showing: "Showing", of: "of", tickets: "tickets", employee: "Employee", submitted: "Submitted", status: "Status", priority: "Priority", dueDate: "Due date", noDueDate: "Not set", action: "Action", view: "View", ticket: "Ticket", create: "Create ticket", loadError: "Tickets could not be loaded. Please try again.", historyError: "Some ticket history could not be loaded.", ticketCreated: "Ticket submitted successfully.", followUpAdded: "Follow-up added.", newTicket: (name: string) => `A new ticket was submitted by ${name}.`, updateFailed: "Ticket settings could not be updated.", updated: "Ticket settings updated.", followUpFailed: "Follow-up could not be saved.", followUpSaved: "Follow-up saved in ticket history.", accessUnavailable: "Employee access is not ready. Sign in again and retry.", imageType: "Attachments must be JPG, PNG, or WebP images.", imageSize: "Image attachments must be at most 5 MB.", createFailed: "Ticket could not be created. Check the details and try again.", attachmentUpload: (id: string) => `${id} was created, but the attachment could not be uploaded.`, attachmentMetadata: (id: string) => `${id} was created, but its attachment metadata could not be saved.`, created: (id: string) => `${id} created successfully.`, attachmentOpen: "Attachment could not be opened." };
   const router = useRouter();
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -146,7 +169,7 @@ export default function EmployeeReportTicketPage() {
     setIsTicketLoading(true);
     const { data: ticketRows, error: ticketError } = await supabase
       .from("d3_tickets")
-      .select("id, ticket_code, employee_id, reporter_name, reporter_employee_code, reporter_department, title, category, description, occurred_at, status, created_at, updated_at")
+      .select("id, ticket_code, employee_id, reporter_name, reporter_employee_code, reporter_department, title, category, description, occurred_at, status, priority, due_at, created_at, updated_at")
       .order("created_at", { ascending: false });
 
     if (ticketError) {
@@ -214,6 +237,8 @@ export default function EmployeeReportTicketPage() {
       createdAt: ticket.created_at,
       updatedAt: ticket.updated_at,
       status: ticket.status as TicketStatus,
+      priority: ticket.priority as TicketPriority,
+      dueAt: ticket.due_at ?? undefined,
       attachment: attachmentsByTicket.get(ticket.id),
       history: (historiesByTicket.get(ticket.id) ?? []).sort((a, b) => a.at.localeCompare(b.at)),
     }));
@@ -370,11 +395,22 @@ export default function EmployeeReportTicketPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerEmployeeId, viewerName, isAccountLoading]);
 
-  async function changeStatus(status: TicketStatus) {
-    if (!selectedTicket || viewRole !== "manager" || selectedTicket.status === status) return;
+  async function updateTicketWorkflow(update: { status?: TicketStatus; priority?: TicketPriority; dueAt?: string | null }) {
+    if (!selectedTicket || viewRole !== "manager") return;
+    const hasDueDateUpdate = "dueAt" in update;
+    const normalizedDueAt = hasDueDateUpdate ? (update.dueAt ? new Date(update.dueAt).toISOString() : null) : undefined;
+    if ((update.status === undefined || selectedTicket.status === update.status)
+      && (update.priority === undefined || selectedTicket.priority === update.priority)
+      && (!hasDueDateUpdate || (selectedTicket.dueAt ?? null) === normalizedDueAt)) return;
+
+    const payload: { status?: TicketStatus; priority?: TicketPriority; due_at?: string | null } = {};
+    if (update.status !== undefined) payload.status = update.status;
+    if (update.priority !== undefined) payload.priority = update.priority;
+    if (hasDueDateUpdate) payload.due_at = normalizedDueAt ?? null;
+
     setIsSaving(true);
     const supabase = createClient();
-    const { error } = await supabase.from("d3_tickets").update({ status }).eq("id", selectedTicket.dbId);
+    const { error } = await supabase.from("d3_tickets").update(payload).eq("id", selectedTicket.dbId);
     setIsSaving(false);
     if (error) {
       showNotice(copy.updateFailed);
@@ -490,12 +526,12 @@ export default function EmployeeReportTicketPage() {
 
           <div className="mt-5 flex flex-col gap-5 xl:grid xl:grid-cols-[minmax(0,1fr)_420px]">
             <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-              <div className="flex flex-col gap-3 border-b border-[#becabd]/35 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"><label className="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-[#d9e2fc] bg-[#f7f8ff] px-2.5 text-[#1e3765]"><Filter size={14} aria-hidden="true" /><span className="sr-only">{language === "id" ? "Filter status tiket" : "Filter ticket status"}</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "ALL" | TicketStatus)} className="min-w-30 bg-transparent text-[11px] font-semibold outline-none"><option value="ALL">{copy.all} ({accessibleTickets.length})</option>{(["SUBMITTED", "IN_REVIEW", "IN_PROGRESS", "RESOLVED", "REJECTED"] as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select></label><label className="flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:hidden"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none" placeholder={copy.search} /></label></div>
-              <div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.ticket}</th><th className="px-3 py-3">{copy.submitted}</th><th className="px-3 py-3">{copy.status}</th><th className="w-16 px-3 py-3">{copy.action}</th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{isTicketLoading ? <tr><td colSpan={5} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.loadingTickets}</td></tr> : visibleTickets.map((ticket) => <tr key={ticket.id} onClick={() => setSelectedId(ticket.id)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selectedTicket?.id === ticket.id ? "bg-[#eaf7f0]" : "bg-white"}`}><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="text-xs font-semibold">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {ticket.category}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt, language)}</td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5"><button onClick={(event) => { event.stopPropagation(); setSelectedId(ticket.id); }} className="rounded-md bg-[#f1f3ff] px-2.5 py-1.5 text-[11px] font-bold text-[#1e3765] transition hover:bg-[#d9e2fc]" aria-label={`${copy.view} ${ticket.id}`}>{copy.view}</button></td></tr>)}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={5} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.noTickets}</td></tr>}</tbody></table></div>
+              <div className="flex flex-col gap-3 border-b border-[#becabd]/35 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"><label className="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-[#d9e2fc] bg-[#f7f8ff] px-2.5 text-[#1e3765]"><Filter size={14} aria-hidden="true" /><span className="sr-only">{language === "id" ? "Filter status tiket" : "Filter ticket status"}</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "ALL" | TicketStatus)} className="min-w-30 bg-transparent text-[11px] font-semibold outline-none"><option value="ALL">{copy.all} ({accessibleTickets.length})</option>{(["PENDING", "TODO", "IN_PROGRESS", "RESOLVED", "REJECTED"] as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select></label><label className="flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:hidden"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => setQuery(event.target.value)} className="w-full bg-transparent text-xs outline-none" placeholder={copy.search} /></label></div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.ticket}</th><th className="px-3 py-3">{copy.submitted}</th><th className="px-3 py-3">{copy.dueDate}</th><th className="px-3 py-3">{copy.priority}</th><th className="px-3 py-3">{copy.status}</th><th className="w-16 px-3 py-3">{copy.action}</th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{isTicketLoading ? <tr><td colSpan={7} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.loadingTickets}</td></tr> : visibleTickets.map((ticket) => <tr key={ticket.id} onClick={() => setSelectedId(ticket.id)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selectedTicket?.id === ticket.id ? "bg-[#eaf7f0]" : "bg-white"}`}><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="text-xs font-semibold">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {ticket.category}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt, language)}</td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</td><td className="px-3 py-3.5"><PriorityBadge priority={ticket.priority} /></td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5"><button onClick={(event) => { event.stopPropagation(); setSelectedId(ticket.id); }} className="rounded-md bg-[#f1f3ff] px-2.5 py-1.5 text-[11px] font-bold text-[#1e3765] transition hover:bg-[#d9e2fc]" aria-label={`${copy.view} ${ticket.id}`}>{copy.view}</button></td></tr>)}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={7} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.noTickets}</td></tr>}</tbody></table></div>
               <div className="border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81]">{copy.showing} <b className="text-[#121b2e]">{visibleTickets.length}</b> {copy.of} <b className="text-[#121b2e]">{accessibleTickets.length}</b> {copy.tickets}.</div>
             </section>
 
-            <TicketDetail ticket={selectedTicket} role={viewRole} followUp={followUp} followUpAt={followUpAt} isSaving={isSaving} onFollowUpChange={setFollowUp} onFollowUpAtChange={setFollowUpAt} onAddFollowUp={addFollowUp} onChangeStatus={changeStatus} onOpenAttachment={openAttachment} onClose={() => setSelectedId("")} />
+            <TicketDetail ticket={selectedTicket} role={viewRole} followUp={followUp} followUpAt={followUpAt} isSaving={isSaving} onFollowUpChange={setFollowUp} onFollowUpAtChange={setFollowUpAt} onAddFollowUp={addFollowUp} onUpdateWorkflow={updateTicketWorkflow} onOpenAttachment={openAttachment} onClose={() => setSelectedId("")} />
           </div>
         </div>
       </section>
@@ -523,16 +559,19 @@ function TicketNotificationPanel({ notifications, isLoading, onRefresh, onReadAl
   </section>;
 }
 
-function TicketDetail({ ticket, role, followUp, followUpAt, isSaving, onFollowUpChange, onFollowUpAtChange, onAddFollowUp, onChangeStatus, onOpenAttachment, onClose }: { ticket?: TicketItem; role: ViewRole; followUp: string; followUpAt: string; isSaving: boolean; onFollowUpChange: (value: string) => void; onFollowUpAtChange: (value: string) => void; onAddFollowUp: () => void; onChangeStatus: (status: TicketStatus) => void; onOpenAttachment: (attachment: { fileName: string; storagePath: string }) => void; onClose: () => void }) {
+function TicketDetail({ ticket, role, followUp, followUpAt, isSaving, onFollowUpChange, onFollowUpAtChange, onAddFollowUp, onUpdateWorkflow, onOpenAttachment, onClose }: { ticket?: TicketItem; role: ViewRole; followUp: string; followUpAt: string; isSaving: boolean; onFollowUpChange: (value: string) => void; onFollowUpAtChange: (value: string) => void; onAddFollowUp: () => void; onUpdateWorkflow: (update: { status?: TicketStatus; priority?: TicketPriority; dueAt?: string | null }) => void; onOpenAttachment: (attachment: { fileName: string; storagePath: string }) => void; onClose: () => void }) {
   const { language } = useLanguage();
-  const copy = language === "id" ? { empty: "Pilih tiket untuk melihat detail.", details: "Detail tiket", workflow: "Alur laporan karyawan", close: "Tutup detail", current: "Status saat ini", restricted: "Status dapat diperbarui oleh HR atau Manager.", reported: "Dilaporkan", occurred: "Kejadian/pengajuan", history: "Progres & riwayat", noFollowUp: "Belum ada tindak lanjut untuk tiket ini.", add: "Tambah tindak lanjut", placeholder: "Tuliskan tindakan atau informasi tindak lanjut...", at: "Tanggal / waktu tindak lanjut", saving: "Menyimpan...", save: "Simpan tindak lanjut" } : { empty: "Select a ticket to view its details.", details: "Ticket details", workflow: "Employee report workflow", close: "Close details", current: "Current status", restricted: "Status can be updated by HR or a Manager.", reported: "Reported", occurred: "Occurrence/submission", history: "Progress & history", noFollowUp: "There is no follow-up for this ticket yet.", add: "Add follow-up", placeholder: "Describe the action taken or follow-up information...", at: "Follow-up date / time", saving: "Saving...", save: "Save follow-up" };
+  const copy = language === "id" ? { empty: "Pilih tiket untuk melihat detail.", details: "Detail tiket", workflow: "Alur laporan karyawan", close: "Tutup detail", current: "Pengaturan tiket", restricted: "Pengaturan hanya dapat diperbarui oleh HR atau Manager.", status: "Status", priority: "Prioritas", dueDate: "Batas waktu", noDueDate: "Belum ditentukan", reported: "Dilaporkan", occurred: "Kejadian/pengajuan", history: "Progres & riwayat", noFollowUp: "Belum ada tindak lanjut untuk tiket ini.", add: "Tambah tindak lanjut", placeholder: "Tuliskan tindakan atau informasi tindak lanjut...", at: "Tanggal / waktu tindak lanjut", saving: "Menyimpan...", save: "Simpan tindak lanjut" } : { empty: "Select a ticket to view its details.", details: "Ticket details", workflow: "Employee report workflow", close: "Close details", current: "Ticket settings", restricted: "Settings can be updated by HR or a Manager.", status: "Status", priority: "Priority", dueDate: "Due date", noDueDate: "Not set", reported: "Reported", occurred: "Occurrence/submission", history: "Progress & history", noFollowUp: "There is no follow-up for this ticket yet.", add: "Add follow-up", placeholder: "Describe the action taken or follow-up information...", at: "Follow-up date / time", saving: "Saving...", save: "Save follow-up" };
   if (!ticket) return <aside className="rounded-xl border border-[#becabd]/45 bg-white p-6 text-sm text-[#4d5f81]">{copy.empty}</aside>;
+  const canManage = role === "manager";
+
   return <aside className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] xl:sticky xl:top-21 xl:h-fit">
     <div className="flex items-start justify-between bg-[#1e3765] px-5 py-4 text-white"><div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-lg border border-[#069494] bg-[#577c8e]"><Ticket size={15} /></span><div><p className="text-sm font-bold">{copy.details} — {ticket.id}</p><p className="text-[11px] text-[#d9e2fc]">{copy.workflow}</p></div></div><button onClick={onClose} className="rounded p-1 text-[#d9e2fc] hover:bg-white/10" aria-label={copy.close}><X size={16} /></button></div>
-    <div className="space-y-5 p-5"><div><div className="mb-2 flex items-center justify-between gap-3"><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#4d5f81]">{copy.current}</p><StatusBadge status={ticket.status} /></div>{role === "manager" ? <select disabled={isSaving} value={ticket.status} onChange={(event) => onChangeStatus(event.target.value as TicketStatus)} className="w-full rounded-lg border border-[#becabd]/60 bg-white px-3 py-2.5 text-xs font-semibold outline-none focus:border-[#069494] disabled:opacity-60">{(Object.keys(statusMeta) as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select> : <p className="text-xs text-[#4d5f81]">{copy.restricted}</p>}</div>
+    <div className="space-y-5 p-5">
+      <div><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[#4d5f81]">{copy.current}</p><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-[11px] font-semibold text-[#4d5f81]"><span>{copy.status}</span>{canManage ? <select disabled={isSaving} value={ticket.status} onChange={(event) => onUpdateWorkflow({ status: event.target.value as TicketStatus })} className="rounded-lg border border-[#becabd]/60 bg-white px-2.5 py-2 text-xs font-semibold text-[#121b2e] outline-none focus:border-[#069494] disabled:opacity-60">{(Object.keys(statusMeta) as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select> : <StatusBadge status={ticket.status} />}</label><label className="grid gap-1 text-[11px] font-semibold text-[#4d5f81]"><span>{copy.priority}</span>{canManage ? <select disabled={isSaving} value={ticket.priority} onChange={(event) => onUpdateWorkflow({ priority: event.target.value as TicketPriority })} className="rounded-lg border border-[#becabd]/60 bg-white px-2.5 py-2 text-xs font-semibold text-[#121b2e] outline-none focus:border-[#069494] disabled:opacity-60">{(["LOW", "NORMAL", "HIGH"] as TicketPriority[]).map((priority) => <option key={priority} value={priority}>{priorityLabel(priority, language)}</option>)}</select> : <PriorityBadge priority={ticket.priority} />}</label><label className="grid gap-1 text-[11px] font-semibold text-[#4d5f81] sm:col-span-2"><span>{copy.dueDate}</span>{canManage ? <input key={ticket.id} disabled={isSaving} defaultValue={toDateTimeLocal(ticket.dueAt)} onBlur={(event) => onUpdateWorkflow({ dueAt: event.target.value || null })} type="datetime-local" className="rounded-lg border border-[#becabd]/60 bg-white px-2.5 py-2 text-xs font-semibold text-[#121b2e] outline-none focus:border-[#069494] disabled:opacity-60" /> : <span className="text-xs font-semibold text-[#121b2e]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</span>}</label></div>{!canManage && <p className="mt-3 text-xs text-[#4d5f81]">{copy.restricted}</p>}</div>
       <div className="border-y border-[#becabd]/35 py-4"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId} · {ticket.department}</p></div></div><h2 className="mt-4 text-base font-bold leading-6">{ticket.title}</h2><p className="mt-1 text-xs text-[#4d5f81]">{ticket.category} · {copy.reported} {formatDate(ticket.createdAt, language, true)}</p>{ticket.occurredAt && <p className="mt-1 text-xs text-[#4d5f81]">{copy.occurred}: {formatDate(ticket.occurredAt, language, true)}</p>}<p className="mt-3 text-sm leading-6 text-[#3f4940]">{ticket.description}</p>{ticket.attachment && <button onClick={() => onOpenAttachment(ticket.attachment!)} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs font-semibold text-[#1e3765] hover:bg-[#d9e2fc]"><Paperclip size={14} />{ticket.attachment.fileName}</button>}</div>
       <div><div className="mb-3 flex items-center gap-2"><Clock3 size={15} className="text-[#069494]" /><p className="text-xs font-bold">{copy.history}</p></div>{!ticket.history.some((activity) => activity.kind === "followup") && <p className="mb-3 rounded-lg bg-[#f7f8ff] px-3 py-2 text-xs text-[#4d5f81]">{copy.noFollowUp}</p>}<ol className="space-y-4 border-l border-[#d9e2fc] pl-4">{[...ticket.history].reverse().map((activity) => <li key={activity.id} className="relative"><span className={`absolute -left-[21px] top-1 grid size-3 place-items-center rounded-full ${activity.kind === "status" ? "bg-[#069494]" : activity.kind === "followup" ? "bg-[#16834b]" : "bg-[#b0c6d4]"}`}><span className="size-1 rounded-full bg-white" /></span><p className="text-xs font-semibold text-[#3f4940]">{activity.message}</p><p className="mt-1 text-[10px] text-[#4d5f81]">{activity.actor} · {formatDate(activity.at, language, true)}</p></li>)}</ol></div>
-      {role === "manager" && <div className="rounded-lg bg-[#f1f3ff] p-3"><label className="flex items-center gap-2 text-xs font-bold text-[#1e3765]"><MessageSquareText size={14} /> {copy.add}</label><textarea disabled={isSaving} value={followUp} onChange={(event) => onFollowUpChange(event.target.value)} className="mt-2 min-h-20 w-full resize-none rounded-lg border border-[#d9e2fc] bg-white p-2.5 text-xs outline-none focus:border-[#069494] disabled:opacity-60" placeholder={copy.placeholder} /><label className="mt-2 block text-[11px] font-semibold text-[#4d5f81]">{copy.at}<input disabled={isSaving} value={followUpAt} onChange={(event) => onFollowUpAtChange(event.target.value)} type="datetime-local" className="mt-1 block w-full rounded-lg border border-[#d9e2fc] bg-white px-2.5 py-2 text-xs font-normal outline-none focus:border-[#069494] disabled:opacity-60" /></label><button disabled={!followUp.trim() || isSaving} onClick={onAddFollowUp} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Send size={13} /> {isSaving ? copy.saving : copy.save}</button></div>}</div>
+      {canManage && <div className="rounded-lg bg-[#f1f3ff] p-3"><label className="flex items-center gap-2 text-xs font-bold text-[#1e3765]"><MessageSquareText size={14} /> {copy.add}</label><textarea disabled={isSaving} value={followUp} onChange={(event) => onFollowUpChange(event.target.value)} className="mt-2 min-h-20 w-full resize-none rounded-lg border border-[#d9e2fc] bg-white p-2.5 text-xs outline-none focus:border-[#069494] disabled:opacity-60" placeholder={copy.placeholder} /><label className="mt-2 block text-[11px] font-semibold text-[#4d5f81]">{copy.at}<input disabled={isSaving} value={followUpAt} onChange={(event) => onFollowUpAtChange(event.target.value)} type="datetime-local" className="mt-1 block w-full rounded-lg border border-[#d9e2fc] bg-white px-2.5 py-2 text-xs font-normal outline-none focus:border-[#069494] disabled:opacity-60" /></label><button disabled={!followUp.trim() || isSaving} onClick={onAddFollowUp} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Send size={13} /> {isSaving ? copy.saving : copy.save}</button></div>}</div>
   </aside>;
 }
 
