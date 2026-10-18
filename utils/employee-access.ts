@@ -15,13 +15,14 @@ export async function getD3AppRole(
   authUserId: string
 ): Promise<D3AppRole | null> {
   const { data, error } = await supabase
-    .from("d3_user_access")
+    .from("b2_register")
     .select("app_role")
     .eq("auth_user_id", authUserId)
+    .eq("is_active", true)
     .maybeSingle();
 
   if (error) {
-    console.error("D3 user access query failed", {
+    console.error("B2 account role query failed", {
       code: error.code,
       message: error.message,
     });

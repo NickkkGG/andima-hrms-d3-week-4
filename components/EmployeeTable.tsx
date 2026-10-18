@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import HrmsStatusPill from "@/components/hrms/HrmsStatusPill";
+import TablePagination from "@/components/hrms/TablePagination";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import type { EmployeeListItem } from "@/types/employee";
 
@@ -30,6 +31,8 @@ export default function EmployeeTable({ employees, summary }: EmployeeTableProps
   );
   const [selectedDepartment, setSelectedDepartment] = useState("__all__");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const visibleEmployees = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     return employees.filter((employee) => {
@@ -42,6 +45,9 @@ export default function EmployeeTable({ employees, summary }: EmployeeTableProps
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
   }, [employees, searchQuery, selectedDepartment]);
+  const totalPages = Math.max(1, Math.ceil(visibleEmployees.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedEmployees = visibleEmployees.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="mt-5 space-y-5">
@@ -51,7 +57,7 @@ export default function EmployeeTable({ employees, summary }: EmployeeTableProps
         <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
         <input
           className="h-11 w-full rounded-xl border border-[#BCD4EE] bg-white py-2 pl-10 pr-3 text-sm text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-[#0C68D5] focus:ring-4 focus:ring-[#0C68D5]/10"
-          onChange={(event) => setSearchQuery(event.target.value)}
+          onChange={(event) => { setSearchQuery(event.target.value); setPage(1); }}
           placeholder={copy.searchPlaceholder}
           type="search"
           value={searchQuery}
@@ -69,7 +75,7 @@ export default function EmployeeTable({ employees, summary }: EmployeeTableProps
                   : "border-[#BCD4EE] bg-white text-[#0B2548] hover:border-[#0C68D5] hover:bg-[#EAF2FC] hover:text-[#0C68D5]"
               }`}
               key={department}
-              onClick={() => setSelectedDepartment(department)}
+              onClick={() => { setSelectedDepartment(department); setPage(1); }}
               type="button"
             >
               {department === "__all__" ? copy.all : department}
@@ -84,7 +90,7 @@ export default function EmployeeTable({ employees, summary }: EmployeeTableProps
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {visibleEmployees.map((employee) => (
+          {paginatedEmployees.map((employee) => (
             <Link
               className="group relative min-h-[116px] overflow-hidden rounded-2xl border border-[#BCD4EE] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(31,77,130,0.07)] transition hover:-translate-y-0.5 hover:border-[#0C68D5] hover:shadow-[0_12px_28px_rgba(31,77,130,0.13)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0C68D5]"
               href={`/employees/${encodeURIComponent(employee.employee_id)}`}
@@ -103,6 +109,7 @@ export default function EmployeeTable({ employees, summary }: EmployeeTableProps
           ))}
         </div>
       )}
+      <TablePagination page={currentPage} pageSize={pageSize} totalItems={visibleEmployees.length} onPageChange={setPage} />
     </div>
   );
 }

@@ -25,8 +25,11 @@ export function LanguageProvider({ children, initialLanguage = "id" }: { childre
     const savedLanguage = normalizeLanguage(window.localStorage.getItem(storageKey));
     if (savedLanguage !== initialLanguage) {
       document.cookie = `${languageCookieName}=${savedLanguage}; path=/; max-age=${cookieMaxAge}; samesite=lax`;
-      setLanguageState(savedLanguage);
-      router.refresh();
+      const refreshLanguage = window.setTimeout(() => {
+        setLanguageState(savedLanguage);
+        router.refresh();
+      }, 0);
+      return () => window.clearTimeout(refreshLanguage);
     }
   }, [initialLanguage, router]);
 
