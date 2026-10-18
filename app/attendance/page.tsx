@@ -82,6 +82,22 @@ export default function AttendancePageUI() {
     managementTitle: 'Attendance & Correction Management', managementDescription: 'Manage attendance history, the seven-hour minimum validation, and attendance-correction approvals connected to Supabase.', all: 'All', awaitingApproval: 'Awaiting approval', approved: 'Approved', searchPlaceholder: 'Search by name, employee ID, or department...', loadingData: 'Loading employee attendance data from Supabase...', noAttendance: 'No attendance data', noResults: 'No data matches your current filter or search.', workDuration: 'Work duration', lessThanSeven: '< 7 work hours', detailAudit: 'Attendance details & audit', originalLog: 'Original log data (fingerprint)', dataSource: 'Data source', activeCorrectionNone: 'There is no active correction request for this date.', correctionTypeLabel: 'Correction type', proposedClockIn: 'Proposed clock in', proposedClockOut: 'Proposed clock out', reasonRequired: 'Request reason (required)', progressTrail: 'Progress & history', attendanceReceived: 'Attendance log received', fingerprintSystem: 'Fingerprint system', correctionCreated: 'Correction request created', byEmployee: 'By employee', correctionApprovedTrail: 'Correction approved', correctionRejectedTrail: 'Correction rejected', byHr: 'By HR Admin', approve: 'Approve', reject: 'Reject', in: 'In', out: 'Out',
   }
   const interpolate = (value: string, values: Record<string, string>) => value.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '')
+  const formatAttendanceTime = (value: string | null | undefined) => {
+    if (!value) return '-'
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime())
+      ? '-'
+      : parsed.toLocaleTimeString(locale, {
+          timeZone: 'Asia/Jakarta',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+  }
+  const formatCorrectionTime = (value: string | null | undefined) => {
+    if (!value) return '-'
+    const match = value.match(/(?:T| )(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?/)
+    return match?.[1] ?? value.slice(0, 5)
+  }
   const correctionStatusLabel = (status: CorrectionStatus) => ({ PENDING: language === 'id' ? 'Menunggu persetujuan' : 'Awaiting approval', APPROVED: copy.approved, REJECTED: language === 'id' ? 'Ditolak' : 'Rejected' }[status] ?? status)
   const [attendances, setAttendances] = useState<AttendanceItem[]>([])
   const [selectedItem, setSelectedItem] = useState<AttendanceItem | null>(null)
@@ -262,23 +278,23 @@ export default function AttendancePageUI() {
     try {
       const supabase = createClient()
       const correctionId = selectedItem.correction.id
-      const correctionUpdate: { status: string; reviewed_by?: string } = { status, reviewed_by: viewerEmployeeId || undefined }
-
-      const { error: correctionError } = await supabase
-        .from('d3_attendance_corrections')
-        .update(correctionUpdate)
-        .eq('id', correctionId)
-
-      if (correctionError) throw correctionError
-
       const attendanceUpdate: { clock_in?: string; clock_out?: string } = {}
       if (status === 'APPROVED') {
-        if (selectedItem.correction.proposed_clock_in) {
+        const correctionType = selectedItem.correction.correction_type
+
+        if (
+          (correctionType === 'CLOCK_IN' || correctionType === 'FULL_DAY') &&
+          selectedItem.correction.proposed_clock_in
+        ) {
           attendanceUpdate.clock_in = selectedItem.correction.proposed_clock_in
         }
-        if (selectedItem.correction.proposed_clock_out) {
+        if (
+          (correctionType === 'CLOCK_OUT' || correctionType === 'FULL_DAY') &&
+          selectedItem.correction.proposed_clock_out
+        ) {
           attendanceUpdate.clock_out = selectedItem.correction.proposed_clock_out
         }
+
         if (Object.keys(attendanceUpdate).length > 0) {
           const { error: attendanceError } = await supabase
             .from('d3_attendances')
@@ -287,6 +303,17 @@ export default function AttendancePageUI() {
           if (attendanceError) throw attendanceError
         }
       }
+
+      const correctionUpdate: { status: string; reviewed_by?: string } = {
+        status,
+        reviewed_by: viewerEmployeeId || undefined,
+      }
+      const { error: correctionError } = await supabase
+        .from('d3_attendance_corrections')
+        .update(correctionUpdate)
+        .eq('id', correctionId)
+
+      if (correctionError) throw correctionError
 
       const updatedItem = {
         ...selectedItem,
@@ -415,7 +442,7 @@ export default function AttendancePageUI() {
           {actionMessage && <div className={`mx-4 mt-4 flex items-center gap-2 rounded-lg border p-3 text-xs font-semibold sm:mx-6 ${actionMessage.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}><CheckCircle2 size={16} />{actionMessage.text}</div>}
           {errorMessage && <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 sm:mx-6"><AlertCircle size={16} />{errorMessage}</div>}
           <main className="mx-auto grid max-w-[1600px] gap-5 px-4 py-6 xl:grid-cols-[minmax(0,1fr)_390px] sm:px-6">
-            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center justify-between border-b border-[#becabd]/35 px-5 py-4"><div><h2 className="text-sm font-bold">{copy.attendanceHistory}</h2><p className="mt-1 text-xs text-[#4d5f81]">{attendances.length} {copy.recorded}</p></div><span className="rounded-full bg-[#edf6ff] px-2.5 py-1 text-[10px] font-bold text-[#1971c2]">{pendingCount} {copy.pendingCorrections}</span></div>{loading ? <div className="flex min-h-[260px] items-center justify-center text-xs text-[#4d5f81]"><RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />{copy.loadingHistory}</div> : attendances.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.noHistory}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead><tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.clock}</th><th className="px-3 py-3">{copy.duration}</th><th className="px-3 py-3">{copy.status}</th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedAttendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selected ? 'bg-[#eaf7f0]' : ''}`}><td className="px-4 py-3.5 font-semibold">{row.date}</td><td className="px-3 py-3.5 text-[#4d5f81]">{new Date(row.clock_in).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB <span className="mx-1 text-[#becabd]">/</span> {row.clock_out ? `${new Date(row.clock_out).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB` : '-'}</td><td className="px-3 py-3.5"><span className={duration.isUnderMin ? 'font-semibold text-[#b7791f]' : 'font-semibold'}>{duration.text}</span></td><td className="px-3 py-3.5"><div className="flex flex-wrap gap-1"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'}`}>{duration.isUnderMin ? copy.underSeven : copy.meetsSeven}</span>{row.correction && <span className="rounded bg-[#edf6ff] px-2 py-0.5 text-[10px] font-bold text-[#1971c2]">{copy.correction}: {correctionStatusLabel(row.correction.status)}</span>}</div></td></tr> })}</tbody></table></div>}<TablePagination page={employeeCurrentPage} pageSize={tablePageSize} totalItems={attendances.length} onPageChange={setTablePage} /></section>
+            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center justify-between border-b border-[#becabd]/35 px-5 py-4"><div><h2 className="text-sm font-bold">{copy.attendanceHistory}</h2><p className="mt-1 text-xs text-[#4d5f81]">{attendances.length} {copy.recorded}</p></div><span className="rounded-full bg-[#edf6ff] px-2.5 py-1 text-[10px] font-bold text-[#1971c2]">{pendingCount} {copy.pendingCorrections}</span></div>{loading ? <div className="flex min-h-[260px] items-center justify-center text-xs text-[#4d5f81]"><RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />{copy.loadingHistory}</div> : attendances.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.noHistory}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead><tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.clock}</th><th className="px-3 py-3">{copy.duration}</th><th className="px-3 py-3">{copy.status}</th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedAttendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selected ? 'bg-[#eaf7f0]' : ''}`}><td className="px-4 py-3.5 font-semibold">{row.date}</td><td className="px-3 py-3.5 text-[#4d5f81]">{formatAttendanceTime(row.clock_in)} WIB <span className="mx-1 text-[#becabd]">/</span> {row.clock_out ? `${formatAttendanceTime(row.clock_out)} WIB` : '-'}</td><td className="px-3 py-3.5"><span className={duration.isUnderMin ? 'font-semibold text-[#b7791f]' : 'font-semibold'}>{duration.text}</span></td><td className="px-3 py-3.5"><div className="flex flex-wrap gap-1"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'}`}>{duration.isUnderMin ? copy.underSeven : copy.meetsSeven}</span>{row.correction && <span className="rounded bg-[#edf6ff] px-2 py-0.5 text-[10px] font-bold text-[#1971c2]">{copy.correction}: {correctionStatusLabel(row.correction.status)}</span>}</div></td></tr> })}</tbody></table></div>}<TablePagination page={employeeCurrentPage} pageSize={tablePageSize} totalItems={attendances.length} onPageChange={setTablePage} /></section>
             {employeeItem && <aside className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3"><div><span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.attendanceDetail}</span><h2 className="mt-1 text-sm font-bold">{employeeItem.date}</h2><p className="text-xs text-[#4d5f81]">{employeeItem.employee_id} • {employeeItem.department}</p></div><Clock3 size={18} className="text-[#006838]" /></div><div className="mt-4 space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs"><div className="flex justify-between text-[#4d5f81]"><span>Clock In</span><strong>{new Date(employeeItem.clock_in).toLocaleTimeString(locale)} WIB</strong></div><div className="flex justify-between text-[#4d5f81]"><span>Clock Out</span><strong>{employeeItem.clock_out ? `${new Date(employeeItem.clock_out).toLocaleTimeString(locale)} WIB` : copy.noScan}</strong></div><div className="flex justify-between border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span>{copy.source}</span><strong className="text-[#1971c2]">{employeeItem.source}</strong></div>{employeeItem.notes && <div className="border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span className="font-semibold">{copy.incentiveNotes}:</span><p className="mt-1 text-[#121b2e]">{employeeItem.notes}</p></div>}</div><LocationMapPreview className="mt-4" clockIn={{ latitude: employeeItem.clock_in_latitude, longitude: employeeItem.clock_in_longitude, accuracyMeters: employeeItem.clock_in_accuracy_meters }} clockOut={{ latitude: employeeItem.clock_out_latitude, longitude: employeeItem.clock_out_longitude, accuracyMeters: employeeItem.clock_out_accuracy_meters }} />{employeeItem.correction ? <div className="mt-4 rounded-xl border border-[#b9d6ff] bg-[#edf6ff] p-3.5 text-xs"><div className="flex justify-between font-bold text-[#1e3765]"><span>{copy.correctionRequest}</span><span>{correctionStatusLabel(employeeItem.correction.status)}</span></div><p className="mt-2 text-[#4d5f81]">{employeeItem.correction.reason}</p></div> : <p className="mt-4 rounded-xl border border-dashed border-[#becabd] p-3 text-center text-xs italic text-[#4d5f81]">{copy.noCorrectionForDate}</p>}<button type="button" disabled={!!employeeItem.correction || isSubmittingCorrection} onClick={() => { setCorrectionType('CLOCK_IN'); setIsCorrectionOpen(true) }} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#16834b] py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:cursor-not-allowed disabled:opacity-50"><FilePlus2 size={14} />{employeeItem.correction ? copy.correctionSubmitted : copy.submitCorrection}</button></aside>}
           </main>
         </div>
@@ -552,9 +579,6 @@ export default function AttendancePageUI() {
                       const duration = calculateDuration(row.clock_in, row.clock_out)
                       const isSelected = selectedItem?.id === row.id
 
-                      const clockInTime = new Date(row.clock_in)
-                      const clockOutTime = row.clock_out ? new Date(row.clock_out) : null
-
                       return (
                         <tr
                           key={row.id}
@@ -571,16 +595,12 @@ export default function AttendancePageUI() {
                           <td className="px-3 py-3.5 text-[#4d5f81]">
                             <div>
                               {copy.in}:{' '}
-                              {!isNaN(clockInTime.getTime())
-                                ? clockInTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
-                                : '-'}{' '}
+                              {formatAttendanceTime(row.clock_in)}{' '}
                               WIB
                             </div>
                             <div>
                               {copy.out}:{' '}
-                              {clockOutTime && !isNaN(clockOutTime.getTime())
-                                ? `${clockOutTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} WIB`
-                                : '-'}
+                              {row.clock_out ? `${formatAttendanceTime(row.clock_out)} WIB` : '-'}
                             </div>
                           </td>
                           <td className="px-3 py-3.5">
@@ -648,14 +668,14 @@ export default function AttendancePageUI() {
                   <div className="flex justify-between text-[#4d5f81]">
                     <span>Clock In:</span>
                     <span className="font-mono font-semibold">
-                      {new Date(selectedItem.clock_in).toLocaleTimeString(locale)} WIB
+                      {formatAttendanceTime(selectedItem.clock_in)} WIB
                     </span>
                   </div>
                   <div className="flex justify-between text-[#4d5f81]">
                     <span>Clock Out:</span>
                     <span className="font-mono font-semibold">
                       {selectedItem.clock_out
-                        ? `${new Date(selectedItem.clock_out).toLocaleTimeString(locale)} WIB`
+                        ? `${formatAttendanceTime(selectedItem.clock_out)} WIB`
                         : copy.noScan}
                     </span>
                   </div>
@@ -709,12 +729,12 @@ export default function AttendancePageUI() {
                       </div>
                       {selectedItem.correction.proposed_clock_in && (
                         <div>
-                          <span className="font-semibold">{copy.proposedClockIn}:</span> {selectedItem.correction.proposed_clock_in} WIB
+                          <span className="font-semibold">{copy.proposedClockIn}:</span> {formatCorrectionTime(selectedItem.correction.proposed_clock_in)} WIB
                         </div>
                       )}
                       {selectedItem.correction.proposed_clock_out && (
                         <div>
-                          <span className="font-semibold">{copy.proposedClockOut}:</span> {selectedItem.correction.proposed_clock_out} WIB
+                          <span className="font-semibold">{copy.proposedClockOut}:</span> {formatCorrectionTime(selectedItem.correction.proposed_clock_out)} WIB
                         </div>
                       )}
                     </div>
