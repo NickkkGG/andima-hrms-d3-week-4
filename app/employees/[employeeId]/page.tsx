@@ -14,6 +14,9 @@ import type {
 import { canManageEmployeeProfiles, getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("employeeProfile");
 
 interface EmployeeProfilePageProps {
   params: Promise<{ employeeId: string }>;

@@ -6,6 +6,9 @@ import HrmsShell from "@/components/hrms/HrmsShell";
 import { canManageEmployeeProfiles, getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("employmentStatus");
 
 interface EmployeeStatusPageProps {
   params: Promise<{ employeeId: string }>;

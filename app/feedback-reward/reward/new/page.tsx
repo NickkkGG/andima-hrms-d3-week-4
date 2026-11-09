@@ -3,6 +3,9 @@ import { CreateRecordWizard } from "@/components/feedback-reward/FeedbackRewardU
 import { FeedbackRewardHeader } from "@/components/feedback-reward/FeedbackRewardChrome";
 import { getEmployeeOptions, getFeedbackContext } from "@/utils/feedback-reward";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("submitReward");
 
 export default async function NewRewardPage() {
   const language = await getServerLanguage();

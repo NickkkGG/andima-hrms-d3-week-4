@@ -6,6 +6,9 @@ import type { EmployeeListItem } from "@/types/employee";
 import { getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("employeeDirectory");
 
 interface EmployeeSyncEvent {
   id: string;

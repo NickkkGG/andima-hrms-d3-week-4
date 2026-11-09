@@ -6,6 +6,9 @@ import { StatusBadge, WorkflowStepper } from "@/components/feedback-reward/Feedb
 import { getFeedbackContext, getRecord } from "@/utils/feedback-reward";
 import { dateLabel } from "@/utils/feedback-reward-format";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("rewardDetails");
 
 export default async function RewardDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [language, { access }, record] = await Promise.all([getServerLanguage(), getFeedbackContext(), getRecord("reward", (await params).id)]); if ("feedback_text" in record) notFound(); const submitStatus = async (form: FormData) => { "use server"; await updateRewardStatus(form); }; const canApprove = access.app_role === "HR" && !record.is_legacy;

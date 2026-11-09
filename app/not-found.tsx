@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("notFound");
 
 export default function NotFound() {
   return (

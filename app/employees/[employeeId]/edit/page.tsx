@@ -7,6 +7,9 @@ import type { DepartmentOption, EmployeeProfile, PositionOption } from "@/types/
 import { canManageEmployeeProfiles, getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("editEmployeeProfile");
 
 interface EditEmployeePageProps {
   params: Promise<{ employeeId: string }>;

@@ -4,6 +4,9 @@ import { FeedbackPagination, FeedbackRewardHeader, FeedbackRewardTabs } from "@/
 import { RewardList } from "@/components/feedback-reward/RecordList";
 import { getEmployeeOptions, getFeedbackContext, getRecords, param, type SearchParams } from "@/utils/feedback-reward";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("rewardList");
 
 const types = ["EMPLOYEE_OF_THE_MONTH", "SAFETY_CHAMPION", "SERVICE_EXCELLENCE", "BEST_ATTENDANCE", "SPECIAL_CONTRIBUTION", "OTHER"] as const;
 const statuses = ["SUBMITTED", "APPROVED", "PUBLISHED", "REJECTED"] as const;

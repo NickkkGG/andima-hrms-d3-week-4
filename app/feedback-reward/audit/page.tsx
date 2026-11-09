@@ -3,6 +3,9 @@ import { FeedbackPagination, FeedbackRewardHeader } from "@/components/feedback-
 import { RecordList } from "@/components/feedback-reward/RecordList";
 import { getAudit, type SearchParams } from "@/utils/feedback-reward";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("auditTrail");
 
 export default async function AuditTrailPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const language = await getServerLanguage(); const params = await searchParams; const data = await getAudit(params); const totalPages = Math.max(1, Math.ceil(data.count / data.pageSize)); const start = data.count === 0 ? 0 : (data.page - 1) * data.pageSize + 1; const end = Math.min(data.page * data.pageSize, data.count);

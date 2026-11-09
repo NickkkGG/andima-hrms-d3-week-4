@@ -9,8 +9,8 @@ import { getServerLanguage } from "@/lib/i18n-server";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ANDIMA HRMS | Employee Report & Ticket",
-  description: "Employee Report & Ticket untuk PT Andima Transportindo.",
+  title: { default: "ANDIMA HRMS", template: "%s | ANDIMA HRMS" },
+  description: "HRMS PT Andima Transportindo.",
 };
 
 export default async function RootLayout({

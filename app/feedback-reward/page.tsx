@@ -4,6 +4,9 @@ import { FeedbackMetric, FeedbackPagination, FeedbackRewardHeader, FeedbackRewar
 import { FeedbackTimeline, NotificationPanel, RewardCards } from "@/components/feedback-reward/FeedbackRewardUI";
 import { getFeedbackContext, getNotifications, getOverview, getRecords, param, type SearchParams } from "@/utils/feedback-reward";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("feedbackReward");
 
 export default async function FeedbackRewardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const language = await getServerLanguage();

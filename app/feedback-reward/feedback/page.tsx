@@ -4,6 +4,9 @@ import { FeedbackPagination, FeedbackRewardHeader, FeedbackRewardTabs } from "@/
 import { FeedbackListView } from "@/components/feedback-reward/FeedbackListView";
 import { getFeedbackContext, getRecords, param, type SearchParams } from "@/utils/feedback-reward";
 import { getServerLanguage } from "@/lib/i18n-server";
+import { pageMetadata } from "@/lib/page-metadata";
+
+export const generateMetadata = () => pageMetadata("feedbackList");
 
 const types = ["APPRECIATION", "IMPROVEMENT", "PERFORMANCE_NOTE"] as const;
 const statuses = ["NEW", "READ", "IN_PROGRESS", "COMPLETED"] as const;
