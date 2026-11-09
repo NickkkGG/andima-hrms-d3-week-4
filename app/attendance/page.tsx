@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { ChevronRight, RefreshCw, AlertCircle, CheckCircle2, Clock3, FilePlus2, X } from 'lucide-react'
+import { ChevronRight, RefreshCw, AlertCircle, CheckCircle2, Clock3, FilePlus2, X, CalendarDays, History, LockKeyhole, Unlock, Search } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import HeaderAccount from '@/components/HeaderAccount'
 import { useLanguage } from '@/components/i18n/LanguageProvider'
@@ -11,6 +11,33 @@ import TablePagination from '@/components/hrms/TablePagination'
 type CorrectionType = 'CLOCK_IN' | 'CLOCK_OUT' | 'FULL_DAY' | string
 type CorrectionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | string
 type AppRole = 'EMPLOYEE' | 'HR' | 'MANAGER'
+type ManagementView = 'ATTENDANCE' | 'AUDIT' | 'CLOSING'
+
+type AttendanceClosing = {
+  id: string
+  period_start: string
+  period_end: string
+  status: 'OPEN' | 'CLOSED'
+  closed_by_b2_register_id: string
+  closed_at: string
+  reopened_by_b2_register_id: string | null
+  reopened_at: string | null
+  reason: string | null
+}
+
+type AttendanceAuditEntry = {
+  id: string
+  attendance_id: string | null
+  correction_id: number | null
+  closing_id: string | null
+  target_b2_register_id: string | null
+  actor_b2_register_id: string | null
+  action: string
+  details: Record<string, unknown>
+  created_at: string
+  target_name: string
+  actor_name: string
+}
 
 export type AttendanceCorrection = {
   id: string
@@ -73,12 +100,12 @@ export default function AttendancePageUI() {
     accessRequired: 'Akses dashboard memerlukan akun HRMS yang telah dipetakan.', loadFailed: 'Data presensi belum dapat dimuat dari Supabase.', connectionFailed: 'Terjadi kesalahan saat menghubungkan ke Supabase.', employee: 'Karyawan', general: 'Umum', correction: 'Koreksi presensi', correctionApproved: 'Koreksi absensi {name} berhasil disetujui dan diterapkan.', correctionRejected: 'Koreksi absensi {name} berhasil ditolak.', updateFailed: 'Gagal memperbarui koreksi', unknownError: 'Terjadi kesalahan', requestFailed: 'Pengajuan koreksi gagal disimpan.', noteFailed: 'Koreksi tersimpan, tetapi catatan insentif gagal disimpan', requestSuccess: 'Koreksi berhasil diajukan dan menunggu persetujuan HR.', incomplete: 'Belum lengkap', hours: 'jam',
     selfService: 'Layanan mandiri karyawan', myHistory: 'Riwayat Presensi Saya', greeting: 'Halo', reviewMy: 'Tinjau detail kehadiran dan ajukan koreksi bila ada data yang perlu diperbaiki.', attendanceHistory: 'Riwayat kehadiran', recorded: 'catatan presensi tercatat', pendingCorrections: 'koreksi menunggu', loadingHistory: 'Memuat riwayat presensi...', noHistory: 'Belum ada riwayat presensi.', date: 'Tanggal', clock: 'Clock in / out', duration: 'Durasi', status: 'Status', underSeven: 'DI BAWAH 7 JAM', meetsSeven: 'MEMENUHI 7 JAM', attendanceDetail: 'Detail presensi', noScan: 'Belum ada scan', source: 'Sumber', incentiveNotes: 'Catatan insentif/lembur', correctionRequest: 'Pengajuan koreksi', noCorrectionForDate: 'Belum ada pengajuan koreksi untuk tanggal ini.', correctionSubmitted: 'Koreksi sudah diajukan', submitCorrection: 'Ajukan koreksi',
     submitAttendanceCorrection: 'Ajukan koreksi presensi', sentToHr: 'Tanggal {date} akan dikirim ke HR untuk ditinjau.', close: 'Tutup', correctionType: 'Tipe koreksi', correctClockIn: 'Perbaikan Clock In', correctClockOut: 'Perbaikan Clock Out', correctFullDay: 'Perbaikan satu hari penuh', correctClockInLabel: 'Clock In yang benar', correctClockOutLabel: 'Clock Out yang benar', overtimeNote: 'Catatan lembur / insentif (opsional)', overtimePlaceholder: 'Isi jika jam kerja melebihi jam formal dan membutuhkan catatan insentif', requestReason: 'Alasan pengajuan', reasonPlaceholder: 'Jelaskan alasan koreksi (minimal 10 karakter)', cancel: 'Batal', sending: 'Mengirim...', sendRequest: 'Kirim pengajuan',
-    managementTitle: 'Manajemen Presensi & Koreksi', managementDescription: 'Kelola riwayat presensi, validasi minimum 7 jam kerja, dan persetujuan koreksi absensi yang terhubung ke database Supabase.', all: 'Semua', awaitingApproval: 'Menunggu Persetujuan', approved: 'Disetujui', searchPlaceholder: 'Cari nama, NIP, atau divisi...', loadingData: 'Memuat data kehadiran karyawan dari Supabase...', noAttendance: 'Tidak ada data presensi', noResults: 'Tidak ada data yang cocok dengan kriteria filter atau pencarian Anda.', workDuration: 'Durasi kerja', lessThanSeven: '< 7 jam kerja', detailAudit: 'Detail presensi & audit', originalLog: 'Data log asli', dataSource: 'Sumber data', activeCorrectionNone: 'Tidak ada pengajuan koreksi aktif untuk tanggal ini.', correctionTypeLabel: 'Tipe koreksi', proposedClockIn: 'Clock In diajukan', proposedClockOut: 'Clock Out diajukan', reasonRequired: 'Alasan pengajuan (wajib)', progressTrail: 'Progres & riwayat', attendanceReceived: 'Log presensi diterima', attendanceSource: 'Biometrik wajah', correctionCreated: 'Pengajuan koreksi dibuat', byEmployee: 'Oleh pegawai', correctionApprovedTrail: 'Koreksi disetujui', correctionRejectedTrail: 'Koreksi ditolak', byHr: 'Oleh HR Admin', approve: 'Setujui', reject: 'Tolak', in: 'Masuk', out: 'Pulang',
+    managementTitle: 'Manajemen Presensi & Koreksi', managementDescription: 'Kelola riwayat presensi, validasi minimum 7 jam kerja, dan persetujuan koreksi absensi yang terhubung ke database Supabase.', all: 'Semua', awaitingApproval: 'Menunggu Persetujuan', approved: 'Disetujui', searchPlaceholder: 'Cari nama, NIP, atau divisi...', loadingData: 'Memuat data kehadiran karyawan dari Supabase...', noAttendance: 'Tidak ada data presensi', noResults: 'Tidak ada data yang cocok dengan kriteria filter atau pencarian Anda.', workDuration: 'Durasi kerja', lessThanSeven: '< 7 jam kerja', detailAudit: 'Detail presensi & audit', originalLog: 'Data log asli', dataSource: 'Sumber data', activeCorrectionNone: 'Tidak ada pengajuan koreksi aktif untuk tanggal ini.', correctionTypeLabel: 'Tipe koreksi', proposedClockIn: 'Clock In diajukan', proposedClockOut: 'Clock Out diajukan', reasonRequired: 'Alasan pengajuan (wajib)', progressTrail: 'Progres & riwayat', attendanceReceived: 'Log presensi diterima', attendanceSource: 'Biometrik wajah', correctionCreated: 'Pengajuan koreksi dibuat', byEmployee: 'Oleh pegawai', correctionApprovedTrail: 'Koreksi disetujui', correctionRejectedTrail: 'Koreksi ditolak', byHr: 'Oleh HR Admin', approve: 'Setujui', reject: 'Tolak', in: 'Masuk', out: 'Pulang', attendanceTab: 'Riwayat Kehadiran', auditTab: 'Audit Trail', closingTab: 'Attendance Closing', fromDate: 'Dari tanggal', toDate: 'Sampai tanggal', clearFilter: 'Reset filter', closedPeriod: 'Periode terkunci', openPeriod: 'Periode terbuka', periodClosed: 'Periode berhasil ditutup.', periodReopened: 'Periode dibuka kembali melalui Emergency Edit.', closingFailed: 'Gagal mengubah attendance closing', auditEmpty: 'Belum ada riwayat perubahan kehadiran.', closingEmpty: 'Belum ada periode attendance closing.', periodStart: 'Awal periode', periodEnd: 'Akhir periode', closePeriod: 'Tutup periode', emergencyEdit: 'Emergency Edit', closedAt: 'Ditutup pada', reopenedAt: 'Dibuka pada', action: 'Aksi', actor: 'Pelaku', auditAction: 'Perubahan', reason: 'Catatan',
   } : {
     accessRequired: 'This dashboard requires a mapped HRMS account.', loadFailed: 'Attendance data could not be loaded from Supabase.', connectionFailed: 'An error occurred while connecting to Supabase.', employee: 'Employee', general: 'General', correction: 'Attendance correction', correctionApproved: 'Attendance correction for {name} was approved and applied.', correctionRejected: 'Attendance correction for {name} was rejected.', updateFailed: 'Unable to update correction', unknownError: 'An unexpected error occurred', requestFailed: 'The correction request could not be saved.', noteFailed: 'The correction was saved, but the incentive note could not be saved', requestSuccess: 'Correction request submitted and awaiting HR approval.', incomplete: 'Incomplete', hours: 'hours',
     selfService: 'Employee self service', myHistory: 'My Attendance History', greeting: 'Hello', reviewMy: 'Review attendance details and submit a correction when a record needs updating.', attendanceHistory: 'Attendance history', recorded: 'attendance records', pendingCorrections: 'pending corrections', loadingHistory: 'Loading attendance history...', noHistory: 'No attendance history yet.', date: 'Date', clock: 'Clock in / out', duration: 'Duration', status: 'Status', underSeven: 'UNDER 7 HOURS', meetsSeven: 'MEETS 7 HOURS', attendanceDetail: 'Attendance details', noScan: 'No scan yet', source: 'Source', incentiveNotes: 'Overtime / incentive note', correctionRequest: 'Correction request', noCorrectionForDate: 'No correction request for this date.', correctionSubmitted: 'Correction submitted', submitCorrection: 'Submit correction',
     submitAttendanceCorrection: 'Submit attendance correction', sentToHr: 'The record for {date} will be sent to HR for review.', close: 'Close', correctionType: 'Correction type', correctClockIn: 'Correct clock in', correctClockOut: 'Correct clock out', correctFullDay: 'Correct full day', correctClockInLabel: 'Correct clock in', correctClockOutLabel: 'Correct clock out', overtimeNote: 'Overtime / incentive note (optional)', overtimePlaceholder: 'Add a note when working hours exceed normal hours and need an incentive record', requestReason: 'Reason for request', reasonPlaceholder: 'Explain the correction reason (at least 10 characters)', cancel: 'Cancel', sending: 'Sending...', sendRequest: 'Submit request',
-    managementTitle: 'Attendance & Correction Management', managementDescription: 'Manage attendance history, the seven-hour minimum validation, and attendance-correction approvals connected to Supabase.', all: 'All', awaitingApproval: 'Awaiting approval', approved: 'Approved', searchPlaceholder: 'Search by name, employee ID, or department...', loadingData: 'Loading employee attendance data from Supabase...', noAttendance: 'No attendance data', noResults: 'No data matches your current filter or search.', workDuration: 'Work duration', lessThanSeven: '< 7 work hours', detailAudit: 'Attendance details & audit', originalLog: 'Original log data', dataSource: 'Data source', activeCorrectionNone: 'There is no active correction request for this date.', correctionTypeLabel: 'Correction type', proposedClockIn: 'Proposed clock in', proposedClockOut: 'Proposed clock out', reasonRequired: 'Request reason (required)', progressTrail: 'Progress & history', attendanceReceived: 'Attendance log received', attendanceSource: 'Face biometric', correctionCreated: 'Correction request created', byEmployee: 'By employee', correctionApprovedTrail: 'Correction approved', correctionRejectedTrail: 'Correction rejected', byHr: 'By HR Admin', approve: 'Approve', reject: 'Reject', in: 'In', out: 'Out',
+    managementTitle: 'Attendance & Correction Management', managementDescription: 'Manage attendance history, the seven-hour minimum validation, and attendance-correction approvals connected to Supabase.', all: 'All', awaitingApproval: 'Awaiting approval', approved: 'Approved', searchPlaceholder: 'Search by name, employee ID, or department...', loadingData: 'Loading employee attendance data from Supabase...', noAttendance: 'No attendance data', noResults: 'No data matches your current filter or search.', workDuration: 'Work duration', lessThanSeven: '< 7 work hours', detailAudit: 'Attendance details & audit', originalLog: 'Original log data', dataSource: 'Data source', activeCorrectionNone: 'There is no active correction request for this date.', correctionTypeLabel: 'Correction type', proposedClockIn: 'Proposed clock in', proposedClockOut: 'Proposed clock out', reasonRequired: 'Request reason (required)', progressTrail: 'Progress & history', attendanceReceived: 'Attendance log received', attendanceSource: 'Face biometric', correctionCreated: 'Correction request created', byEmployee: 'By employee', correctionApprovedTrail: 'Correction approved', correctionRejectedTrail: 'Correction rejected', byHr: 'By HR Admin', approve: 'Approve', reject: 'Reject', in: 'In', out: 'Out', attendanceTab: 'Attendance History', auditTab: 'Audit Trail', closingTab: 'Attendance Closing', fromDate: 'From date', toDate: 'To date', clearFilter: 'Clear filter', closedPeriod: 'Closed period', openPeriod: 'Open period', periodClosed: 'Attendance period closed successfully.', periodReopened: 'Period reopened through Emergency Edit.', closingFailed: 'Unable to update attendance closing', auditEmpty: 'No attendance change history yet.', closingEmpty: 'No attendance closing periods yet.', periodStart: 'Period start', periodEnd: 'Period end', closePeriod: 'Close period', emergencyEdit: 'Emergency Edit', closedAt: 'Closed at', reopenedAt: 'Reopened at', action: 'Action', actor: 'Actor', auditAction: 'Change', reason: 'Note',
   }
   const interpolate = (value: string, values: Record<string, string>) => value.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '')
   const formatAttendanceTime = (value: string | null | undefined) => {
@@ -99,7 +126,16 @@ export default function AttendancePageUI() {
   const [attendances, setAttendances] = useState<AttendanceItem[]>([])
   const [selectedItem, setSelectedItem] = useState<AttendanceItem | null>(null)
   const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL')
+  const [managementView, setManagementView] = useState<ManagementView>('ATTENDANCE')
   const [searchQuery, setSearchQuery] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [closings, setClosings] = useState<AttendanceClosing[]>([])
+  const [auditEntries, setAuditEntries] = useState<AttendanceAuditEntry[]>([])
+  const [closingStart, setClosingStart] = useState('')
+  const [closingEnd, setClosingEnd] = useState('')
+  const [closingReason, setClosingReason] = useState('')
+  const [isClosingSaving, setIsClosingSaving] = useState(false)
   const [tablePage, setTablePage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -230,6 +266,50 @@ export default function AttendancePageUI() {
     }
   }
 
+  async function fetchAttendanceManagementData() {
+    const supabase = createClient()
+    const { data: closingRows, error: closingError } = await supabase
+      .from('d3_attendance_closings')
+      .select('id, period_start, period_end, status, closed_by_b2_register_id, closed_at, reopened_by_b2_register_id, reopened_at, reason')
+      .order('period_start', { ascending: false })
+
+    if (closingError) {
+      console.warn('Attendance closing query notice:', closingError.message)
+    } else {
+      setClosings((closingRows ?? []) as AttendanceClosing[])
+    }
+
+    if (appRole === 'EMPLOYEE') return
+
+    const { data: auditRows, error: auditError } = await supabase
+      .from('d3_attendance_audit_log')
+      .select('id, attendance_id, correction_id, closing_id, target_b2_register_id, actor_b2_register_id, action, details, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    if (auditError) {
+      console.warn('Attendance audit query notice:', auditError.message)
+      return
+    }
+
+    const rows = (auditRows ?? []) as Omit<AttendanceAuditEntry, 'target_name' | 'actor_name'>[]
+    const registerIds = [...new Set(rows.flatMap((row) => [row.target_b2_register_id, row.actor_b2_register_id]).filter(Boolean))] as string[]
+    let names = new Map<string, string>()
+    if (registerIds.length) {
+      const { data: registers } = await supabase
+        .from('b2_register')
+        .select('id, full_name, employee_id')
+        .in('id', registerIds)
+      names = new Map((registers ?? []).map((register) => [register.id, `${register.full_name || copy.employee} · ${register.employee_id || '-'}`]))
+    }
+
+    setAuditEntries(rows.map((row) => ({
+      ...row,
+      target_name: row.target_b2_register_id ? names.get(row.target_b2_register_id) ?? copy.employee : copy.general,
+      actor_name: row.actor_b2_register_id ? names.get(row.actor_b2_register_id) ?? copy.employee : copy.general,
+    })))
+  }
+
   useEffect(() => {
     let mounted = true
 
@@ -259,14 +339,76 @@ export default function AttendancePageUI() {
   useEffect(() => {
     // Data loading is intentionally triggered after the authenticated role is known.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (appRole) void fetchAttendanceData()
+    if (appRole) {
+      void fetchAttendanceData()
+      void fetchAttendanceManagementData()
+    }
     // fetchAttendanceData reads the authenticated session and active role.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appRole, viewerB2RegisterId])
 
+  const getClosingForDate = (date: string) => closings.find((closing) => closing.status === 'CLOSED' && date >= closing.period_start && date <= closing.period_end)
+  const isDateClosed = (date: string) => Boolean(getClosingForDate(date))
+
+  async function handleCreateClosing(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (appRole === 'EMPLOYEE' || !viewerB2RegisterId || !closingStart || !closingEnd || closingStart > closingEnd) return
+
+    setIsClosingSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase.from('d3_attendance_closings').insert({
+      period_start: closingStart,
+      period_end: closingEnd,
+      closed_by_b2_register_id: viewerB2RegisterId,
+      reason: closingReason.trim() || null,
+    })
+
+    if (error) {
+      setActionMessage({ type: 'error', text: `${copy.closingFailed}: ${error.message}` })
+    } else {
+      setClosingStart('')
+      setClosingEnd('')
+      setClosingReason('')
+      await fetchAttendanceManagementData()
+      setActionMessage({ type: 'success', text: copy.periodClosed })
+    }
+    setIsClosingSaving(false)
+    setTimeout(() => setActionMessage(null), 4000)
+  }
+
+  async function handleEmergencyEdit(closing: AttendanceClosing) {
+    if (appRole === 'EMPLOYEE' || !viewerB2RegisterId) return
+
+    setIsClosingSaving(true)
+    const supabase = createClient()
+    const { error } = await supabase
+      .from('d3_attendance_closings')
+      .update({ status: 'OPEN', reopened_by_b2_register_id: viewerB2RegisterId, reopened_at: new Date().toISOString() })
+      .eq('id', closing.id)
+      .eq('status', 'CLOSED')
+
+    if (error) {
+      setActionMessage({ type: 'error', text: `${copy.closingFailed}: ${error.message}` })
+    } else {
+      await fetchAttendanceManagementData()
+      setActionMessage({ type: 'success', text: copy.periodReopened })
+    }
+    setIsClosingSaving(false)
+    setTimeout(() => setActionMessage(null), 4000)
+  }
+
+  function matchesDateRange(date: string) {
+    return (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo)
+  }
+
   // Action Handler Persetujuan / Penolakan Koreksi
   async function handleUpdateCorrectionStatus(status: 'APPROVED' | 'REJECTED') {
     if (!selectedItem?.correction) return
+
+    if (isDateClosed(selectedItem.date)) {
+      setActionMessage({ type: 'error', text: copy.closedPeriod })
+      return
+    }
 
     try {
       const supabase = createClient()
@@ -334,6 +476,11 @@ export default function AttendancePageUI() {
     event.preventDefault()
     if (!selectedItem || !viewerB2RegisterId || correctionReason.trim().length < 10) return
 
+    if (isDateClosed(selectedItem.date)) {
+      setActionMessage({ type: 'error', text: copy.closedPeriod })
+      return
+    }
+
     setIsSubmittingCorrection(true)
     const supabase = createClient()
     const { data, error } = await supabase
@@ -399,6 +546,7 @@ export default function AttendancePageUI() {
   // Filter Data Tab & Search
   const filteredData = useMemo(() => {
     return attendances.filter((item) => {
+      if (!matchesDateRange(item.date)) return false
       const matchesSearch =
         item.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -408,18 +556,22 @@ export default function AttendancePageUI() {
       if (activeTab === 'ALL') return true
       return item.correction?.status === activeTab
     })
-  }, [attendances, searchQuery, activeTab])
+  }, [attendances, searchQuery, activeTab, dateFrom, dateTo])
+  const filteredEmployeeData = useMemo(
+    () => attendances.filter((item) => matchesDateRange(item.date)),
+    [attendances, dateFrom, dateTo]
+  )
   const tablePageSize = 10
-  const employeeTotalPages = Math.max(1, Math.ceil(attendances.length / tablePageSize))
+  const employeeTotalPages = Math.max(1, Math.ceil(filteredEmployeeData.length / tablePageSize))
   const employeeCurrentPage = Math.min(tablePage, employeeTotalPages)
-  const paginatedAttendances = attendances.slice((employeeCurrentPage - 1) * tablePageSize, employeeCurrentPage * tablePageSize)
+  const paginatedAttendances = filteredEmployeeData.slice((employeeCurrentPage - 1) * tablePageSize, employeeCurrentPage * tablePageSize)
   const managementTotalPages = Math.max(1, Math.ceil(filteredData.length / tablePageSize))
   const managementCurrentPage = Math.min(tablePage, managementTotalPages)
   const paginatedFilteredData = filteredData.slice((managementCurrentPage - 1) * tablePageSize, managementCurrentPage * tablePageSize)
 
   if (appRole === 'EMPLOYEE') {
-    const employeeItem = selectedItem || attendances[0]
-    const pendingCount = attendances.filter((item) => item.correction?.status === 'PENDING').length
+    const employeeItem = selectedItem || filteredEmployeeData[0] || attendances[0]
+    const pendingCount = filteredEmployeeData.filter((item) => item.correction?.status === 'PENDING').length
 
     return (
       <>
@@ -431,12 +583,12 @@ export default function AttendancePageUI() {
               <div className="flex items-center gap-2 sm:gap-3"><HeaderAccount /></div>
             </div>
           </header>
-          <section className="border-b border-[#d9e2fc] bg-white px-4 py-5 sm:px-6"><div className="mx-auto max-w-[1600px]"><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#006838]">{copy.selfService}</p><h1 className="mt-1 text-2xl font-bold tracking-[-0.4px]">{copy.myHistory}</h1><p className="mt-1 text-sm text-[#4d5f81]">{copy.greeting}, {viewerName || copy.employee}. {copy.reviewMy}</p></div></section>
+          <section className="border-b border-[#d9e2fc] bg-white px-4 py-5 sm:px-6"><div className="mx-auto flex max-w-[1600px] flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#006838]">{copy.selfService}</p><h1 className="mt-1 text-2xl font-bold tracking-[-0.4px]">{copy.myHistory}</h1><p className="mt-1 text-sm text-[#4d5f81]">{copy.greeting}, {viewerName || copy.employee}. {copy.reviewMy}</p></div><div className="flex flex-wrap items-end justify-end gap-2"><label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-[#4d5f81]"><span>{copy.fromDate}</span><input aria-label={copy.fromDate} type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-2 text-xs font-normal normal-case tracking-normal" /></label><label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-[#4d5f81]"><span>{copy.toDate}</span><input aria-label={copy.toDate} type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-2 text-xs font-normal normal-case tracking-normal" /></label>{(dateFrom || dateTo) && <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-3 text-xs font-bold text-[#4d5f81] hover:bg-[#f7f8ff]">{copy.clearFilter}</button>}</div></div></section>
           {actionMessage && <div className={`mx-4 mt-4 flex items-center gap-2 rounded-lg border p-3 text-xs font-semibold sm:mx-6 ${actionMessage.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}><CheckCircle2 size={16} />{actionMessage.text}</div>}
           {errorMessage && <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 sm:mx-6"><AlertCircle size={16} />{errorMessage}</div>}
           <main className="mx-auto grid max-w-[1600px] gap-5 px-4 py-6 xl:grid-cols-[minmax(0,1fr)_390px] sm:px-6">
-            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center justify-between border-b border-[#becabd]/35 px-5 py-4"><div><h2 className="text-sm font-bold">{copy.attendanceHistory}</h2><p className="mt-1 text-xs text-[#4d5f81]">{attendances.length} {copy.recorded}</p></div><span className="rounded-full bg-[#edf6ff] px-2.5 py-1 text-[10px] font-bold text-[#1971c2]">{pendingCount} {copy.pendingCorrections}</span></div>{loading ? <div className="flex min-h-[260px] items-center justify-center text-xs text-[#4d5f81]"><RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />{copy.loadingHistory}</div> : attendances.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.noHistory}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead><tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.clock}</th><th className="px-3 py-3">{copy.duration}</th><th className="px-3 py-3">{copy.status}</th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedAttendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selected ? 'bg-[#eaf7f0]' : ''}`}><td className="px-4 py-3.5 font-semibold">{row.date}</td><td className="px-3 py-3.5 text-[#4d5f81]">{formatAttendanceTime(row.clock_in)} WIB <span className="mx-1 text-[#becabd]">/</span> {row.clock_out ? `${formatAttendanceTime(row.clock_out)} WIB` : '-'}</td><td className="px-3 py-3.5"><span className={duration.isUnderMin ? 'font-semibold text-[#b7791f]' : 'font-semibold'}>{duration.text}</span></td><td className="px-3 py-3.5"><div className="flex flex-wrap gap-1"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'}`}>{duration.isUnderMin ? copy.underSeven : copy.meetsSeven}</span>{row.correction && <span className="rounded bg-[#edf6ff] px-2 py-0.5 text-[10px] font-bold text-[#1971c2]">{copy.correction}: {correctionStatusLabel(row.correction.status)}</span>}</div></td></tr> })}</tbody></table></div>}<TablePagination page={employeeCurrentPage} pageSize={tablePageSize} totalItems={attendances.length} onPageChange={setTablePage} /></section>
-            {employeeItem && <aside className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3"><div><span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.attendanceDetail}</span><h2 className="mt-1 text-sm font-bold">{employeeItem.date}</h2><p className="text-xs text-[#4d5f81]">{employeeItem.employee_id} • {employeeItem.department}</p></div><Clock3 size={18} className="text-[#006838]" /></div><div className="mt-4 space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs"><div className="flex justify-between text-[#4d5f81]"><span>Clock In</span><strong>{formatAttendanceTime(employeeItem.clock_in)} WIB</strong></div><div className="flex justify-between text-[#4d5f81]"><span>Clock Out</span><strong>{employeeItem.clock_out ? `${formatAttendanceTime(employeeItem.clock_out)} WIB` : copy.noScan}</strong></div><div className="flex justify-between border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span>{copy.source}</span><strong className="text-[#1971c2]">{copy.attendanceSource}</strong></div>{employeeItem.notes && <div className="border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span className="font-semibold">{copy.incentiveNotes}:</span><p className="mt-1 text-[#121b2e]">{employeeItem.notes}</p></div>}</div><LocationMapPreview className="mt-4" clockIn={{ latitude: employeeItem.clock_in_latitude, longitude: employeeItem.clock_in_longitude, accuracyMeters: employeeItem.clock_in_accuracy_meters }} clockOut={{ latitude: employeeItem.clock_out_latitude, longitude: employeeItem.clock_out_longitude, accuracyMeters: employeeItem.clock_out_accuracy_meters }} />{employeeItem.correction ? <div className="mt-4 rounded-xl border border-[#b9d6ff] bg-[#edf6ff] p-3.5 text-xs"><div className="flex justify-between font-bold text-[#1e3765]"><span>{copy.correctionRequest}</span><span>{correctionStatusLabel(employeeItem.correction.status)}</span></div><p className="mt-2 text-[#4d5f81]">{employeeItem.correction.reason}</p></div> : <p className="mt-4 rounded-xl border border-dashed border-[#becabd] p-3 text-center text-xs italic text-[#4d5f81]">{copy.noCorrectionForDate}</p>}<button type="button" disabled={!!employeeItem.correction || isSubmittingCorrection} onClick={() => { setCorrectionType('CLOCK_IN'); setIsCorrectionOpen(true) }} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#16834b] py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:cursor-not-allowed disabled:opacity-50"><FilePlus2 size={14} />{employeeItem.correction ? copy.correctionSubmitted : copy.submitCorrection}</button></aside>}
+            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center justify-between border-b border-[#becabd]/35 px-5 py-4"><div><h2 className="text-sm font-bold">{copy.attendanceHistory}</h2><p className="mt-1 text-xs text-[#4d5f81]">{filteredEmployeeData.length} {copy.recorded}</p></div><span className="rounded-full bg-[#edf6ff] px-2.5 py-1 text-[10px] font-bold text-[#1971c2]">{pendingCount} {copy.pendingCorrections}</span></div>{loading ? <div className="flex min-h-[260px] items-center justify-center text-xs text-[#4d5f81]"><RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />{copy.loadingHistory}</div> : filteredEmployeeData.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{attendances.length === 0 ? copy.noHistory : copy.noResults}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead><tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.clock}</th><th className="px-3 py-3">{copy.duration}</th><th className="px-3 py-3">{copy.status}</th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedAttendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selected ? 'bg-[#eaf7f0]' : ''}`}><td className="px-4 py-3.5 font-semibold">{row.date}</td><td className="px-3 py-3.5 text-[#4d5f81]">{formatAttendanceTime(row.clock_in)} WIB <span className="mx-1 text-[#becabd]">/</span> {row.clock_out ? `${formatAttendanceTime(row.clock_out)} WIB` : '-'}</td><td className="px-3 py-3.5"><span className={duration.isUnderMin ? 'font-semibold text-[#b7791f]' : 'font-semibold'}>{duration.text}</span></td><td className="px-3 py-3.5"><div className="flex flex-wrap gap-1"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'}`}>{duration.isUnderMin ? copy.underSeven : copy.meetsSeven}</span>{isDateClosed(row.date) && <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">{copy.closedPeriod}</span>}{row.correction && <span className="rounded bg-[#edf6ff] px-2 py-0.5 text-[10px] font-bold text-[#1971c2]">{copy.correction}: {correctionStatusLabel(row.correction.status)}</span>}</div></td></tr> })}</tbody></table></div>}<TablePagination page={employeeCurrentPage} pageSize={tablePageSize} totalItems={filteredEmployeeData.length} onPageChange={setTablePage} /></section>
+            {employeeItem && <aside className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,77,130,0.05)]"><div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3"><div><span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.attendanceDetail}</span><h2 className="mt-1 text-sm font-bold">{employeeItem.date}</h2><p className="text-xs text-[#4d5f81]">{employeeItem.employee_id} • {employeeItem.department}</p></div><Clock3 size={18} className="text-[#006838]" /></div><div className="mt-4 space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs"><div className="flex justify-between text-[#4d5f81]"><span>Clock In</span><strong>{formatAttendanceTime(employeeItem.clock_in)} WIB</strong></div><div className="flex justify-between text-[#4d5f81]"><span>Clock Out</span><strong>{employeeItem.clock_out ? `${formatAttendanceTime(employeeItem.clock_out)} WIB` : copy.noScan}</strong></div><div className="flex justify-between border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span>{copy.source}</span><strong className="text-[#1971c2]">{copy.attendanceSource}</strong></div>{employeeItem.notes && <div className="border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span className="font-semibold">{copy.incentiveNotes}:</span><p className="mt-1 text-[#121b2e]">{employeeItem.notes}</p></div>}{isDateClosed(employeeItem.date) && <div className="flex items-center gap-2 border-t border-amber-200 pt-2 font-bold text-amber-700"><LockKeyhole size={13} />{copy.closedPeriod}</div>}</div><LocationMapPreview className="mt-4" clockIn={{ latitude: employeeItem.clock_in_latitude, longitude: employeeItem.clock_in_longitude, accuracyMeters: employeeItem.clock_in_accuracy_meters }} clockOut={{ latitude: employeeItem.clock_out_latitude, longitude: employeeItem.clock_out_longitude, accuracyMeters: employeeItem.clock_out_accuracy_meters }} />{employeeItem.correction ? <div className="mt-4 rounded-xl border border-[#b9d6ff] bg-[#edf6ff] p-3.5 text-xs"><div className="flex justify-between font-bold text-[#1e3765]"><span>{copy.correctionRequest}</span><span>{correctionStatusLabel(employeeItem.correction.status)}</span></div><p className="mt-2 text-[#4d5f81]">{employeeItem.correction.reason}</p></div> : <p className="mt-4 rounded-xl border border-dashed border-[#becabd] p-3 text-center text-xs italic text-[#4d5f81]">{copy.noCorrectionForDate}</p>}<button type="button" disabled={!!employeeItem.correction || isSubmittingCorrection || isDateClosed(employeeItem.date)} onClick={() => { if (isDateClosed(employeeItem.date)) { setActionMessage({ type: 'error', text: copy.closedPeriod }); return }; setCorrectionType('CLOCK_IN'); setIsCorrectionOpen(true) }} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#16834b] py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:cursor-not-allowed disabled:opacity-50"><FilePlus2 size={14} />{isDateClosed(employeeItem.date) ? copy.closedPeriod : employeeItem.correction ? copy.correctionSubmitted : copy.submitCorrection}</button></aside>}
           </main>
         </div>
         {isCorrectionOpen && employeeItem && <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f2342]/45 p-4"><section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#d9e2fc] px-5 py-4"><div><h2 className="text-lg font-bold">{copy.submitAttendanceCorrection}</h2><p className="mt-1 text-xs text-[#4d5f81]">{interpolate(copy.sentToHr, { date: employeeItem.date })}</p></div><button type="button" onClick={() => setIsCorrectionOpen(false)} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label={copy.close}><X size={18} /></button></div><form onSubmit={handleSubmitCorrection} className="space-y-4 p-5"><label className="block text-xs font-bold text-[#121b2e]">{copy.correctionType}<select value={correctionType} onChange={(event) => setCorrectionType(event.target.value as CorrectionType)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] bg-white px-3 py-2.5 text-xs font-normal outline-none focus:border-[#069494]"><option value="CLOCK_IN">{copy.correctClockIn}</option><option value="CLOCK_OUT">{copy.correctClockOut}</option><option value="FULL_DAY">{copy.correctFullDay}</option></select></label><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">{copy.correctClockInLabel}<input type="time" value={proposedClockIn} onChange={(event) => setProposedClockIn(event.target.value)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] px-3 py-2.5 text-xs font-normal" /></label><label className="text-xs font-bold">{copy.correctClockOutLabel}<input type="time" value={proposedClockOut} onChange={(event) => setProposedClockOut(event.target.value)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] px-3 py-2.5 text-xs font-normal" /></label></div><label className="block text-xs font-bold">{copy.overtimeNote}<textarea value={incentiveNote} onChange={(event) => setIncentiveNote(event.target.value)} className="mt-1 min-h-16 w-full resize-y rounded-lg border border-[#d9e2fc] p-3 text-xs font-normal outline-none focus:border-[#069494]" placeholder={copy.overtimePlaceholder} /></label><label className="block text-xs font-bold">{copy.requestReason}<textarea required minLength={10} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} className="mt-1 min-h-24 w-full resize-y rounded-lg border border-[#d9e2fc] p-3 text-xs font-normal outline-none focus:border-[#069494]" placeholder={copy.reasonPlaceholder} /></label><div className="flex justify-end gap-2 border-t border-[#d9e2fc] pt-4"><button type="button" onClick={() => setIsCorrectionOpen(false)} className="rounded-lg px-3 py-2 text-xs font-bold text-[#4d5f81] hover:bg-[#f1f3ff]">{copy.cancel}</button><button type="submit" disabled={isSubmittingCorrection || correctionReason.trim().length < 10} className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"><FilePlus2 size={14} />{isSubmittingCorrection ? copy.sending : copy.sendRequest}</button></div></form></section></div>}
@@ -475,6 +627,21 @@ export default function AttendancePageUI() {
             {/* <span className="inline-flex w-fit items-center rounded-full border border-[#006838]/25 bg-[#eaf7f0] px-3 py-1.5 text-xs font-bold text-[#006838]">
               Role: HR / Manager
             </span> */}
+          </div>
+
+          <div className="mx-auto mt-5 flex max-w-[1600px] flex-wrap items-center justify-between gap-3 border-b border-[#d9e2fc] pb-3">
+            <div className="flex flex-wrap gap-1 text-xs font-semibold">
+              {([['ATTENDANCE', copy.attendanceTab], ['AUDIT', copy.auditTab], ['CLOSING', copy.closingTab]] as [ManagementView, string][]).map(([view, label]) => (
+                <button key={view} type="button" onClick={() => setManagementView(view)} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${managementView === view ? 'bg-[#eaf7f0] font-bold text-[#006838]' : 'text-[#4d5f81] hover:bg-[#f7f8ff] hover:text-[#121b2e]'}`}>
+                  {view === 'AUDIT' ? <History size={14} /> : view === 'CLOSING' ? <LockKeyhole size={14} /> : <Clock3 size={14} />}{label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-[#4d5f81]">{copy.fromDate}<input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-2 text-xs font-normal normal-case tracking-normal" /></label>
+              <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-[#4d5f81]">{copy.toDate}<input type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-2 text-xs font-normal normal-case tracking-normal" /></label>
+              {(dateFrom || dateTo) && <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-3 text-xs font-bold text-[#4d5f81] hover:bg-[#f7f8ff]">{copy.clearFilter}</button>}
+            </div>
           </div>
 
           {actionMessage && (
@@ -542,7 +709,7 @@ export default function AttendancePageUI() {
         </section>
 
         {/* MAIN BODY: TABLE + DRAWER */}
-        <div className="mx-auto flex max-w-[1600px] flex-col gap-5 px-4 py-6 xl:flex-row sm:px-6">
+        {managementView === 'ATTENDANCE' ? <div className="mx-auto flex max-w-[1600px] flex-col gap-5 px-4 py-6 xl:flex-row sm:px-6">
           <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
             {loading ? (
               <div className="flex min-h-[300px] items-center justify-center text-xs text-[#4d5f81]">
@@ -803,8 +970,40 @@ export default function AttendancePageUI() {
               )}
             </div>
           )}
-        </div>
+        </div> : managementView === 'AUDIT' ? <AttendanceAuditPanel entries={auditEntries} copy={copy} dateFrom={dateFrom} dateTo={dateTo} /> : <AttendanceClosingPanel closings={closings} copy={copy} dateFrom={dateFrom} dateTo={dateTo} closingStart={closingStart} closingEnd={closingEnd} closingReason={closingReason} isSaving={isClosingSaving} onStartChange={setClosingStart} onEndChange={setClosingEnd} onReasonChange={setClosingReason} onSubmit={handleCreateClosing} onEmergencyEdit={handleEmergencyEdit} />}
       </div>
     </>
   )
+}
+
+type AttendancePanelCopy = Record<string, string>
+
+function formatAttendanceAuditDate(value: string, language: 'id' | 'en') {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString(language === 'id' ? 'id-ID' : 'en-GB', {
+    timeZone: 'Asia/Jakarta',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
+function auditEntryDate(value: string) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(value))
+}
+
+function AttendanceAuditPanel({ entries, copy, dateFrom, dateTo }: { entries: AttendanceAuditEntry[]; copy: AttendancePanelCopy; dateFrom: string; dateTo: string }) {
+  const { language } = useLanguage()
+  const visibleEntries = entries.filter((entry) => {
+    const date = auditEntryDate(entry.created_at)
+    return (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo)
+  })
+
+  return <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6"><div className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="border-b border-[#becabd]/35 px-5 py-4"><div className="flex items-center gap-2"><History size={17} className="text-[#006838]" /><h2 className="text-sm font-bold">{copy.auditTab}</h2></div><p className="mt-1 text-xs text-[#4d5f81]">{visibleEntries.length} {copy.auditAction}</p></div>{visibleEntries.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.auditEmpty}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.action}</th><th className="px-3 py-3">{copy.actor}</th><th className="px-3 py-3">{copy.reason}</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleEntries.map((entry) => <tr key={entry.id}><td className="whitespace-nowrap px-4 py-3.5 text-[#4d5f81]">{formatAttendanceAuditDate(entry.created_at, language)}</td><td className="px-3 py-3.5 font-semibold">{entry.target_name}</td><td className="px-3 py-3.5"><span className="rounded bg-[#eaf7f0] px-2 py-1 text-[10px] font-bold text-[#006838]">{entry.action.replaceAll('_', ' ')}</span></td><td className="px-3 py-3.5 text-[#4d5f81]">{entry.actor_name}</td><td className="max-w-[360px] px-3 py-3.5 text-[#4d5f81]">{typeof entry.details.reason === 'string' ? entry.details.reason : entry.action === 'ATTENDANCE_PERIOD_CLOSED' || entry.action === 'ATTENDANCE_PERIOD_REOPENED' ? `${entry.details.period_start ?? ''} – ${entry.details.period_end ?? ''}` : '-'}</td></tr>)}</tbody></table></div>}</div></div>
+}
+
+function AttendanceClosingPanel({ closings, copy, dateFrom, dateTo, closingStart, closingEnd, closingReason, isSaving, onStartChange, onEndChange, onReasonChange, onSubmit, onEmergencyEdit }: { closings: AttendanceClosing[]; copy: AttendancePanelCopy; dateFrom: string; dateTo: string; closingStart: string; closingEnd: string; closingReason: string; isSaving: boolean; onStartChange: (value: string) => void; onEndChange: (value: string) => void; onReasonChange: (value: string) => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; onEmergencyEdit: (closing: AttendanceClosing) => void }) {
+  const visibleClosings = closings.filter((closing) => (!dateFrom || closing.period_end >= dateFrom) && (!dateTo || closing.period_start <= dateTo))
+
+  return <div className="mx-auto grid w-full max-w-[1600px] gap-5 px-4 py-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:px-6"><form onSubmit={onSubmit} className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center gap-2"><LockKeyhole size={17} className="text-[#006838]" /><h2 className="text-sm font-bold">{copy.closePeriod}</h2></div><p className="mt-1 text-xs leading-5 text-[#4d5f81]">{copy.closedPeriod}</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-xs font-bold text-[#4d5f81]">{copy.periodStart}<input required type="date" value={closingStart} onChange={(event) => onStartChange(event.target.value)} className="h-10 rounded-lg border border-[#d9e2fc] px-3 text-sm font-normal" /></label><label className="grid gap-1 text-xs font-bold text-[#4d5f81]">{copy.periodEnd}<input required type="date" value={closingEnd} onChange={(event) => onEndChange(event.target.value)} className="h-10 rounded-lg border border-[#d9e2fc] px-3 text-sm font-normal" /></label></div><label className="mt-3 grid gap-1 text-xs font-bold text-[#4d5f81]">{copy.reason}<textarea value={closingReason} onChange={(event) => onReasonChange(event.target.value)} className="min-h-20 resize-y rounded-lg border border-[#d9e2fc] p-3 text-sm font-normal" /></label><button disabled={isSaving} className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-[#006838] px-4 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><LockKeyhole size={14} />{isSaving ? copy.sending : copy.closePeriod}</button></form><section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="border-b border-[#becabd]/35 px-5 py-4"><h2 className="text-sm font-bold">{copy.closingTab}</h2><p className="mt-1 text-xs text-[#4d5f81]">{visibleClosings.length} {copy.recorded}</p></div>{visibleClosings.length === 0 ? <div className="flex min-h-[220px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.closingEmpty}</div> : <div className="divide-y divide-slate-100">{visibleClosings.map((closing) => <article key={closing.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><div className="flex items-center gap-2 text-sm font-bold"><span>{closing.period_start} – {closing.period_end}</span><span className={`rounded px-2 py-0.5 text-[10px] ${closing.status === 'CLOSED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{closing.status === 'CLOSED' ? copy.closedPeriod : copy.openPeriod}</span></div><p className="mt-1 text-xs text-[#4d5f81]">{closing.status === 'CLOSED' ? copy.closedAt : copy.reopenedAt}: {formatAttendanceAuditDate(closing.status === 'CLOSED' ? closing.closed_at : closing.reopened_at ?? closing.closed_at, 'id')}</p>{closing.reason && <p className="mt-1 text-xs text-[#4d5f81]">{closing.reason}</p>}</div>{closing.status === 'CLOSED' && <button type="button" disabled={isSaving} onClick={() => onEmergencyEdit(closing)} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"><Unlock size={14} />{copy.emergencyEdit}</button>}</article>)}</div>}</section></div>
 }
