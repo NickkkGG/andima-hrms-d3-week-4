@@ -338,8 +338,8 @@ export default function AttendancePageUI() {
 
   useEffect(() => {
     // Data loading is intentionally triggered after the authenticated role is known.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (appRole) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void fetchAttendanceData()
       void fetchAttendanceManagementData()
     }
