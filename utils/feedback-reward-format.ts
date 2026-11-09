@@ -4,6 +4,6 @@ export function dateLabel(date: string, includeTime = false, language: "id" | "e
     month: "short",
     year: "numeric",
     ...(includeTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-    timeZone: "UTC",
+    timeZone: "Asia/Jakarta",
   }).format(new Date(includeTime ? date : `${date}T00:00:00Z`));
 }

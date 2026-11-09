@@ -192,7 +192,7 @@ export async function getAudit(params: SearchParams) {
   if (!b2EmployeeIds.length) return { records: [], count: 0, page, pageSize: 10 };
   query = query.in("target_employee_id", b2EmployeeIds);
   if (param(params, "module") === "FEEDBACK" || param(params, "module") === "REWARD") query = query.eq("entity_type", param(params, "module"));
-  if (bounds) query = query.gte("created_at", `${bounds.start}T00:00:00Z`).lt("created_at", `${bounds.end}T00:00:00Z`);
+  if (bounds) query = query.gte("created_at", `${bounds.start}T00:00:00+07:00`).lt("created_at", `${bounds.end}T00:00:00+07:00`);
   const pageSize = 10;
   const { data, error, count } = await query.range((page - 1) * pageSize, page * pageSize - 1).returns<AuditEntry[]>();
   if (error) queryError("audit", error);
