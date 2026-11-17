@@ -215,12 +215,16 @@ function requestAttendanceLocation(): Promise<AttendanceLocationPayload> {
 
 function RealtimeAttendanceClock({ variant = "header", frozenAt = null }: { variant?: "header" | "inline"; frozenAt?: Date | null }) {
   const { language } = useLanguage();
-  const [now, setNow] = useState<Date>(() => new Date());
+  // Do not read the current time during SSR. The server and browser can cross
+  // a second boundary before hydration, which would make their initial text
+  // differ and trigger a recoverable hydration error.
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
     if (frozenAt) return;
 
     const updateClock = () => setNow(new Date());
+    updateClock();
     const timer = window.setInterval(updateClock, 1000);
     return () => window.clearInterval(timer);
   }, [frozenAt]);

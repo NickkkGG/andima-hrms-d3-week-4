@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Link2, Mail, MapPin, Phone } from "lucide-react";
 import EmployeeDirectoryVisibilityButton from "@/components/EmployeeDirectoryVisibilityButton";
 import HrmsShell from "@/components/hrms/HrmsShell";
@@ -156,17 +156,10 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
   }
 
   if (!b2Employee) {
-    return (
-      <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-7xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">Employee Profile</h1>
-          <p className="mt-2 text-slate-600">Data pegawai tidak ditemukan.</p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Employee Directory
-          </Link>
-        </section>
-      </HrmsShell>
-    );
+    // The B2 lookup is protected by RLS. Treat a row filtered by the caller's
+    // profile scope exactly like a missing record so direct URLs do not reveal
+    // that another employee's profile exists.
+    notFound();
   }
 
   const { data: b2Source, error: b2SourceError } = await supabase
