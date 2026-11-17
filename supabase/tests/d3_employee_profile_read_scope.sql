@@ -1,6 +1,24 @@
 begin;
 
-select plan(9);
+select plan(11);
+
+select ok(
+  (select relrowsecurity
+   from pg_class
+   where oid = 'public.b2_register'::regclass),
+  'B2 profile table has RLS enabled'
+);
+
+select ok(
+  not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'b2_register'
+      and policyname = 'Allow IT and Director full modification'
+  ),
+  'legacy position-based profile bypass is removed'
+);
 
 create temp table d3_profile_scope_fixture on commit drop as
 with employee_account as (

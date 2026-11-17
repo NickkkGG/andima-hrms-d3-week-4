@@ -45,7 +45,9 @@ done
 for d3_sql in \
   "$d3_root/scripts/d3-profile-rls-bootstrap.sql" \
   "$d3_root/supabase/migrations/20261109094307_d3_employee_profile_read_scope.sql" \
-  "$d3_root/supabase/migrations/20261109095043_d3_employee_profile_scope_helper.sql"; do
+  "$d3_root/supabase/migrations/20261109095043_d3_employee_profile_scope_helper.sql" \
+  "$d3_root/supabase/migrations/20261117050907_d3_enforce_b2_profile_rls.sql" \
+  "$d3_root/supabase/migrations/20261117051311_d3_remove_legacy_profile_admin_bypass.sql"; do
   "${d3_docker[@]}" exec -i -e PGPASSWORD=postgres "$d3_container" \
     psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -f - < "$d3_sql"
 done

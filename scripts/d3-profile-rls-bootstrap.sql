@@ -118,6 +118,15 @@ grant select on table public.d3_b2_employee_sources to authenticated;
 alter table public.b2_register enable row level security;
 alter table public.d3_b2_employee_sources enable row level security;
 
+-- Simulate the legacy position-based bypass found in the connected project.
+-- The final migration must remove it before the role-scope assertions run.
+create policy "Allow IT and Director full modification"
+  on public.b2_register
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
 insert into public.d3_employee (id, full_name) values
   ('00000000-0000-0000-0000-000000000101', 'Employee Satu'),
   ('00000000-0000-0000-0000-000000000102', 'Manager Satu'),
