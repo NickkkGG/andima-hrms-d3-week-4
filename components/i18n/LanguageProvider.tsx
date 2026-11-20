@@ -17,14 +17,39 @@ const LanguageContext = createContext<LanguageContextValue | null>(null);
 const storageKey = "andima-hrms-language";
 const cookieMaxAge = 60 * 60 * 24 * 365;
 
+// localStorage can throw (blocked site data, strict privacy modes on some
+// Windows/Edge and Safari setups). The cookie is the source of truth for the
+// server render, so storage failures are ignored instead of breaking the toggle.
+function readStoredLanguage() {
+  try {
+    const saved = window.localStorage.getItem(storageKey);
+    return saved ? normalizeLanguage(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeLanguage(language: SupportedLanguage) {
+  try {
+    window.localStorage.setItem(storageKey, language);
+  } catch {
+    // Ignore: the language cookie still carries the choice.
+  }
+}
+
+function writeLanguageCookie(language: SupportedLanguage) {
+  const secure = window.location.protocol === "https:" ? "; secure" : "";
+  document.cookie = `${languageCookieName}=${language}; path=/; max-age=${cookieMaxAge}; samesite=lax${secure}`;
+}
+
 export function LanguageProvider({ children, initialLanguage = "id" }: { children: React.ReactNode; initialLanguage?: SupportedLanguage }) {
   const router = useRouter();
   const [language, setLanguageState] = useState<SupportedLanguage>(initialLanguage);
 
   useEffect(() => {
-    const savedLanguage = normalizeLanguage(window.localStorage.getItem(storageKey));
-    if (savedLanguage !== initialLanguage) {
-      document.cookie = `${languageCookieName}=${savedLanguage}; path=/; max-age=${cookieMaxAge}; samesite=lax`;
+    const savedLanguage = readStoredLanguage();
+    if (savedLanguage && savedLanguage !== initialLanguage) {
+      writeLanguageCookie(savedLanguage);
       const refreshLanguage = window.setTimeout(() => {
         setLanguageState(savedLanguage);
         router.refresh();
@@ -35,13 +60,13 @@ export function LanguageProvider({ children, initialLanguage = "id" }: { childre
 
   useEffect(() => {
     document.documentElement.lang = language;
-    window.localStorage.setItem(storageKey, language);
+    storeLanguage(language);
   }, [language]);
 
   const setLanguage = useCallback((nextLanguage: SupportedLanguage) => {
     if (nextLanguage === language) return;
-    document.cookie = `${languageCookieName}=${nextLanguage}; path=/; max-age=${cookieMaxAge}; samesite=lax`;
-    window.localStorage.setItem(storageKey, nextLanguage);
+    writeLanguageCookie(nextLanguage);
+    storeLanguage(nextLanguage);
     setLanguageState(nextLanguage);
     router.refresh();
   }, [language, router]);
