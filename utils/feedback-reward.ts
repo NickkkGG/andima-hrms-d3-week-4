@@ -89,7 +89,7 @@ export async function getEmployeeOptions(): Promise<EmployeeIdentity[]> {
       .returns<{ employee: EmployeeIdentity | null }[]>();
     if (error) queryError("subordinate options", error);
     return (data ?? [])
-      .flatMap((row) => row.employee && b2EmployeeIds.includes(row.employee.id) ? [row.employee] : [])
+      .flatMap((row) => row.employee && b2EmployeeIds.includes(row.employee.id) && row.employee.id !== access.employee_id ? [row.employee] : [])
       .sort((a, b) => a.full_name.localeCompare(b.full_name));
   }
 
@@ -100,7 +100,8 @@ export async function getEmployeeOptions(): Promise<EmployeeIdentity[]> {
     .order("full_name")
     .returns<EmployeeIdentity[]>();
   if (error) queryError("employee options", error);
-  return data ?? [];
+  // Nobody records feedback or a reward for themselves.
+  return (data ?? []).filter((employee) => employee.id !== access.employee_id);
 }
 
 export async function getOverview(params: SearchParams = {}) {
