@@ -23,8 +23,8 @@ export default function HrmsShell({ children, userEmail, userRole, pageTitle = "
 
   return (
     <div className="min-h-screen bg-[#EAF2FC] font-sans text-[#121B2E]">
-      <header className="sticky top-0 z-20 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 px-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-3">
+      <header className="sticky top-0 z-20 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 pl-16 pr-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:pr-6 lg:pl-6">
+        <div className="flex w-full min-w-0 items-center justify-between gap-3">
           <div className="hidden min-w-0 items-center gap-3 sm:flex">
             <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span>
             <span className="h-5 border-l border-[#BCD4EE]" />
