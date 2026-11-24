@@ -41,6 +41,9 @@ yarn-error.log*
 /.windsurf/
 /AGENTS.local.md
 /CLAUDE.local.md
+# Written automatically by `next dev` (Next.js agent rules); keep it out of the repo
+/AGENTS.md
+/CLAUDE.md
 
 # vercel
 .vercel
