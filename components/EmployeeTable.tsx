@@ -100,7 +100,7 @@ export default function EmployeeTable({ employees, summary }: EmployeeTableProps
               <div className="flex items-start gap-3 pt-1">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#EAF2FC] text-sm font-bold text-[#0C68D5]">{initials(employee.full_name)}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2"><h2 className="truncate text-[17px] font-bold leading-5 text-[#172033] transition group-hover:text-[#0C68D5]">{employee.full_name}</h2><HrmsStatusPill value={employee.employment_status} /></div>
+                  <div className="flex items-start justify-between gap-2"><h2 className="truncate text-sm font-bold leading-5 text-[#121b2e] transition group-hover:text-[#0C68D5]">{employee.full_name}</h2><HrmsStatusPill value={employee.employment_status} /></div>
                   <p className="mt-0.5 truncate text-[11px] font-semibold leading-4 text-[#4D5F81]">{[employee.position_title, employee.department_name].filter(Boolean).join(" · ") || copy.positionMissing}</p>
                   <div className="mt-3 flex items-center justify-between gap-2"><p className="text-xs font-bold tracking-[0.08em] text-[#0B2548]">{employee.employee_id}</p><span className="text-xs font-bold text-[#0C68D5]">{copy.viewProfile} →</span></div>
                 </div>

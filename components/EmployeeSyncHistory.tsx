@@ -1,3 +1,7 @@
+"use client";
+
+import { useLanguage } from "@/components/i18n/LanguageProvider";
+
 interface EmployeeSyncHistoryItem {
   id: string;
   event_kind: string;
@@ -39,7 +43,8 @@ function eventClassName(kind: string) {
   }
 }
 
-export default function EmployeeSyncHistory({ events, language = "id" }: { events: EmployeeSyncHistoryItem[]; language?: "id" | "en" }) {
+export default function EmployeeSyncHistory({ events }: { events: EmployeeSyncHistoryItem[] }) {
+  const { language } = useLanguage();
   const copy = language === "id" ? { title: "Riwayat sinkronisasi pegawai", description: "Data baru dari registrasi B2 dengan status PROVISIONED disinkronkan otomatis.", empty: "Belum ada riwayat sinkronisasi." } : { title: "Employee synchronization history", description: "New B2 registration data with PROVISIONED status is synchronized automatically.", empty: "No synchronization history yet." };
   return (
     <section className="mt-5 rounded-[10px] border border-[#578AFC]/30 bg-white p-5 shadow-[3px_3px_16px_rgba(87,138,252,0.16)]">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LocalizedText } from "@/components/i18n/LocalizedText";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const generateMetadata = () => pageMetadata("notFound");
@@ -16,9 +17,9 @@ export default function NotFound() {
           <span className="font-[family:var(--font-poppins)] text-xl font-semibold tracking-[-0.03em]">ANDIMA HRMS</span>
         </div>
         <p className="mt-10 text-sm font-semibold tracking-[0.12em] text-[#0c68d5]">404</p>
-        <h1 className="mt-2 font-[family:var(--font-poppins)] text-2xl font-semibold text-[#172033]">Halaman tidak tersedia</h1>
-        <p className="mt-3 text-sm leading-6 text-[#4d5f81]">Alamat yang Anda buka tidak tersedia atau telah dipindahkan.</p>
-        <Link href="/face-biometric-attendance" className="mt-7 inline-flex h-10 items-center rounded-lg bg-[#0c68d5] px-5 text-sm font-semibold text-white transition hover:bg-[#0958b8] focus-visible:outline-offset-4">Kembali ke HRMS</Link>
+        <h1 className="mt-2 font-[family:var(--font-poppins)] text-2xl font-semibold text-[#172033]"><LocalizedText id="Halaman tidak tersedia" en="Page not found" /></h1>
+        <p className="mt-3 text-sm leading-6 text-[#4d5f81]"><LocalizedText id="Alamat yang Anda buka tidak tersedia atau telah dipindahkan." en="The address you opened does not exist or has moved." /></p>
+        <Link href="/face-biometric-attendance" className="mt-7 inline-flex h-10 items-center rounded-lg bg-[#0c68d5] px-5 text-sm font-semibold text-white transition hover:bg-[#0958b8] focus-visible:outline-offset-4"><LocalizedText id="Kembali ke HRMS" en="Back to HRMS" /></Link>
       </section>
     </main>
   );

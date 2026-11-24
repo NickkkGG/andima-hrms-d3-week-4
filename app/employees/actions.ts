@@ -13,15 +13,21 @@ const employmentStatuses = new Set([
   "TERMINATED",
 ]);
 
+// Messages go back in both languages; the client shows the active one.
+export interface ActionMessage {
+  id: string;
+  en: string;
+}
+
 export interface EmployeeDirectoryVisibilityResult {
   ok: boolean;
-  message: string;
+  message: ActionMessage;
 }
 
 export interface EmployeeStatusChangeResult {
   ok: boolean;
   employeeId?: string;
-  message: string;
+  message: ActionMessage;
 }
 
 interface EmployeeStatusRpcResult {
@@ -55,13 +61,13 @@ async function requireHr() {
 
   if (error || !user) {
     logActionError("authentication", null, error ?? { message: "Authenticated user is unavailable." });
-    return { supabase, user: null, message: "Sesi Anda tidak valid. Silakan masuk kembali." };
+    return { supabase, user: null, message: { id: "Sesi Anda tidak valid. Silakan masuk kembali.", en: "Your session is no longer valid. Please sign in again." } };
   }
 
   const role = await getD3AppRole(supabase, user.id);
   if (role !== "HR") {
     logActionError("authorization", null, { message: "The current user does not have the HR role." });
-    return { supabase, user: null, message: "Anda tidak memiliki izin HR untuk menjalankan aksi ini." };
+    return { supabase, user: null, message: { id: "Anda tidak memiliki izin HR untuk menjalankan aksi ini.", en: "You do not have HR permission to perform this action." } };
   }
 
   return { supabase, user, message: null };
@@ -72,11 +78,11 @@ export async function setEmployeeDirectoryVisibility(
   shouldHide: boolean,
 ): Promise<EmployeeDirectoryVisibilityResult> {
   if (!isUuid(employeeUuid)) {
-    return { ok: false, message: "Data pegawai tidak valid." };
+    return { ok: false, message: { id: "Data pegawai tidak valid.", en: "The employee data is not valid." } };
   }
 
   const { supabase, user, message } = await requireHr();
-  if (!user) return { ok: false, message: message ?? "Aksi tidak dapat dijalankan." };
+  if (!user) return { ok: false, message: message ?? { id: "Aksi tidak dapat dijalankan.", en: "The action could not be performed." } };
 
   if (shouldHide) {
     const { error } = await supabase
@@ -90,7 +96,7 @@ export async function setEmployeeDirectoryVisibility(
     // Repeating hide is idempotent because the hidden table uses a unique employee key.
     if (error && error.code !== "23505") {
       logActionError("hide_directory_employee", employeeUuid, error);
-      return { ok: false, message: "Data pegawai belum dapat disembunyikan dari Employee Directory." };
+      return { ok: false, message: { id: "Data pegawai belum dapat disembunyikan dari Direktori Pegawai.", en: "The employee could not be hidden from the Employee Directory." } };
     }
   } else {
     const { error } = await supabase
@@ -100,7 +106,7 @@ export async function setEmployeeDirectoryVisibility(
 
     if (error) {
       logActionError("restore_directory_employee", employeeUuid, error);
-      return { ok: false, message: "Data pegawai belum dapat ditampilkan kembali di Employee Directory." };
+      return { ok: false, message: { id: "Data pegawai belum dapat ditampilkan kembali di Direktori Pegawai.", en: "The employee could not be shown in the Employee Directory again." } };
     }
   }
 
@@ -109,8 +115,8 @@ export async function setEmployeeDirectoryVisibility(
   return {
     ok: true,
     message: shouldHide
-      ? "Employee disembunyikan dari Employee Directory. Data profil tetap tersimpan."
-      : "Employee ditampilkan kembali di Employee Directory.",
+      ? { id: "Pegawai disembunyikan dari Direktori Pegawai. Data profil tetap tersimpan.", en: "The employee is hidden from the Employee Directory. Profile data is kept." }
+      : { id: "Pegawai ditampilkan kembali di Direktori Pegawai.", en: "The employee is shown in the Employee Directory again." },
   };
 }
 
@@ -120,11 +126,11 @@ export async function updateEmployeeEmploymentStatus(
 ): Promise<EmployeeStatusChangeResult> {
   const normalizedStatus = employmentStatus.trim().toUpperCase();
   if (!isUuid(b2RegisterId) || !employmentStatuses.has(normalizedStatus)) {
-    return { ok: false, message: "Employment Status tidak valid." };
+    return { ok: false, message: { id: "Status kepegawaian tidak valid.", en: "The employment status is not valid." } };
   }
 
   const { supabase, user, message } = await requireHr();
-  if (!user) return { ok: false, message: message ?? "Aksi tidak dapat dijalankan." };
+  if (!user) return { ok: false, message: message ?? { id: "Aksi tidak dapat dijalankan.", en: "The action could not be performed." } };
 
   const { data, error } = await supabase
     .rpc("d3_update_b2_employee_employment_status", {
@@ -137,19 +143,19 @@ export async function updateEmployeeEmploymentStatus(
   if (error || !data) {
     logActionError("update_employment_status", b2RegisterId, error ?? { message: "Status RPC returned no employee." });
     if (error?.code === "42501") {
-      return { ok: false, message: "Anda tidak memiliki izin untuk mengubah employment status pegawai." };
+      return { ok: false, message: { id: "Anda tidak memiliki izin untuk mengubah status kepegawaian.", en: "You do not have permission to change the employment status." } };
     }
     if (error?.code === "22023") {
       return {
         ok: false,
         message: error.message.toLowerCase().includes("permanent")
-          ? "Employee permanent hanya dapat diubah menjadi RESIGNED atau TERMINATED."
+          ? { id: "Pegawai tetap hanya dapat diubah menjadi Mengundurkan diri atau Diberhentikan.", en: "A permanent employee can only be changed to Resigned or Terminated." }
           : error.message.toLowerCase().includes("final")
-            ? "Employee dengan status RESIGNED atau TERMINATED tidak dapat diubah kembali."
-          : "Employment Status tidak valid.",
+            ? { id: "Pegawai yang sudah Mengundurkan diri atau Diberhentikan tidak dapat diubah kembali.", en: "An employee who has resigned or been terminated cannot be changed again." }
+          : { id: "Status kepegawaian tidak valid.", en: "The employment status is not valid." },
       };
     }
-    return { ok: false, message: "Employment Status belum dapat diperbarui. Silakan coba lagi." };
+    return { ok: false, message: { id: "Status kepegawaian belum dapat diperbarui. Silakan coba lagi.", en: "The employment status could not be updated. Please try again." } };
   }
 
   revalidatePath("/employees");
@@ -159,7 +165,7 @@ export async function updateEmployeeEmploymentStatus(
     ok: true,
     employeeId: data.employee_id,
     message: normalizedStatus === "TERMINATED"
-      ? "Layoff berhasil dicatat dan employment status menjadi TERMINATED."
-      : "Employment Status berhasil diperbarui.",
+      ? { id: "Pemberhentian berhasil dicatat dan status kepegawaian menjadi Diberhentikan.", en: "The layoff was recorded and the employment status is now Terminated." }
+      : { id: "Status kepegawaian berhasil diperbarui.", en: "The employment status was updated." },
   };
 }

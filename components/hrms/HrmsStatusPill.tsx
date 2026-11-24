@@ -6,6 +6,19 @@ interface HrmsStatusPillProps {
   value: string | null;
 }
 
+const statusLabels = {
+  id: { PERMANENT: "Tetap", CONTRACT: "Kontrak", PROBATION: "Masa percobaan", INTERN: "Magang", RESIGNED: "Mengundurkan diri", TERMINATED: "Diberhentikan", VALID: "Valid", PRESENT: "Hadir", LATE: "Terlambat", ABSENT: "Tidak hadir", EXPIRING: "Akan berakhir", EXPIRED: "Kedaluwarsa" },
+  en: { PERMANENT: "Permanent", CONTRACT: "Contract", PROBATION: "Probation", INTERN: "Intern", RESIGNED: "Resigned", TERMINATED: "Terminated", VALID: "Valid", PRESENT: "Present", LATE: "Late", ABSENT: "Absent", EXPIRING: "Expiring", EXPIRED: "Expired" },
+} as const;
+
+/** Display name of an employment / certification / attendance status in the active language. */
+export function hrmsStatusLabel(value: string, language: "id" | "en") {
+  const normalized = value.toUpperCase();
+  return statusLabels[language][normalized as keyof (typeof statusLabels)["id"]] ?? value.replaceAll("_", " ");
+}
+
+// Colour follows the stored status, not the translated label, so it is the
+// same in both languages.
 function statusClass(value: string) {
   const normalized = value.toUpperCase();
 
@@ -18,12 +31,7 @@ function statusClass(value: string) {
 
 export default function HrmsStatusPill({ value }: HrmsStatusPillProps) {
   const { language } = useLanguage();
-  const fallback = language === "id" ? "Belum tersedia" : "Not available";
-  const labels = language === "id"
-    ? { PERMANENT: "Tetap", CONTRACT: "Kontrak", PROBATION: "Masa percobaan", INTERN: "Magang", RESIGNED: "Mengundurkan diri", TERMINATED: "Diberhentikan", VALID: "Valid", PRESENT: "Hadir", LATE: "Terlambat", ABSENT: "Tidak hadir", EXPIRING: "Akan berakhir", EXPIRED: "Kedaluwarsa" }
-    : { PERMANENT: "Permanent", CONTRACT: "Contract", PROBATION: "Probation", INTERN: "Intern", RESIGNED: "Resigned", TERMINATED: "Terminated", VALID: "Valid", PRESENT: "Present", LATE: "Late", ABSENT: "Absent", EXPIRING: "Expiring", EXPIRED: "Expired" };
-  const normalized = value?.toUpperCase() ?? "";
-  const label = labels[normalized as keyof typeof labels] ?? value ?? fallback;
+  const label = value ? hrmsStatusLabel(value, language) : language === "id" ? "Belum tersedia" : "Not available";
 
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] ${statusClass(label)}`}>{label}</span>;
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] ${statusClass(value ?? "")}`}>{label}</span>;
 }

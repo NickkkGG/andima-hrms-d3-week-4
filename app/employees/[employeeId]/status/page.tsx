@@ -5,7 +5,8 @@ import EmployeeManagementAccessDenied from "@/components/hrms/EmployeeManagement
 import HrmsShell from "@/components/hrms/HrmsShell";
 import { canManageEmployeeProfiles, getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
-import { getServerLanguage } from "@/lib/i18n-server";
+import { LocalizedText } from "@/components/i18n/LocalizedText";
+import { localizedCopy } from "@/lib/i18n-copy";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const generateMetadata = () => pageMetadata("employmentStatus");
@@ -23,8 +24,7 @@ interface EmployeeStatusProfile {
 }
 
 export default async function EmployeeStatusPage({ params }: EmployeeStatusPageProps) {
-  const language = await getServerLanguage();
-  const copy = language === "id" ? { title: "Ubah status kepegawaian", back: "← Profil pegawai", eyebrow: "MANAJEMEN PEGAWAI", description: "Perbarui status tanpa mengubah data profil atau riwayat pegawai." } : { title: "Change employment status", back: "← Employee profile", eyebrow: "EMPLOYEE MANAGEMENT", description: "Update status without changing employee profile data or history." };
+  const copyText = { id: { title: "Ubah status kepegawaian", back: "← Profil pegawai", eyebrow: "MANAJEMEN PEGAWAI", description: "Perbarui status tanpa mengubah data profil atau riwayat pegawai." }, en: { title: "Change employment status", back: "← Employee profile", eyebrow: "EMPLOYEE MANAGEMENT", description: "Update status without changing employee profile data or history." } }; const copy = localizedCopy(copyText);
   const { employeeId } = await params;
   const supabase = await createClient();
   const {
@@ -62,10 +62,10 @@ export default async function EmployeeStatusPage({ params }: EmployeeStatusPageP
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">Ubah Status Kepegawaian</h1>
-          <p className="mt-2">Data pegawai belum dapat dimuat. Silakan coba lagi nanti.</p>
+          <h1 className="text-xl font-bold">{copy.title}</h1>
+          <p className="mt-2"><LocalizedText id="Data pegawai belum dapat dimuat. Silakan coba lagi nanti." en="Employee data could not be loaded. Please try again later." /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Kembali ke Daftar Pegawai
+            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
           </Link>
         </section>
       </HrmsShell>
@@ -76,10 +76,10 @@ export default async function EmployeeStatusPage({ params }: EmployeeStatusPageP
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-3xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">Ubah Status Kepegawaian</h1>
-          <p className="mt-2 text-slate-600">Data pegawai tidak ditemukan.</p>
+          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
+          <p className="mt-2 text-slate-600"><LocalizedText id="Data pegawai tidak ditemukan." en="Employee data was not found." /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Kembali ke Daftar Pegawai
+            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
           </Link>
         </section>
       </HrmsShell>
@@ -100,9 +100,9 @@ export default async function EmployeeStatusPage({ params }: EmployeeStatusPageP
         <Link className="inline-flex text-sm font-semibold text-[#1E3765] hover:text-[#155DFC]" href={`/employees/${encodeURIComponent(employee.employee_id)}`}>{copy.back}</Link>
 
         <header>
-          <p className="text-xs font-bold tracking-[0.16em] text-[#1E3765]">{copy.eyebrow}</p>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.04em] text-[#121B2E] sm:text-[42px]">{copy.title}</h1>
-          <p className="mt-3 text-base text-slate-600">{copy.description}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#1E3765]">{copy.eyebrow}</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{copy.title}</h1>
+          <p className="mt-1 text-sm text-[#4d5f81]">{copy.description}</p>
         </header>
 
         <EmployeeStatusForm employee={employee} />

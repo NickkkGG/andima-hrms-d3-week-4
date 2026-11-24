@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import CustomButton from "@/components/CustomButton";
-import HrmsStatusPill from "@/components/hrms/HrmsStatusPill";
+import HrmsStatusPill, { hrmsStatusLabel } from "@/components/hrms/HrmsStatusPill";
 import { updateEmployeeEmploymentStatus } from "@/app/employees/actions";
 import { employmentStatuses, type EmploymentStatus } from "@/types/employee";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
@@ -66,13 +66,13 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
     try {
       const result = await updateEmployeeEmploymentStatus(employee.b2_register_id, selectedStatus);
       if (!result.ok || !result.employeeId) {
-        setErrorMessage(result.message);
+        setErrorMessage(result.message[language]);
         setIsSubmitting(false);
         return;
       }
 
       const updatedEmployeeId = result.employeeId;
-      setSuccessMessage(`${result.message} ${copy.redirect}`);
+      setSuccessMessage(`${result.message[language]} ${copy.redirect}`);
       window.setTimeout(() => {
         router.replace(`/employees/${encodeURIComponent(updatedEmployeeId)}`);
         router.refresh();
@@ -86,10 +86,10 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
   return (
     <form className="space-y-6" onSubmit={handleSubmit} noValidate>
       <section className="rounded-2xl border border-[#BCD4EE] bg-white p-5 shadow-[0_8px_24px_rgba(31,77,130,0.08)] sm:p-7">
-        <h2 className="text-xl font-extrabold tracking-tight text-[#121B2E]">{copy.title}</h2>
+        <h2 className="text-base font-bold text-[#121b2e]">{copy.title}</h2>
         <dl className="mt-5 grid gap-4 rounded-xl border border-[#DCE7F3] bg-[#F8FBFF] p-4 sm:grid-cols-3">
           <div>
-            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">Employee ID</dt>
+            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{language === "id" ? "ID Pegawai" : "Employee ID"}</dt>
             <dd className="mt-1 text-sm font-semibold text-slate-900">{employee.employee_id}</dd>
           </div>
           <div>
@@ -116,7 +116,7 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
             <option value="">{copy.select}</option>
             {selectableStatuses.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {hrmsStatusLabel(status, language)}
               </option>
             ))}
           </select>

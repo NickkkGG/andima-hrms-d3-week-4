@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import LanguageToggle from "@/components/i18n/LanguageToggle";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { SkeletonBlock } from "@/components/hrms/Skeleton";
 
+// The role is kept as the stored value and translated while rendering, so the
+// header follows the language toggle without reloading the account.
 type Account = {
   initials: string;
-  name: string;
-  role: string;
+  name: string | null;
+  appRole: AccountAccess["app_role"];
 };
 
 type AccountAccess = {
@@ -18,8 +21,8 @@ type AccountAccess = {
 
 const fallbackAccount: Account = {
   initials: "AU",
-  name: "Andima User",
-  role: "HRMS User",
+  name: null,
+  appRole: null,
 };
 
 function roleLabel(role: AccountAccess["app_role"], t: ReturnType<typeof useLanguage>["t"]) {
@@ -30,8 +33,10 @@ function roleLabel(role: AccountAccess["app_role"], t: ReturnType<typeof useLang
 }
 
 export default function HeaderAccount() {
-  const { language, t } = useLanguage();
-  const [account, setAccount] = useState<Account>(fallbackAccount);
+  const { t } = useLanguage();
+  // null while the session is read, so the header shows a skeleton instead of a
+  // placeholder name.
+  const [account, setAccount] = useState<Account | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -40,7 +45,11 @@ export default function HeaderAccount() {
       const supabase = createClient();
       const { data: userData } = await supabase.auth.getUser();
       const user = userData.user;
-      if (!user || !isMounted) return;
+      if (!isMounted) return;
+      if (!user) {
+        setAccount(fallbackAccount);
+        return;
+      }
 
       const { data: access } = await supabase
         .from("b2_register")
@@ -53,9 +62,9 @@ export default function HeaderAccount() {
       const metadataName = user.user_metadata?.full_name;
       const registeredName = typeof metadataName === "string" && metadataName.trim()
         ? metadataName.trim()
-        : user.email?.split("@")[0] ?? fallbackAccount.name;
+        : user.email?.split("@")[0] ?? null;
       const name = accountAccess?.full_name?.trim() || registeredName;
-      const initials = name
+      const initials = (name ?? "")
         .split(" ")
         .filter(Boolean)
         .map((part) => part[0])
@@ -64,27 +73,39 @@ export default function HeaderAccount() {
         .toUpperCase() || fallbackAccount.initials;
 
       if (isMounted) {
-        setAccount({ initials, name, role: roleLabel(accountAccess?.app_role ?? null, t) });
+        setAccount({ initials, name, appRole: accountAccess?.app_role ?? null });
       }
     }
 
-    void loadAccount();
+    // A failed lookup falls back to the generic label instead of a skeleton that never ends.
+    void loadAccount().catch(() => {
+      if (isMounted) setAccount((current) => current ?? fallbackAccount);
+    });
     return () => {
       isMounted = false;
     };
-  }, [language, t]);
+  }, []);
 
   return (
     <div className="flex items-center gap-2 sm:gap-3">
       <LanguageToggle />
       <div className="hidden items-center gap-2 border-l border-[#BCD4EE] pl-3 sm:flex">
-        <span className="grid size-8 place-items-center rounded-full border border-[#0C68D5]/25 bg-[#E6F1FF] text-xs font-bold text-[#0C68D5]">
-          {account.initials}
-        </span>
-        <div className="min-w-0 text-left">
-          <p className="max-w-40 truncate text-xs font-bold text-[#172033]">{account.name}</p>
-          <p className="text-[10px] text-[#4d5f81]">{account.role}</p>
-        </div>
+        {account ? (
+          <>
+            <span className="grid size-8 place-items-center rounded-full border border-[#0C68D5]/25 bg-[#E6F1FF] text-xs font-bold text-[#0C68D5]">
+              {account.initials}
+            </span>
+            <div className="min-w-0 text-left">
+              <p className="max-w-40 truncate text-xs font-bold text-[#172033]">{account.name ?? t("hrmsUser")}</p>
+              <p className="text-[10px] text-[#4d5f81]">{roleLabel(account.appRole, t)}</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <SkeletonBlock className="size-8 rounded-full" />
+            <div className="space-y-1.5"><SkeletonBlock className="h-3 w-24" /><SkeletonBlock className="h-2.5 w-14" /></div>
+          </>
+        )}
       </div>
     </div>
   );

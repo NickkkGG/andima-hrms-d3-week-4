@@ -6,6 +6,7 @@ import HrmsShell from "@/components/hrms/HrmsShell";
 import type { DepartmentOption, PositionOption } from "@/types/employee";
 import { canManageEmployeeProfiles, getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
+import { LocalizedText } from "@/components/i18n/LocalizedText";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const generateMetadata = () => pageMetadata("newEmployee");
@@ -25,7 +26,7 @@ export default async function NewEmployeePage() {
   if (!canManageEmployeeProfiles(userRole)) {
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <EmployeeManagementAccessDenied title="Add a New Employee" />
+        <EmployeeManagementAccessDenied title={<LocalizedText id="Tambah Pegawai Baru" en="Add a New Employee" />} />
       </HrmsShell>
     );
   }
@@ -52,10 +53,10 @@ export default async function NewEmployeePage() {
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">Add a New Employee</h1>
-          <p className="mt-2">Pilihan position atau department belum dapat dimuat. Silakan coba lagi nanti.</p>
+          <h1 className="text-xl font-bold"><LocalizedText id="Tambah Pegawai Baru" en="Add a New Employee" /></h1>
+          <p className="mt-2"><LocalizedText id="Pilihan posisi atau departemen belum dapat dimuat. Silakan coba lagi nanti." en="Position or department options could not be loaded. Please try again later." /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Kembali ke Daftar Pegawai
+            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
           </Link>
         </section>
       </HrmsShell>

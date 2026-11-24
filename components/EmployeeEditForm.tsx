@@ -294,7 +294,7 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
     <form className="space-y-6" onSubmit={handleSubmit} noValidate>
       <fieldset disabled={isSubmitting}>
         <section className="rounded-2xl border border-[#BCD4EE] bg-white p-5 shadow-[0_8px_24px_rgba(31,77,130,0.08)] sm:p-7">
-          <div className="flex flex-col gap-1 border-b border-[#D9E2FC] pb-5"><h2 className="text-xl font-extrabold tracking-tight text-[#121B2E]">{copy.basic}</h2><p className="text-sm text-slate-500">{copy.basicDescription}</p></div>
+          <div className="flex flex-col gap-1 border-b border-[#D9E2FC] pb-5"><h2 className="text-base font-bold text-[#121b2e]">{copy.basic}</h2><p className="text-sm text-slate-500">{copy.basicDescription}</p></div>
           <div className="mt-6 grid gap-x-6 gap-y-5 md:grid-cols-2">
             <label className="text-sm font-semibold text-[#121B2E]">
               {copy.name} <span className="text-[#E5484D]">*</span>
@@ -314,7 +314,7 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
               {focusedField === "fullName" && <ValidationChecklist id="employee-name-requirements" requirements={nameRequirements} />}
               {focusedField !== "fullName" && nameError && <span id="employee-name-error" className="mt-1 block text-xs font-normal text-red-600" role="alert">{nameError}</span>}
             </label>
-            <label className="text-sm font-semibold text-[#121B2E]">Employee ID<input className={fieldClassName(false)} value={employee.employee_id} disabled /><span className="mt-1 block text-xs font-normal text-slate-500">{copy.fromB2}</span></label>
+            <label className="text-sm font-semibold text-[#121B2E]">{language === "id" ? "ID Pegawai" : "Employee ID"}<input className={fieldClassName(false)} value={employee.employee_id} disabled /><span className="mt-1 block text-xs font-normal text-slate-500">{copy.fromB2}</span></label>
             <label className="text-sm font-semibold text-[#121B2E]">Email <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.email.trim()))} type="email" value={formData.email} onChange={(event) => updateField("email", event.target.value)} required /></label>
             <label className="text-sm font-semibold text-[#121B2E]">
               {copy.phone}
@@ -345,7 +345,7 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
           </div>
         </section>
         <section className="mt-6 rounded-2xl border border-[#BCD4EE] bg-white p-5 shadow-[0_8px_24px_rgba(31,77,130,0.08)] sm:p-7">
-          <div className="flex flex-col gap-1 border-b border-[#D9E2FC] pb-5"><h2 className="text-xl font-extrabold tracking-tight text-[#121B2E]">{copy.work}</h2><p className="text-sm text-slate-500">{copy.workDescription}</p></div>
+          <div className="flex flex-col gap-1 border-b border-[#D9E2FC] pb-5"><h2 className="text-base font-bold text-[#121b2e]">{copy.work}</h2><p className="text-sm text-slate-500">{copy.workDescription}</p></div>
           <div className="mt-6 grid gap-x-6 gap-y-5 md:grid-cols-2">
             <label className="text-sm font-semibold text-[#121B2E]">{copy.department} <span className="text-[#E5484D]">*</span><select className={fieldClassName(Boolean(errorMessage && !formData.departmentId))} value={formData.departmentId} onChange={(event) => { const departmentId = event.target.value; setFormData((current) => ({ ...current, departmentId, positionId: current.positionId && positions.find((position) => position.id === current.positionId)?.department_id === departmentId ? current.positionId : "" })); }} required><option value="">{copy.selectDepartment}</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name} ({department.code})</option>)}</select></label>
             <label className="text-sm font-semibold text-[#121B2E]">{copy.position} <span className="text-[#E5484D]">*</span><select className={fieldClassName(Boolean(errorMessage && !formData.positionId))} value={formData.positionId} onChange={(event) => updateField("positionId", event.target.value)} disabled={!formData.departmentId} required><option value="">{formData.departmentId ? copy.selectPosition : copy.chooseDepartment}</option>{availablePositions.map((position) => <option key={position.id} value={position.id}>{position.title} ({position.code})</option>)}</select></label>

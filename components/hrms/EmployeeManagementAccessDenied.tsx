@@ -5,7 +5,7 @@ import { ShieldAlert } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface EmployeeManagementAccessDeniedProps {
-  title: string;
+  title: React.ReactNode;
 }
 
 export default function EmployeeManagementAccessDenied({ title }: EmployeeManagementAccessDeniedProps) {

@@ -5,7 +5,7 @@ import HrmsShell from "@/components/hrms/HrmsShell";
 import type { EmployeeListItem } from "@/types/employee";
 import { getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
-import { getServerLanguage } from "@/lib/i18n-server";
+import { localizedCopy } from "@/lib/i18n-copy";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const generateMetadata = () => pageMetadata("employeeDirectory");
@@ -36,8 +36,7 @@ interface EmployeeReference {
 }
 
 export default async function EmployeesPage() {
-  const language = await getServerLanguage();
-  const copy = language === "id" ? { directory: "Direktori Pegawai", loadFailed: "Data pegawai belum dapat dimuat. Silakan coba lagi nanti.", eyebrow: "HRMS · Profil Pegawai", description: "Direktori pegawai yang telah tersinkronisasi dari registrasi B2.", active: "Aktif", syncHistory: "Riwayat sinkronisasi", open: "(buka untuk melihat)", noEmployees: "Belum ada data pegawai", noEmployeesDescription: "Pegawai dari registrasi B2 akan muncul di sini setelah tersedia.", employee: "Karyawan" } : { directory: "Employee Directory", loadFailed: "Employee data could not be loaded. Please try again later.", eyebrow: "HRMS · Employee Profile", description: "Employee directory synchronized from B2 registration.", active: "Active", syncHistory: "Synchronization history", open: "(open to view)", noEmployees: "No employee data yet", noEmployeesDescription: "Employees from B2 registration will appear here when available.", employee: "Employee" };
+  const copyText = { id: { directory: "Direktori Pegawai", loadFailed: "Data pegawai belum dapat dimuat. Silakan coba lagi nanti.", eyebrow: "HRMS · Profil Pegawai", description: "Direktori pegawai yang telah tersinkronisasi dari registrasi B2.", active: "Aktif", syncHistory: "Riwayat sinkronisasi", open: "(buka untuk melihat)", noEmployees: "Belum ada data pegawai", noEmployeesDescription: "Pegawai dari registrasi B2 akan muncul di sini setelah tersedia.", employee: "Karyawan" }, en: { directory: "Employee Directory", loadFailed: "Employee data could not be loaded. Please try again later.", eyebrow: "HRMS · Employee Profile", description: "Employee directory synchronized from B2 registration.", active: "Active", syncHistory: "Synchronization history", open: "(open to view)", noEmployees: "No employee data yet", noEmployeesDescription: "Employees from B2 registration will appear here when available.", employee: "Employee" } }; const copy = localizedCopy(copyText);
   const supabase = await createClient();
   const {
     data: { user },
@@ -130,15 +129,15 @@ export default async function EmployeesPage() {
     <HrmsShell userEmail={user.email} userRole={userRole}>
       <section className="mx-auto w-full max-w-[1240px]">
         <header className="mb-6 flex items-start justify-between gap-4">
-          <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#0C68D5]">{copy.eyebrow}</p><h1 className="mt-2 text-3xl font-bold tracking-[-0.04em] text-[#0B2548] sm:text-[34px]">{copy.directory}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[#4D5F81]">{copy.description}</p></div>
+          <div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#0C68D5]">{copy.eyebrow}</p><h1 className="mt-1 text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{copy.directory}</h1><p className="mt-1 max-w-2xl text-sm text-[#4d5f81]">{copy.description}</p></div>
         </header>
 
         <div className="flex min-h-[104px] items-center gap-4 rounded-2xl border border-[#BCD4EE] bg-white px-5 py-4 shadow-[0_10px_28px_rgba(31,77,130,0.08)] sm:px-6">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#0B2548] text-lg font-bold text-white shadow-[0_6px_16px_rgba(11,37,72,0.2)]">{profileInitials}</span>
-          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-xl font-bold leading-7 text-[#172033] sm:text-2xl">{profileName}</p><span className="rounded-full border border-[#54B98B]/45 bg-[#ECF9F1] px-2 py-0.5 text-[10px] font-bold text-[#187244]">{copy.active}</span></div><p className="mt-1 text-xs font-semibold text-[#0C68D5]">{profileRole}</p></div>
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#0B2548] text-base font-bold text-white shadow-[0_6px_16px_rgba(11,37,72,0.2)]">{profileInitials}</span>
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-base font-bold leading-6 text-[#121b2e]">{profileName}</p><span className="rounded-full border border-[#54B98B]/45 bg-[#ECF9F1] px-2 py-0.5 text-[10px] font-bold text-[#187244]">{copy.active}</span></div><p className="mt-1 text-xs font-semibold text-[#0C68D5]">{profileRole}</p></div>
         </div>
 
-        {userRole === "HR" && <details className="mt-5 rounded-2xl border border-[#BCD4EE] bg-white shadow-[0_8px_24px_rgba(31,77,130,0.06)]"><summary className="cursor-pointer list-none px-5 py-4 text-sm font-bold text-[#0B2548] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0C68D5]">{copy.syncHistory} <span className="ml-1 text-xs font-normal text-[#4D5F81]">{copy.open}</span></summary><div className="border-t border-[#E2ECF8] p-5"><EmployeeSyncHistory events={eventsResult.data ?? []} language={language} /></div></details>}
+        {userRole === "HR" && <details className="mt-5 rounded-2xl border border-[#BCD4EE] bg-white shadow-[0_8px_24px_rgba(31,77,130,0.06)]"><summary className="cursor-pointer list-none px-5 py-4 text-sm font-bold text-[#0B2548] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0C68D5]">{copy.syncHistory} <span className="ml-1 text-xs font-normal text-[#4D5F81]">{copy.open}</span></summary><div className="border-t border-[#E2ECF8] p-5"><EmployeeSyncHistory events={eventsResult.data ?? []} /></div></details>}
 
         {employees.length === 0 ? (
           <div className="mt-5 rounded-2xl border border-dashed border-[#BCD4EE] bg-white p-8 text-center text-slate-600 shadow-[0_8px_24px_rgba(31,77,130,0.06)]">

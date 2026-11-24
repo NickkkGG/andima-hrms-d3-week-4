@@ -29,7 +29,7 @@ export default function EmployeeDirectoryVisibilityButton({
 
     const result = await setEmployeeDirectoryVisibility(employeeUuid, !isHidden);
     setIsSubmitting(false);
-    setMessage(result.message);
+    setMessage(result.message[language]);
 
     if (result.ok) {
       setIsHidden(!isHidden);

@@ -13,7 +13,8 @@ import type {
 } from "@/types/employee";
 import { canManageEmployeeProfiles, getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
-import { getServerLanguage } from "@/lib/i18n-server";
+import { LocalizedText } from "@/components/i18n/LocalizedText";
+import { bilingual, localizedCopy } from "@/lib/i18n-copy";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const generateMetadata = () => pageMetadata("employeeProfile");
@@ -91,16 +92,16 @@ function initials(fullName: string) {
     .join("") || "EP";
 }
 
-function ProfileSection({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
+function ProfileSection({ title, children, className = "" }: { title: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
     <section className={`rounded-[10px] border border-[rgba(87,138,252,0.22)] bg-white p-5 shadow-[3px_3px_16px_rgba(87,138,252,0.16)] sm:p-6 ${className}`}>
-      <h2 className="text-lg font-bold tracking-tight text-[#121B2E]">{title}</h2>
+      <h2 className="text-base font-bold text-[#121b2e]">{title}</h2>
       <div className="mt-5">{children}</div>
     </section>
   );
 }
 
-function EmptyState({ children = "Belum tersedia" }: { children?: React.ReactNode }) {
+function EmptyState({ children = <LocalizedText id="Belum tersedia" en="Not available" /> }: { children?: React.ReactNode }) {
   return <div className="flex items-center gap-3 rounded-lg border border-dashed border-[#D9E2FC] bg-[#F7F9FC] px-4 py-4 text-sm text-slate-500"><span className="flex size-8 items-center justify-center rounded-full bg-[#EEF4FF] text-[#155DFC]" aria-hidden="true">○</span><span>{children}</span></div>;
 }
 
@@ -113,8 +114,7 @@ function logRelatedQueryError(source: string, error: { code: string; message: st
 }
 
 export default async function EmployeeProfilePage({ params }: EmployeeProfilePageProps) {
-  const language = await getServerLanguage();
-  const copy = language === "id" ? { directory: "← Direktori pegawai", profile: "Profil pegawai", edit: "Edit profil", status: "Ubah status", unavailable: "Belum tersedia", joined: "Bergabung", tenure: "Masa kerja", connected: "Data kehadiran, sertifikasi, umpan balik, dan reward terhubung melalui ID Pegawai ini.", contact: "Informasi kontak", phone: "Telepon", location: "Lokasi kerja", identity: "Identitas", skills: "Keahlian & kompetensi", noSkills: "Belum ada data keahlian atau kompetensi.", certifications: "Sertifikasi", noCertifications: "Belum ada data sertifikasi.", issued: "Diterbitkan", expires: "Berakhir", credential: "ID kredensial", attendance: "Kehadiran", noAttendance: "Belum ada data kehadiran.", present: "Hadir", late: "Terlambat", absent: "Tidak hadir", feedback: "Umpan balik & reward", noFeedback: "Belum ada data umpan balik atau reward." } : { directory: "← Employee directory", profile: "Employee profile", edit: "Edit profile", status: "Change status", unavailable: "Not available", joined: "Joined", tenure: "Tenure", connected: "Attendance, certifications, feedback, and rewards are linked through this Employee ID.", contact: "Contact information", phone: "Phone", location: "Work location", identity: "Identity", skills: "Skills & competencies", noSkills: "No skill or competency data yet.", certifications: "Certifications", noCertifications: "No certification data yet.", issued: "Issued", expires: "Expires", credential: "Credential ID", attendance: "Attendance", noAttendance: "No attendance data yet.", present: "Present", late: "Late", absent: "Absent", feedback: "Feedback & reward", noFeedback: "No feedback or reward data yet." };
+  const copyText = { id: { directory: "← Direktori pegawai", profile: "Profil pegawai", edit: "Edit profil", status: "Ubah status", unavailable: "Belum tersedia", joined: "Bergabung", tenure: "Masa kerja", connected: "Data kehadiran, sertifikasi, umpan balik, dan reward terhubung melalui ID Pegawai ini.", contact: "Informasi kontak", phone: "Telepon", location: "Lokasi kerja", identity: "Identitas", skills: "Keahlian & kompetensi", noSkills: "Belum ada data keahlian atau kompetensi.", certifications: "Sertifikasi", noCertifications: "Belum ada data sertifikasi.", issued: "Diterbitkan", expires: "Berakhir", credential: "ID kredensial", attendance: "Kehadiran", noAttendance: "Belum ada data kehadiran.", present: "Hadir", late: "Terlambat", absent: "Tidak hadir", feedback: "Umpan balik & reward", noFeedback: "Belum ada data umpan balik atau reward." }, en: { directory: "← Employee directory", profile: "Employee profile", edit: "Edit profile", status: "Change status", unavailable: "Not available", joined: "Joined", tenure: "Tenure", connected: "Attendance, certifications, feedback, and rewards are linked through this Employee ID.", contact: "Contact information", phone: "Phone", location: "Work location", identity: "Identity", skills: "Skills & competencies", noSkills: "No skill or competency data yet.", certifications: "Certifications", noCertifications: "No certification data yet.", issued: "Issued", expires: "Expires", credential: "Credential ID", attendance: "Attendance", noAttendance: "No attendance data yet.", present: "Present", late: "Late", absent: "Absent", feedback: "Feedback & reward", noFeedback: "No feedback or reward data yet." } }; const copy = localizedCopy(copyText);
   const { employeeId } = await params;
   const supabase = await createClient();
   const {
@@ -145,10 +145,10 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-7xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">Employee Profile</h1>
-          <p className="mt-2">Profil pegawai belum dapat dimuat. Silakan coba lagi nanti.</p>
+          <h1 className="text-xl font-bold"><LocalizedText id="Profil Pegawai" en="Employee Profile" /></h1>
+          <p className="mt-2"><LocalizedText id="Profil pegawai belum dapat dimuat. Silakan coba lagi nanti." en="The employee profile could not be loaded. Please try again later." /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Employee Directory
+            <LocalizedText id="← Direktori pegawai" en="← Employee directory" />
           </Link>
         </section>
       </HrmsShell>
@@ -177,10 +177,10 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-7xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">Employee Profile</h1>
-          <p className="mt-2">Sumber data employee belum dapat diverifikasi. Silakan coba lagi nanti.</p>
+          <h1 className="text-xl font-bold"><LocalizedText id="Profil Pegawai" en="Employee Profile" /></h1>
+          <p className="mt-2"><LocalizedText id="Sumber data pegawai belum dapat diverifikasi. Silakan coba lagi nanti." en="The employee data source could not be verified. Please try again later." /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Employee Directory
+            <LocalizedText id="← Direktori pegawai" en="← Employee directory" />
           </Link>
         </section>
       </HrmsShell>
@@ -283,7 +283,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
   const certifications = certificationsResult.data ?? [];
   const attendances = attendancesResult.data ?? [];
   const feedbackRewards = feedbackRewardsResult.data ?? [];
-  const tenure = formatTenure(employee.tenure_years, employee.tenure_months, employee.join_date, language);
+  const tenure = bilingual((lang) => formatTenure(employee.tenure_years, employee.tenure_months, employee.join_date, lang));
   const attendanceSummary = attendances.reduce(
     (summary, attendance) => {
       const status = attendance.status?.toUpperCase() ?? "";
@@ -301,7 +301,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <Link className="text-sm font-semibold text-[#1E3765] transition hover:text-[#155DFC]" href="/employees">{copy.directory}</Link>
-            <h1 className="mt-4 text-4xl font-extrabold tracking-[-0.04em] text-[#121B2E] sm:text-[42px]">{copy.profile}</h1>
+            <h1 className="mt-2 text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{copy.profile}</h1>
           </div>
           {canManageEmployees && (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
@@ -319,14 +319,14 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
         <header className="rounded-[10px] border border-[rgba(87,138,252,0.3)] bg-white p-6 shadow-[3px_3px_20px_rgba(87,138,252,0.5)] sm:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
-              <span className="flex size-[90px] shrink-0 items-center justify-center rounded-full bg-[#1E3765] text-3xl font-extrabold tracking-tight text-white shadow-[0_0_0_8px_rgba(87,138,252,0.16)]">{initials(employee.full_name)}</span>
+              <span className="flex size-[90px] shrink-0 items-center justify-center rounded-full bg-[#1E3765] text-2xl font-bold tracking-tight text-white shadow-[0_0_0_8px_rgba(87,138,252,0.16)]">{initials(employee.full_name)}</span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-3xl font-extrabold tracking-[-0.04em] text-[#121B2E] sm:text-[38px]">{employee.full_name}</h2>
+                  <h2 className="text-xl font-bold tracking-[-0.3px] text-[#121b2e]">{employee.full_name}</h2>
                   <HrmsStatusPill value={employee.employment_status} />
                 </div>
                 <p className="mt-2 text-base font-medium text-[#1E3765]">{[employee.position_title, employee.department_name, employee.work_location].filter(Boolean).join(" · ") || copy.unavailable}</p>
-                <p className="mt-3 text-sm font-semibold text-[#121B2E]">ID {employee.employee_id} <span className="px-1.5 text-[#577CFC]">·</span> {copy.joined} {formatDate(employee.join_date, language)} <span className="px-1.5 text-[#577CFC]">·</span> {copy.tenure} {tenure}</p>
+                <p className="mt-3 text-sm font-semibold text-[#121B2E]">ID {employee.employee_id} <span className="px-1.5 text-[#577CFC]">·</span> {copy.joined} {bilingual((lang) => formatDate(employee.join_date, lang))} <span className="px-1.5 text-[#577CFC]">·</span> {copy.tenure} {tenure}</p>
                 <p className="mt-4 flex max-w-2xl items-start gap-2 rounded-lg border border-[#D9E2FC] bg-[#F5F8FF] px-3 py-2 text-xs leading-5 text-[#1E3765]">
                   <Link2 className="mt-0.5 size-4 shrink-0 text-[#155DFC]" aria-hidden="true" />
                   {copy.connected}
@@ -339,9 +339,9 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
         <div className="grid gap-5 lg:grid-cols-2 xl:gap-6">
           <ProfileSection title={copy.contact}>
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-              <div className="flex items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#155DFC]/10 text-[#155DFC]"><Mail className="size-4" aria-hidden="true" /></span><div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Email</dt><dd className="mt-0.5 break-all text-sm font-semibold text-[#121B2E]">{displayValue(employee.email, language)}</dd></div></div>
-              <div className="flex items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#155DFC]/10 text-[#155DFC]"><Phone className="size-4" aria-hidden="true" /></span><div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{copy.phone}</dt><dd className="mt-0.5 text-sm font-semibold text-[#121B2E]">{displayValue(employee.phone, language)}</dd></div></div>
-              <div className="flex items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#155DFC]/10 text-[#155DFC]"><MapPin className="size-4" aria-hidden="true" /></span><div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{copy.location}</dt><dd className="mt-0.5 text-sm font-semibold text-[#121B2E]">{displayValue(employee.work_location, language)}</dd></div></div>
+              <div className="flex items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#155DFC]/10 text-[#155DFC]"><Mail className="size-4" aria-hidden="true" /></span><div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">Email</dt><dd className="mt-0.5 break-all text-sm font-semibold text-[#121B2E]">{bilingual((lang) => displayValue(employee.email, lang))}</dd></div></div>
+              <div className="flex items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#155DFC]/10 text-[#155DFC]"><Phone className="size-4" aria-hidden="true" /></span><div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{copy.phone}</dt><dd className="mt-0.5 text-sm font-semibold text-[#121B2E]">{bilingual((lang) => displayValue(employee.phone, lang))}</dd></div></div>
+              <div className="flex items-center gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#155DFC]/10 text-[#155DFC]"><MapPin className="size-4" aria-hidden="true" /></span><div className="min-w-0"><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{copy.location}</dt><dd className="mt-0.5 text-sm font-semibold text-[#121B2E]">{bilingual((lang) => displayValue(employee.work_location, lang))}</dd></div></div>
               <div><dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{copy.identity}</dt><dd className="mt-0.5 text-sm font-semibold text-[#121B2E]">{[employee.identity_type, employee.identity_number].filter(Boolean).join(" · ") || copy.unavailable}</dd></div>
             </dl>
           </ProfileSection>
@@ -351,7 +351,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
               <div className="flex flex-wrap gap-2">
                 {skills.map((skill) => (
                   <span className="inline-flex max-w-full items-center rounded-full border border-[#577CFC]/45 bg-[#155DFC]/10 px-3 py-1.5 text-xs font-bold text-[#1E3765]" key={skill.competency_id} title={skill.evidence_notes || undefined}>
-                    <span className="truncate">{displayValue(skill.competencies?.name ?? null, language)}</span>{skill.proficiency_level && <span className="ml-1.5 shrink-0 border-l border-[#577CFC]/40 pl-1.5 text-[10px] font-semibold text-[#577CFC]">{skill.proficiency_level}</span>}
+                    <span className="truncate">{bilingual((lang) => displayValue(skill.competencies?.name ?? null, lang))}</span>{skill.proficiency_level && <span className="ml-1.5 shrink-0 border-l border-[#577CFC]/40 pl-1.5 text-[10px] font-semibold text-[#577CFC]">{skill.proficiency_level}</span>}
                   </span>
                 ))}
               </div>
@@ -363,7 +363,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
               <div className="space-y-3">
                 {certifications.map((certification, index) => (
                   <article className="flex flex-col gap-3 border-b border-[#D9E2FC] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between" key={`${certification.credential_id ?? certification.title ?? "certification"}-${index}`}>
-                    <div className="min-w-0"><h3 className="text-sm font-bold text-[#121B2E]">{displayValue(certification.title, language)}</h3><p className="mt-1 text-xs font-medium text-[#1E3765]">{displayValue(certification.issuing_organization, language)}</p><p className="mt-2 text-xs leading-5 text-slate-500">{copy.issued} {formatDate(certification.issue_date, language)} · {copy.expires} {formatDate(certification.expiry_date, language)}</p>{certification.credential_id && <p className="mt-1 text-[11px] text-slate-500">{copy.credential}: {certification.credential_id}</p>}</div>
+                    <div className="min-w-0"><h3 className="text-sm font-bold text-[#121B2E]">{bilingual((lang) => displayValue(certification.title, lang))}</h3><p className="mt-1 text-xs font-medium text-[#1E3765]">{bilingual((lang) => displayValue(certification.issuing_organization, lang))}</p><p className="mt-2 text-xs leading-5 text-slate-500">{copy.issued} {bilingual((lang) => formatDate(certification.issue_date, lang))} · {copy.expires} {bilingual((lang) => formatDate(certification.expiry_date, lang))}</p>{certification.credential_id && <p className="mt-1 text-[11px] text-slate-500">{copy.credential}: {certification.credential_id}</p>}</div>
                     <HrmsStatusPill value={certification.status} />
                   </article>
                 ))}
@@ -373,7 +373,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
 
           <ProfileSection title={copy.attendance}>
             {attendances.length === 0 ? <EmptyState>{copy.noAttendance}</EmptyState> : (
-              <><div className="grid grid-cols-3 gap-3 text-center"><div className="rounded-lg border border-emerald-500/20 bg-emerald-50/60 px-2 py-3"><p className="text-2xl font-extrabold text-emerald-700">{attendanceSummary.present}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">{copy.present}</p></div><div className="rounded-lg border border-amber-500/20 bg-amber-50/60 px-2 py-3"><p className="text-2xl font-extrabold text-amber-700">{attendanceSummary.late}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">{copy.late}</p></div><div className="rounded-lg border border-rose-500/20 bg-rose-50/60 px-2 py-3"><p className="text-2xl font-extrabold text-rose-700">{attendanceSummary.absent}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-rose-700">{copy.absent}</p></div></div><div className="mt-5 space-y-2 border-t border-[#D9E2FC] pt-4">{attendances.map((attendance, index) => (<article className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[#F5F8FF] px-3 py-2.5" key={`${attendance.date ?? "attendance"}-${index}`}><div><p className="text-xs font-bold text-[#121B2E]">{formatDate(attendance.date, language)}</p><p className="mt-0.5 text-[11px] text-slate-500">{formatTime(attendance.clock_in, language)} – {formatTime(attendance.clock_out, language)}{attendance.notes ? ` · ${attendance.notes}` : ""}</p></div><HrmsStatusPill value={attendance.status} /></article>))}</div></>
+              <><div className="grid grid-cols-3 gap-3 text-center"><div className="rounded-lg border border-emerald-500/20 bg-emerald-50/60 px-2 py-3"><p className="text-2xl font-bold text-emerald-700">{attendanceSummary.present}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">{copy.present}</p></div><div className="rounded-lg border border-amber-500/20 bg-amber-50/60 px-2 py-3"><p className="text-2xl font-bold text-amber-700">{attendanceSummary.late}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">{copy.late}</p></div><div className="rounded-lg border border-rose-500/20 bg-rose-50/60 px-2 py-3"><p className="text-2xl font-bold text-rose-700">{attendanceSummary.absent}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-rose-700">{copy.absent}</p></div></div><div className="mt-5 space-y-2 border-t border-[#D9E2FC] pt-4">{attendances.map((attendance, index) => (<article className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[#F5F8FF] px-3 py-2.5" key={`${attendance.date ?? "attendance"}-${index}`}><div><p className="text-xs font-bold text-[#121B2E]">{bilingual((lang) => formatDate(attendance.date, lang))}</p><p className="mt-0.5 text-[11px] text-slate-500">{bilingual((lang) => formatTime(attendance.clock_in, lang))} – {bilingual((lang) => formatTime(attendance.clock_out, lang))}{attendance.notes ? ` · ${attendance.notes}` : ""}</p></div><HrmsStatusPill value={attendance.status} /></article>))}</div></>
             )}
           </ProfileSection>
 
@@ -381,7 +381,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
             {feedbackRewards.length === 0 ? <EmptyState>{copy.noFeedback}</EmptyState> : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {feedbackRewards.map((feedbackReward, index) => (
-                  <article className="rounded-lg border border-[#D9E2FC] bg-[#F5F8FF]/70 p-4" key={`${feedbackReward.created_at ?? "feedback"}-${index}`}><div className="flex items-start justify-between gap-3"><p className="text-sm font-bold text-[#121B2E]">{displayValue(feedbackReward.title, language)}</p><span className="shrink-0 rounded-full border border-[#577CFC]/35 bg-white px-2 py-1 text-[10px] font-bold text-[#1E3765]">{feedbackReward.points === null ? "—" : `${feedbackReward.points} pts`}</span></div><p className="mt-1 text-[11px] font-semibold text-[#577CFC]">{[feedbackReward.type, feedbackReward.category].filter(Boolean).join(" · ") || "Feedback"}</p>{feedbackReward.message && <p className="mt-2 text-sm leading-5 text-slate-600">{feedbackReward.message}</p>}</article>
+                  <article className="rounded-lg border border-[#D9E2FC] bg-[#F5F8FF]/70 p-4" key={`${feedbackReward.created_at ?? "feedback"}-${index}`}><div className="flex items-start justify-between gap-3"><p className="text-sm font-bold text-[#121B2E]">{bilingual((lang) => displayValue(feedbackReward.title, lang))}</p><span className="shrink-0 rounded-full border border-[#577CFC]/35 bg-white px-2 py-1 text-[10px] font-bold text-[#1E3765]">{feedbackReward.points === null ? "—" : `${feedbackReward.points} pts`}</span></div><p className="mt-1 text-[11px] font-semibold text-[#577CFC]">{[feedbackReward.type, feedbackReward.category].filter(Boolean).join(" · ") || "Feedback"}</p>{feedbackReward.message && <p className="mt-2 text-sm leading-5 text-slate-600">{feedbackReward.message}</p>}</article>
                 ))}
               </div>
             )}

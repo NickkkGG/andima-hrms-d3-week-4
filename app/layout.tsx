@@ -3,6 +3,7 @@ import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "@fontsource-variable/inter";
 import "@fontsource/poppins/600.css";
+import "@fontsource/poppins/700.css";
 import AppShell from "@/components/AppShell";
 import { LanguageProvider } from "@/components/i18n/LanguageProvider";
 import { getServerLanguage } from "@/lib/i18n-server";

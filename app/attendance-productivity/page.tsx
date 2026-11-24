@@ -9,10 +9,10 @@ import {
   TrendingUp,
   ChevronRight,
   Search,
-  RefreshCw,
   AlertCircle,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import { SkeletonBlock, SkeletonTable } from "@/components/hrms/Skeleton";
 import HeaderAccount from "@/components/HeaderAccount";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import LocationMapPreview from "@/components/attendance/LocationMapPreview";
@@ -89,9 +89,9 @@ export default function AttendanceProductivityPage() {
   const { t, language } = useLanguage();
   const locale = language === "id" ? "id-ID" : "en-GB";
   const copy = language === "id" ? {
-    restricted: "Fitur ini hanya dapat diakses oleh HR atau Manajer.", accessRequired: "Akses dashboard memerlukan akun HRMS yang telah dipetakan ke data karyawan.", loadFailed: "Data kehadiran belum dapat dimuat. Coba kembali atau hubungi HR Admin.", connectionFailed: "Terjadi kesalahan saat menghubungkan ke Supabase.", sessionMissing: "Sesi login tidak ditemukan. Silakan login kembali.", accountMissing: "Akun belum dipetakan ke role HRMS. Hubungi HR Admin.", productivityRestricted: "Fitur Presensi & Produktivitas hanya dapat diakses oleh HR atau Manajer.", employee: "Karyawan", title: "Presensi & Produktivitas", description: "Pantau ringkasan kehadiran dan informasi produktivitas karyawan", from: "Dari", until: "Sampai", search: "Cari nama, NIP, departemen...", totalData: "Total data", attendanceRecords: "Catatan kehadiran", present: "Hadir", attendanceRecorded: "Kehadiran tercatat", underSeven: "Di bawah 7 jam", durationBelow: "Durasi belum memenuhi minimum", absent: "Tidak hadir", noAttendance: "Tidak ada kehadiran", leave: "Izin / cuti", leaveData: "Data izin atau cuti", workTrend: "Tren jam kerja", averageDaily: "Rata-rata jam kerja per hari", followsDate: "Periode mengikuti filter tanggal di atas.", noWorkHours: "Belum ada data jam kerja untuk periode ini.", productivityComparison: "Perbandingan produktivitas", averagePerEmployee: "Rata-rata per karyawan", sortedAverage: "Diurutkan berdasarkan jam kerja rata-rata.", noData: "Belum ada data.", history: "Riwayat kehadiran", found: "data ditemukan pada periode terpilih", loading: "Memuat data dari Supabase...", unavailable: "Data kehadiran belum tersedia", noResults: "Tidak terdapat data pada periode atau pencarian yang dipilih.", date: "Tanggal", status: "Status", clock: "Clock in / out", workHours: "Jam kerja", in: "Masuk", out: "Pulang", attendanceDetail: "Detail kehadiran", notAvailable: "Tidak tersedia", notYetAvailable: "Belum tersedia", productivityInfo: "Informasi produktivitas", flexibleDuration: "Penilaian durasi fleksibel: presensi memenuhi target jika total jam kerja minimal 7 jam.", meetsSeven: "MEMENUHI 7 JAM", belowSeven: "DI BAWAH 7 JAM", information: "Informasi", disclaimer: "Data presensi digunakan sebagai informasi monitoring dan tidak digunakan untuk menyimpulkan performa karyawan.", loadingData: "Memuat data kehadiran karyawan dari Supabase...", noDataTitle: "Tidak ada data presensi", noDataDescription: "Tidak ada data yang cocok dengan kriteria filter atau pencarian Anda.",
+    clockInLabel: "Jam masuk", clockOutLabel: "Jam pulang", restricted: "Fitur ini hanya dapat diakses oleh HR atau Manajer.", accessRequired: "Akses dashboard memerlukan akun HRMS yang telah dipetakan ke data karyawan.", loadFailed: "Data kehadiran belum dapat dimuat. Coba kembali atau hubungi HR Admin.", connectionFailed: "Terjadi kesalahan saat menghubungkan ke Supabase.", sessionMissing: "Sesi login tidak ditemukan. Silakan login kembali.", accountMissing: "Akun belum dipetakan ke role HRMS. Hubungi HR Admin.", productivityRestricted: "Fitur Presensi & Produktivitas hanya dapat diakses oleh HR atau Manajer.", employee: "Karyawan", title: "Presensi & Produktivitas", description: "Pantau ringkasan kehadiran dan informasi produktivitas karyawan", from: "Dari", until: "Sampai", search: "Cari nama, NIP, departemen...", totalData: "Total data", attendanceRecords: "Catatan kehadiran", present: "Hadir", attendanceRecorded: "Kehadiran tercatat", underSeven: "Di bawah 7 jam", durationBelow: "Durasi belum memenuhi minimum", absent: "Tidak hadir", noAttendance: "Tidak ada kehadiran", leave: "Izin / cuti", leaveData: "Data izin atau cuti", workTrend: "Tren jam kerja", averageDaily: "Rata-rata jam kerja per hari", followsDate: "Periode mengikuti filter tanggal di atas.", noWorkHours: "Belum ada data jam kerja untuk periode ini.", productivityComparison: "Perbandingan produktivitas", averagePerEmployee: "Rata-rata per karyawan", sortedAverage: "Diurutkan berdasarkan jam kerja rata-rata.", noData: "Belum ada data.", history: "Riwayat kehadiran", found: "data ditemukan pada periode terpilih", loading: "Memuat data dari Supabase...", unavailable: "Data kehadiran belum tersedia", noResults: "Tidak terdapat data pada periode atau pencarian yang dipilih.", date: "Tanggal", status: "Status", clock: "Clock in / out", workHours: "Jam kerja", in: "Masuk", out: "Pulang", attendanceDetail: "Detail kehadiran", notAvailable: "Tidak tersedia", notYetAvailable: "Belum tersedia", productivityInfo: "Informasi produktivitas", flexibleDuration: "Penilaian durasi fleksibel: presensi memenuhi target jika total jam kerja minimal 7 jam.", meetsSeven: "MEMENUHI 7 JAM", belowSeven: "DI BAWAH 7 JAM", information: "Informasi", disclaimer: "Data presensi digunakan sebagai informasi monitoring dan tidak digunakan untuk menyimpulkan performa karyawan.", loadingData: "Memuat data kehadiran karyawan dari Supabase...", noDataTitle: "Tidak ada data presensi", noDataDescription: "Tidak ada data yang cocok dengan kriteria filter atau pencarian Anda.",
   } : {
-    restricted: "This feature is only available to HR or Managers.", accessRequired: "This dashboard requires an HRMS account mapped to employee data.", loadFailed: "Attendance data could not be loaded. Please try again or contact an HR Admin.", connectionFailed: "An error occurred while connecting to Supabase.", sessionMissing: "No login session was found. Please sign in again.", accountMissing: "This account has not been mapped to an HRMS role. Contact an HR Admin.", productivityRestricted: "Attendance & Productivity is only available to HR or Managers.", employee: "Employee", title: "Attendance & Productivity", description: "Monitor employee attendance summaries and productivity information", from: "From", until: "To", search: "Search by name, employee ID, or department...", totalData: "Total data", attendanceRecords: "Attendance records", present: "Present", attendanceRecorded: "Recorded attendance", underSeven: "Under 7 hours", durationBelow: "Duration below the minimum", absent: "Absent", noAttendance: "No attendance", leave: "Leave", leaveData: "Leave records", workTrend: "Work-hour trend", averageDaily: "Average work hours per day", followsDate: "The period follows the selected date filter.", noWorkHours: "No work-hour data for this period.", productivityComparison: "Productivity comparison", averagePerEmployee: "Average per employee", sortedAverage: "Sorted by average work hours.", noData: "No data yet.", history: "Attendance history", found: "records found for the selected period", loading: "Loading data from Supabase...", unavailable: "Attendance data is not available yet", noResults: "There is no data for the selected period or search.", date: "Date", status: "Status", clock: "Clock in / out", workHours: "Work hours", in: "In", out: "Out", attendanceDetail: "Attendance details", notAvailable: "Not available", notYetAvailable: "Not available yet", productivityInfo: "Productivity information", flexibleDuration: "Flexible duration assessment: attendance meets the target when total work hours reach at least seven hours.", meetsSeven: "MEETS 7 HOURS", belowSeven: "UNDER 7 HOURS", information: "Information", disclaimer: "Attendance data is used for monitoring information and is not used to conclude employee performance.", loadingData: "Loading employee attendance data from Supabase...", noDataTitle: "No attendance data", noDataDescription: "No data matches your current filter or search.",
+    clockInLabel: "Clock in", clockOutLabel: "Clock out", restricted: "This feature is only available to HR or Managers.", accessRequired: "This dashboard requires an HRMS account mapped to employee data.", loadFailed: "Attendance data could not be loaded. Please try again or contact an HR Admin.", connectionFailed: "An error occurred while connecting to Supabase.", sessionMissing: "No login session was found. Please sign in again.", accountMissing: "This account has not been mapped to an HRMS role. Contact an HR Admin.", productivityRestricted: "Attendance & Productivity is only available to HR or Managers.", employee: "Employee", title: "Attendance & Productivity", description: "Monitor employee attendance summaries and productivity information", from: "From", until: "To", search: "Search by name, employee ID, or department...", totalData: "Total data", attendanceRecords: "Attendance records", present: "Present", attendanceRecorded: "Recorded attendance", underSeven: "Under 7 hours", durationBelow: "Duration below the minimum", absent: "Absent", noAttendance: "No attendance", leave: "Leave", leaveData: "Leave records", workTrend: "Work-hour trend", averageDaily: "Average work hours per day", followsDate: "The period follows the selected date filter.", noWorkHours: "No work-hour data for this period.", productivityComparison: "Productivity comparison", averagePerEmployee: "Average per employee", sortedAverage: "Sorted by average work hours.", noData: "No data yet.", history: "Attendance history", found: "records found for the selected period", loading: "Loading data from Supabase...", unavailable: "Attendance data is not available yet", noResults: "There is no data for the selected period or search.", date: "Date", status: "Status", clock: "Clock in / out", workHours: "Work hours", in: "In", out: "Out", attendanceDetail: "Attendance details", notAvailable: "Not available", notYetAvailable: "Not available yet", productivityInfo: "Productivity information", flexibleDuration: "Flexible duration assessment: attendance meets the target when total work hours reach at least seven hours.", meetsSeven: "MEETS 7 HOURS", belowSeven: "UNDER 7 HOURS", information: "Information", disclaimer: "Attendance data is used for monitoring information and is not used to conclude employee performance.", loadingData: "Loading employee attendance data from Supabase...", noDataTitle: "No attendance data", noDataDescription: "No data matches your current filter or search.",
   };
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
   const [selectedItem, setSelectedItem] = useState<AttendanceRecord | null>(null);
@@ -506,7 +506,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#121b2e]">
-                  {loading ? "..." : filteredData.length}
+                  {loading ? <SkeletonBlock className="h-7 w-12" /> : filteredData.length}
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
@@ -529,7 +529,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#16834b]">
-                  {loading ? "..." : summary.present}
+                  {loading ? <SkeletonBlock className="h-7 w-12" /> : summary.present}
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
@@ -552,7 +552,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#b7791f]">
-                  {loading ? "..." : summary.underMinimum}
+                  {loading ? <SkeletonBlock className="h-7 w-12" /> : summary.underMinimum}
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
@@ -575,7 +575,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#d64545]">
-                  {loading ? "..." : summary.absent}
+                  {loading ? <SkeletonBlock className="h-7 w-12" /> : summary.absent}
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
@@ -598,7 +598,7 @@ export default function AttendanceProductivityPage() {
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-[#1971c2]">
-                  {loading ? "..." : summary.leave}
+                  {loading ? <SkeletonBlock className="h-7 w-12" /> : summary.leave}
                 </p>
 
                 <p className="mt-1 text-[10px] text-[#4d5f81]">
@@ -644,10 +644,7 @@ export default function AttendanceProductivityPage() {
             </div>
 
             {loading ? (
-              <div className="flex min-h-[250px] items-center justify-center p-6 text-xs text-[#4d5f81]">
-                <RefreshCw size={18} className="mr-2 animate-spin text-[#006838]" />
-                <span>{copy.loading}</span>
-              </div>
+              <SkeletonTable rows={8} columns={6} />
             ) : filteredData.length === 0 ? (
               <div className="flex min-h-[250px] items-center justify-center p-6 text-center">
                 <div>
@@ -791,7 +788,7 @@ export default function AttendanceProductivityPage() {
                 />
 
                 <DetailRow
-                  label="Clock In"
+                  label={copy.clockInLabel}
                   value={
                     selectedItem.clock_in
                       ? `${selectedItem.clock_in} WIB`
@@ -800,7 +797,7 @@ export default function AttendanceProductivityPage() {
                 />
 
                 <DetailRow
-                  label="Clock Out"
+                  label={copy.clockOutLabel}
                   value={
                     selectedItem.clock_out
                       ? `${selectedItem.clock_out} WIB`

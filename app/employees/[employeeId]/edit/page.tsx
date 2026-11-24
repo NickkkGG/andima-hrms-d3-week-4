@@ -6,7 +6,8 @@ import HrmsShell from "@/components/hrms/HrmsShell";
 import type { DepartmentOption, EmployeeProfile, PositionOption } from "@/types/employee";
 import { canManageEmployeeProfiles, getD3AppRole } from "@/utils/employee-access";
 import { createClient } from "@/utils/supabase/server";
-import { getServerLanguage } from "@/lib/i18n-server";
+import { LocalizedText } from "@/components/i18n/LocalizedText";
+import { localizedCopy } from "@/lib/i18n-copy";
 import { pageMetadata } from "@/lib/page-metadata";
 
 export const generateMetadata = () => pageMetadata("editEmployeeProfile");
@@ -41,8 +42,7 @@ interface D3MirrorProvisionResult {
 }
 
 export default async function EditEmployeePage({ params }: EditEmployeePageProps) {
-  const language = await getServerLanguage();
-  const copy = language === "id" ? { title: "Edit profil pegawai", back: "← Profil pegawai", eyebrow: "MANAJEMEN PEGAWAI", description: (name: string) => `Perbarui informasi profil untuk ${name}.` } : { title: "Edit employee profile", back: "← Employee profile", eyebrow: "EMPLOYEE MANAGEMENT", description: (name: string) => `Update profile information for ${name}.` };
+  const copy = localizedCopy({ id: { title: "Edit profil pegawai", back: "← Profil pegawai", eyebrow: "MANAJEMEN PEGAWAI" }, en: { title: "Edit employee profile", back: "← Employee profile", eyebrow: "EMPLOYEE MANAGEMENT" } });
   const { employeeId } = await params;
   const supabase = await createClient();
   const {
@@ -80,10 +80,10 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">Edit Profil Pegawai</h1>
-          <p className="mt-2">Profil pegawai belum dapat dimuat. Silakan coba lagi nanti.</p>
+          <h1 className="text-xl font-bold">{copy.title}</h1>
+          <p className="mt-2"><LocalizedText id="Profil pegawai belum dapat dimuat. Silakan coba lagi nanti." en="The employee profile could not be loaded. Please try again later." /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Kembali ke Daftar Pegawai
+            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
           </Link>
         </section>
       </HrmsShell>
@@ -94,10 +94,10 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">Edit Profil Pegawai</h1>
-          <p className="mt-2 text-slate-600">Data pegawai tidak ditemukan.</p>
+          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
+          <p className="mt-2 text-slate-600"><LocalizedText id="Data pegawai tidak ditemukan." en="Employee data was not found." /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Kembali ke Daftar Pegawai
+            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
           </Link>
         </section>
       </HrmsShell>
@@ -121,10 +121,10 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">Edit Profil Pegawai</h1>
-          <p className="mt-2 text-slate-600">Mapping data employee belum dapat dimuat.</p>
+          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
+          <p className="mt-2 text-slate-600"><LocalizedText id="Pemetaan data pegawai belum dapat dimuat." en="The employee data mapping could not be loaded." /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            ← Kembali ke Daftar Pegawai
+            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
           </Link>
         </section>
       </HrmsShell>
@@ -146,19 +146,19 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
       JSON.stringify({ code: provisionErrorCode, message: provisionErrorMessage, details: provisionError?.details ?? null, hint: provisionError?.hint ?? null })
     );
     const userMessage = provisionErrorCode === "23505"
-      ? "Email employee sudah terhubung ke data D3 dengan nama berbeda. Mapping perlu diperbaiki oleh admin terlebih dahulu."
+      ? { id: "Email pegawai sudah terhubung ke data D3 dengan nama berbeda. Pemetaan perlu diperbaiki oleh admin terlebih dahulu.", en: "This employee email is already linked to D3 data under a different name. An admin needs to fix the mapping first." }
       : provisionErrorCode === "22023"
-        ? "Data B2 belum lengkap. Pastikan nama, email, posisi, dan departemen sudah terisi."
+        ? { id: "Data B2 belum lengkap. Pastikan nama, email, posisi, dan departemen sudah terisi.", en: "The B2 data is incomplete. Make sure name, email, position, and department are filled in." }
         : provisionErrorCode === "42501"
-          ? "Anda tidak memiliki izin HR untuk membuat data D3."
-          : "Data D3 belum dapat dibuat. Pastikan posisi dan departemen pegawai sudah tersedia di B2.";
+          ? { id: "Anda tidak memiliki izin HR untuk membuat data D3.", en: "You do not have HR permission to create D3 data." }
+          : { id: "Data D3 belum dapat dibuat. Pastikan posisi dan departemen pegawai sudah tersedia di B2.", en: "D3 data could not be created. Make sure the employee's position and department exist in B2." };
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">Edit Profil Pegawai</h1>
-          <p className="mt-2">{userMessage}</p>
+          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
+          <p className="mt-2"><LocalizedText id={userMessage.id} en={userMessage.en} /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href={`/employees/${encodeURIComponent(employeeId)}`}>
-            ← Kembali ke Profil Pegawai
+            <LocalizedText id="← Kembali ke Profil Pegawai" en="← Back to Employee Profile" />
           </Link>
         </section>
       </HrmsShell>
@@ -180,10 +180,10 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">Edit Profil Pegawai</h1>
-          <p className="mt-2 text-slate-600">Data tambahan employee belum tersinkronisasi ke D3.</p>
+          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
+          <p className="mt-2 text-slate-600"><LocalizedText id="Data tambahan pegawai belum tersinkronisasi ke D3." en="Additional employee data has not been synchronized to D3 yet." /></p>
           <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href={`/employees/${encodeURIComponent(employeeId)}`}>
-            ← Kembali ke Profil Pegawai
+            <LocalizedText id="← Kembali ke Profil Pegawai" en="← Back to Employee Profile" />
           </Link>
         </section>
       </HrmsShell>
@@ -269,13 +269,13 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
         <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">Edit Profil Pegawai</h1>
-          <p className="mt-2">Pilihan position atau department belum dapat dimuat. Silakan coba lagi nanti.</p>
+          <h1 className="text-xl font-bold">{copy.title}</h1>
+          <p className="mt-2"><LocalizedText id="Pilihan posisi atau departemen belum dapat dimuat. Silakan coba lagi nanti." en="Position or department options could not be loaded. Please try again later." /></p>
           <Link
             className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]"
             href={`/employees/${encodeURIComponent(employee.employee_id)}`}
           >
-            ← Kembali ke Profil Pegawai
+            <LocalizedText id="← Kembali ke Profil Pegawai" en="← Back to Employee Profile" />
           </Link>
         </section>
       </HrmsShell>
@@ -288,9 +288,9 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
         <Link className="inline-flex text-sm font-semibold text-[#1E3765] hover:text-[#155DFC]" href={`/employees/${encodeURIComponent(employee.employee_id)}`}>{copy.back}</Link>
 
         <header>
-          <p className="text-xs font-bold tracking-[0.16em] text-[#1E3765]">{copy.eyebrow}</p>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.04em] text-[#121B2E] sm:text-[42px]">{copy.title}</h1>
-          <p className="mt-3 text-base text-slate-600">{copy.description(employee.full_name)}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#1E3765]">{copy.eyebrow}</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{copy.title}</h1>
+          <p className="mt-1 text-sm text-[#4d5f81]"><LocalizedText id={`Perbarui informasi profil untuk ${employee.full_name}.`} en={`Update profile information for ${employee.full_name}.`} /></p>
         </header>
 
         <EmployeeEditForm
