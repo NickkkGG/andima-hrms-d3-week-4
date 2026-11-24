@@ -23,7 +23,11 @@ type AttendanceClosing = {
   reopened_by_b2_register_id: string | null
   reopened_at: string | null
   reason: string | null
+  closed_by_name: string
+  reopened_by_name: string
 }
+
+type AttendanceClosingRow = Omit<AttendanceClosing, 'closed_by_name' | 'reopened_by_name'>
 
 type AttendanceAuditEntry = {
   id: string
@@ -274,32 +278,53 @@ export default function AttendancePageUI() {
 
   async function fetchAttendanceManagementData() {
     const supabase = createClient()
-    const { data: closingRows, error: closingError } = await supabase
+    const closingQuery = supabase
       .from('d3_attendance_closings')
       .select('id, period_start, period_end, status, closed_by_b2_register_id, closed_at, reopened_by_b2_register_id, reopened_at, reason')
       .order('period_start', { ascending: false })
 
-    if (closingError) {
-      console.warn('Attendance closing query notice:', closingError.message)
-    } else {
-      setClosings((closingRows ?? []) as AttendanceClosing[])
-    }
+    if (appRole === 'EMPLOYEE') {
+      const { data: closingRows, error: closingError } = await closingQuery
+      if (closingError) {
+        console.warn('Attendance closing query notice:', closingError.message)
+        setClosings([])
+        setAuditEntries([])
+        return
+      }
 
-    if (appRole === 'EMPLOYEE') return
-
-    const { data: auditRows, error: auditError } = await supabase
-      .from('d3_attendance_audit_log')
-      .select('id, attendance_id, correction_id, closing_id, target_b2_register_id, actor_b2_register_id, action, details, created_at')
-      .order('created_at', { ascending: false })
-      .limit(200)
-
-    if (auditError) {
-      console.warn('Attendance audit query notice:', auditError.message)
+      setClosings(((closingRows ?? []) as AttendanceClosingRow[]).map((closing) => ({
+        ...closing,
+        closed_by_name: copy.employee,
+        reopened_by_name: copy.employee,
+      })))
+      setAuditEntries([])
       return
     }
 
-    const rows = (auditRows ?? []) as Omit<AttendanceAuditEntry, 'target_name' | 'actor_name'>[]
-    const registerIds = [...new Set(rows.flatMap((row) => [row.target_b2_register_id, row.actor_b2_register_id]).filter(Boolean))] as string[]
+    const [
+      { data: closingRows, error: closingError },
+      { data: auditRows, error: auditError },
+    ] = await Promise.all([
+      closingQuery,
+      supabase
+        .from('d3_attendance_audit_log')
+        .select('id, attendance_id, correction_id, closing_id, target_b2_register_id, actor_b2_register_id, action, details, created_at')
+        .order('created_at', { ascending: false })
+        .limit(200),
+    ])
+
+    const closingRecords = closingError ? [] : (closingRows ?? []) as AttendanceClosingRow[]
+    if (closingError) console.warn('Attendance closing query notice:', closingError.message)
+
+    if (auditError) {
+      console.warn('Attendance audit query notice:', auditError.message)
+    }
+
+    const rows = auditError ? [] : (auditRows ?? []) as Omit<AttendanceAuditEntry, 'target_name' | 'actor_name'>[]
+    const registerIds = [...new Set([
+      ...rows.flatMap((row) => [row.target_b2_register_id, row.actor_b2_register_id]),
+      ...closingRecords.flatMap((closing) => [closing.closed_by_b2_register_id, closing.reopened_by_b2_register_id]),
+    ].filter(Boolean))] as string[]
     let names = new Map<string, string>()
     if (registerIds.length) {
       const { data: registers } = await supabase
@@ -313,6 +338,11 @@ export default function AttendancePageUI() {
       ...row,
       target_name: row.target_b2_register_id ? names.get(row.target_b2_register_id) ?? copy.employee : copy.general,
       actor_name: row.actor_b2_register_id ? names.get(row.actor_b2_register_id) ?? copy.employee : copy.general,
+    })))
+    setClosings(closingRecords.map((closing) => ({
+      ...closing,
+      closed_by_name: names.get(closing.closed_by_b2_register_id) ?? copy.employee,
+      reopened_by_name: closing.reopened_by_b2_register_id ? names.get(closing.reopened_by_b2_register_id) ?? copy.employee : copy.general,
     })))
   }
 
@@ -975,7 +1005,7 @@ export default function AttendancePageUI() {
               )}
             </div>
           )}
-        </div> : managementView === 'AUDIT' ? <AttendanceAuditPanel entries={auditEntries} copy={copy} dateFrom={dateFrom} dateTo={dateTo} /> : <AttendanceClosingPanel closings={closings} copy={copy} dateFrom={dateFrom} dateTo={dateTo} closingStart={closingStart} closingEnd={closingEnd} closingReason={closingReason} isSaving={isClosingSaving} onStartChange={setClosingStart} onEndChange={setClosingEnd} onReasonChange={setClosingReason} onSubmit={handleCreateClosing} onEmergencyEdit={handleEmergencyEdit} />}
+        </div> : managementView === 'AUDIT' ? <AttendanceAuditPanel entries={auditEntries} copy={copy} dateFrom={dateFrom} dateTo={dateTo} searchQuery={searchQuery} /> : <AttendanceClosingPanel closings={closings} copy={copy} dateFrom={dateFrom} dateTo={dateTo} searchQuery={searchQuery} closingStart={closingStart} closingEnd={closingEnd} closingReason={closingReason} isSaving={isClosingSaving} onStartChange={setClosingStart} onEndChange={setClosingEnd} onReasonChange={setClosingReason} onSubmit={handleCreateClosing} onEmergencyEdit={handleEmergencyEdit} />}
       </div>
     </>
   )
@@ -997,18 +1027,41 @@ function auditEntryDate(value: string) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date(value))
 }
 
-function AttendanceAuditPanel({ entries, copy, dateFrom, dateTo }: { entries: AttendanceAuditEntry[]; copy: AttendancePanelCopy; dateFrom: string; dateTo: string }) {
+function matchesSearchQuery(query: string, values: Array<string | null | undefined>) {
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  return !normalizedQuery || values.some((value) => value?.toLocaleLowerCase().includes(normalizedQuery))
+}
+
+function AttendanceAuditPanel({ entries, copy, dateFrom, dateTo, searchQuery }: { entries: AttendanceAuditEntry[]; copy: AttendancePanelCopy; dateFrom: string; dateTo: string; searchQuery: string }) {
   const { language } = useLanguage()
   const visibleEntries = entries.filter((entry) => {
     const date = auditEntryDate(entry.created_at)
-    return (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo)
+    return (!dateFrom || date >= dateFrom)
+      && (!dateTo || date <= dateTo)
+      && matchesSearchQuery(searchQuery, [
+        entry.target_name,
+        entry.actor_name,
+        entry.action,
+        typeof entry.details.reason === 'string' ? entry.details.reason : undefined,
+      ])
   })
 
   return <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6"><div className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="border-b border-[#becabd]/35 px-5 py-4"><div className="flex items-center gap-2"><History size={17} className="text-[#006838]" /><h2 className="text-sm font-bold">{copy.auditTab}</h2></div><p className="mt-1 text-xs text-[#4d5f81]">{visibleEntries.length} {copy.auditAction}</p></div>{visibleEntries.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.auditEmpty}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.action}</th><th className="px-3 py-3">{copy.actor}</th><th className="px-3 py-3">{copy.reason}</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleEntries.map((entry) => <tr key={entry.id}><td className="whitespace-nowrap px-4 py-3.5 text-[#4d5f81]">{formatAttendanceAuditDate(entry.created_at, language)}</td><td className="px-3 py-3.5 font-semibold">{entry.target_name}</td><td className="px-3 py-3.5"><span className="rounded bg-[#eaf7f0] px-2 py-1 text-[10px] font-bold text-[#006838]">{entry.action.replaceAll('_', ' ')}</span></td><td className="px-3 py-3.5 text-[#4d5f81]">{entry.actor_name}</td><td className="max-w-[360px] px-3 py-3.5 text-[#4d5f81]">{typeof entry.details.reason === 'string' ? entry.details.reason : entry.action === 'ATTENDANCE_PERIOD_CLOSED' || entry.action === 'ATTENDANCE_PERIOD_REOPENED' ? `${entry.details.period_start ?? ''} – ${entry.details.period_end ?? ''}` : '-'}</td></tr>)}</tbody></table></div>}</div></div>
 }
 
-function AttendanceClosingPanel({ closings, copy, dateFrom, dateTo, closingStart, closingEnd, closingReason, isSaving, onStartChange, onEndChange, onReasonChange, onSubmit, onEmergencyEdit }: { closings: AttendanceClosing[]; copy: AttendancePanelCopy; dateFrom: string; dateTo: string; closingStart: string; closingEnd: string; closingReason: string; isSaving: boolean; onStartChange: (value: string) => void; onEndChange: (value: string) => void; onReasonChange: (value: string) => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; onEmergencyEdit: (closing: AttendanceClosing) => void }) {
-  const visibleClosings = closings.filter((closing) => (!dateFrom || closing.period_end >= dateFrom) && (!dateTo || closing.period_start <= dateTo))
+function AttendanceClosingPanel({ closings, copy, dateFrom, dateTo, searchQuery, closingStart, closingEnd, closingReason, isSaving, onStartChange, onEndChange, onReasonChange, onSubmit, onEmergencyEdit }: { closings: AttendanceClosing[]; copy: AttendancePanelCopy; dateFrom: string; dateTo: string; searchQuery: string; closingStart: string; closingEnd: string; closingReason: string; isSaving: boolean; onStartChange: (value: string) => void; onEndChange: (value: string) => void; onReasonChange: (value: string) => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; onEmergencyEdit: (closing: AttendanceClosing) => void }) {
+  const visibleClosings = closings.filter((closing) => (
+    (!dateFrom || closing.period_end >= dateFrom)
+    && (!dateTo || closing.period_start <= dateTo)
+    && matchesSearchQuery(searchQuery, [
+      closing.period_start,
+      closing.period_end,
+      closing.status,
+      closing.reason,
+      closing.closed_by_name,
+      closing.reopened_by_name,
+    ])
+  ))
 
   return <div className="mx-auto grid w-full max-w-[1600px] gap-5 px-4 py-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:px-6"><form onSubmit={onSubmit} className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center gap-2"><LockKeyhole size={17} className="text-[#006838]" /><h2 className="text-sm font-bold">{copy.closePeriod}</h2></div><p className="mt-1 text-xs leading-5 text-[#4d5f81]">{copy.closedPeriod}</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-xs font-bold text-[#4d5f81]">{copy.periodStart}<input required type="date" value={closingStart} onChange={(event) => onStartChange(event.target.value)} className="h-10 rounded-lg border border-[#d9e2fc] px-3 text-sm font-normal" /></label><label className="grid gap-1 text-xs font-bold text-[#4d5f81]">{copy.periodEnd}<input required type="date" value={closingEnd} onChange={(event) => onEndChange(event.target.value)} className="h-10 rounded-lg border border-[#d9e2fc] px-3 text-sm font-normal" /></label></div><label className="mt-3 grid gap-1 text-xs font-bold text-[#4d5f81]">{copy.reason}<textarea maxLength={500} value={closingReason} onChange={(event) => onReasonChange(event.target.value)} className="min-h-20 resize-y rounded-lg border border-[#d9e2fc] p-3 text-sm font-normal" /></label><button disabled={isSaving} className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-[#006838] px-4 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><LockKeyhole size={14} />{isSaving ? copy.sending : copy.closePeriod}</button></form><section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="border-b border-[#becabd]/35 px-5 py-4"><h2 className="text-sm font-bold">{copy.closingTab}</h2><p className="mt-1 text-xs text-[#4d5f81]">{visibleClosings.length} {copy.recorded}</p></div>{visibleClosings.length === 0 ? <div className="flex min-h-[220px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.closingEmpty}</div> : <div className="divide-y divide-slate-100">{visibleClosings.map((closing) => <article key={closing.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><div className="flex items-center gap-2 text-sm font-bold"><span>{closing.period_start} – {closing.period_end}</span><span className={`rounded px-2 py-0.5 text-[10px] ${closing.status === 'CLOSED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{closing.status === 'CLOSED' ? copy.closedPeriod : copy.openPeriod}</span></div><p className="mt-1 text-xs text-[#4d5f81]">{closing.status === 'CLOSED' ? copy.closedAt : copy.reopenedAt}: {formatAttendanceAuditDate(closing.status === 'CLOSED' ? closing.closed_at : closing.reopened_at ?? closing.closed_at, 'id')}</p>{closing.reason && <p className="mt-1 text-xs text-[#4d5f81]">{closing.reason}</p>}</div>{closing.status === 'CLOSED' && <button type="button" disabled={isSaving} onClick={() => onEmergencyEdit(closing)} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"><Unlock size={14} />{copy.emergencyEdit}</button>}</article>)}</div>}</section></div>
 }

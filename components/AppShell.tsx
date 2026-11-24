@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import SessionIdleGuard from "@/components/SessionIdleGuard";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -23,6 +24,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <>
+      <SessionIdleGuard />
       <Sidebar />
       <div className="min-h-full lg:pl-[260px]">{children}</div>
     </>

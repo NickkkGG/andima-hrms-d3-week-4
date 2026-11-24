@@ -17,10 +17,27 @@ export default function LoginPage() {
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [isPermanentlyBlocked, setIsPermanentlyBlocked] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(0);
+  const [sessionEndNotice, setSessionEndNotice] = useState<string>('');
   const [greeting] = useState<string>(() => {
     const hour = new Date().getHours();
     return hour >= 3 && hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
   });
+
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get('reason');
+    const notice = reason === 'location'
+      ? 'Lokasi kerja akun belum dikonfigurasi untuk automatic logout. Hubungi HR Admin.'
+      : reason === 'profile'
+        ? 'Profil karyawan akun ini sudah tidak aktif atau belum terhubung. Hubungi HR Admin.'
+        : reason === 'idle'
+          ? 'Sesi Anda berakhir karena tidak ada aktivitas selama 30 menit. Silakan login kembali.'
+          : '';
+
+    // The URL is a browser-only external source; this keeps the static login
+    // route free from a search-params suspense boundary.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSessionEndNotice(notice);
+  }, []);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -115,6 +132,21 @@ export default function LoginPage() {
       }
 
       if (registeredUser) {
+        const { data: idleSession, error: idleSessionError } = await supabase
+          .rpc('d3_start_idle_session');
+        const idleSessionStatus = Array.isArray(idleSession) ? idleSession[0] : null;
+
+        if (idleSessionError || idleSessionStatus?.status !== 'ACTIVE') {
+          await supabase.auth.signOut({ scope: 'local' });
+          const rawMessage = idleSessionError?.message ?? '';
+          setErrorMessage(
+            rawMessage.includes('Work location is not configured')
+              ? 'Lokasi kerja akun belum dikonfigurasi untuk automatic logout. Hubungi HR Admin.'
+              : 'Sesi otomatis belum dapat disiapkan. Silakan coba login kembali atau hubungi HR Admin.',
+          );
+          return;
+        }
+
         setLoginAttempts(0);
         setSuccessMessage('Login berhasil. Mengarahkan ke halaman utama...');
         window.setTimeout(() => {
@@ -241,12 +273,12 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {errorMessage && (
+              {(errorMessage || sessionEndNotice) && (
                 <div className="p-4 rounded-xl bg-[#DC2626]/10 border border-[#DC2626]/30 text-[#DC2626] text-xs sm:text-sm flex items-center gap-2.5 font-semibold backdrop-blur-md">
                   <svg className="w-5 h-5 shrink-0 fill-current" viewBox="0 0 20 20">
                     <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" />
                   </svg>
-                  <span>{errorMessage}</span>
+                  <span>{errorMessage || sessionEndNotice}</span>
                 </div>
               )}
 
