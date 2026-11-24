@@ -136,6 +136,8 @@ export default function LocationMapPreview({ clockIn, clockOut, className = "" }
       )}
 
       <div className="relative aspect-[16/8] bg-[#eaf0f8]">
+        {/* Visible behind the map frame until the map has painted. */}
+        <span aria-hidden="true" className="absolute inset-0 animate-pulse bg-[#e2ebf7] motion-reduce:animate-none" />
         {mapMode === "standard" ? (
           <iframe title={`${selected.label} ${copy.onMap}`} src={standardMapUrl(location)} className="absolute inset-0 size-full border-0" loading="lazy" />
         ) : (

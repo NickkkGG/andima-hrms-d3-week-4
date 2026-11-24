@@ -1,1 +1,5 @@
-export default function NewRewardLoading() { return <section className="mx-auto max-w-3xl space-y-5" aria-label="Memuat form reward"><div className="h-36 animate-pulse rounded-[24px] bg-[#EEF4FB]" /><div className="h-96 animate-pulse rounded-[24px] bg-[#EEF4FB]" /></section>; }
+import { PageSkeleton } from "@/components/hrms/Skeleton";
+
+export default function NewRewardLoading() {
+  return <div className="mx-auto max-w-3xl"><PageSkeleton contained={false} layout="form" /></div>;
+}
