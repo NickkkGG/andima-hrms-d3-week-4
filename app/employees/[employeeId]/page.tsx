@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Link2, Mail, MapPin, Phone } from "lucide-react";
+import { ExternalLink, Link2, Mail, MapPin, Phone } from "lucide-react";
 import EmployeeDirectoryVisibilityButton from "@/components/EmployeeDirectoryVisibilityButton";
 import HrmsShell from "@/components/hrms/HrmsShell";
 import HrmsStatusPill from "@/components/hrms/HrmsStatusPill";
@@ -33,6 +33,27 @@ interface B2EmployeeProfileRow {
   position_id: string | null;
   departement_id: string | null;
   created_at: string;
+}
+
+interface EmployeeFeedbackProfileRow {
+  id: number;
+  date: string | null;
+  title: string | null;
+  feedback_text: string | null;
+  feedback_type: string | null;
+  category: string | null;
+  follow_up_status: string | null;
+  created_at: string | null;
+}
+
+interface EmployeeRewardProfileRow {
+  id: number;
+  date: string | null;
+  title: string | null;
+  reason: string | null;
+  reward_type: string | null;
+  status: string | null;
+  created_at: string | null;
 }
 
 function displayValue(value: string | null, language: "id" | "en" = "id") {
@@ -114,7 +135,15 @@ function logRelatedQueryError(source: string, error: { code: string; message: st
 }
 
 export default async function EmployeeProfilePage({ params }: EmployeeProfilePageProps) {
-  const copyText = { id: { directory: "← Direktori pegawai", profile: "Profil pegawai", edit: "Edit profil", status: "Ubah status", unavailable: "Belum tersedia", joined: "Bergabung", tenure: "Masa kerja", connected: "Data kehadiran, sertifikasi, umpan balik, dan reward terhubung melalui ID Pegawai ini.", contact: "Informasi kontak", phone: "Telepon", location: "Lokasi kerja", identity: "Identitas", skills: "Keahlian & kompetensi", noSkills: "Belum ada data keahlian atau kompetensi.", certifications: "Sertifikasi", noCertifications: "Belum ada data sertifikasi.", issued: "Diterbitkan", expires: "Berakhir", credential: "ID kredensial", attendance: "Kehadiran", noAttendance: "Belum ada data kehadiran.", present: "Hadir", late: "Terlambat", absent: "Tidak hadir", feedback: "Umpan balik & reward", noFeedback: "Belum ada data umpan balik atau reward." }, en: { directory: "← Employee directory", profile: "Employee profile", edit: "Edit profile", status: "Change status", unavailable: "Not available", joined: "Joined", tenure: "Tenure", connected: "Attendance, certifications, feedback, and rewards are linked through this Employee ID.", contact: "Contact information", phone: "Phone", location: "Work location", identity: "Identity", skills: "Skills & competencies", noSkills: "No skill or competency data yet.", certifications: "Certifications", noCertifications: "No certification data yet.", issued: "Issued", expires: "Expires", credential: "Credential ID", attendance: "Attendance", noAttendance: "No attendance data yet.", present: "Present", late: "Late", absent: "Absent", feedback: "Feedback & reward", noFeedback: "No feedback or reward data yet." } }; const copy = localizedCopy(copyText);
+  const copyText = {
+    id: {
+      directory: "← Direktori pegawai", profile: "Profil pegawai", edit: "Edit profil", status: "Ubah status", unavailable: "Belum tersedia", joined: "Bergabung", tenure: "Masa kerja", connected: "Data kehadiran, sertifikasi, umpan balik, dan reward terhubung melalui ID Pegawai ini.", contact: "Informasi kontak", phone: "Telepon", location: "Lokasi kerja", identity: "Identitas", skills: "Keahlian & kompetensi", noSkills: "Belum ada data keahlian atau kompetensi.", certifications: "Sertifikasi", noCertifications: "Belum ada data sertifikasi.", issued: "Diterbitkan", expires: "Berakhir", credential: "ID kredensial", viewDocument: "Buka dokumen", attendance: "Kehadiran", noAttendance: "Belum ada data kehadiran.", present: "Hadir", late: "Terlambat", absent: "Tidak hadir", feedback: "Umpan balik & reward", noFeedback: "Belum ada data umpan balik atau reward.", feedbackRecord: "Feedback", rewardRecord: "Reward", recordedOn: "Dicatat",
+    },
+    en: {
+      directory: "← Employee directory", profile: "Employee profile", edit: "Edit profile", status: "Change status", unavailable: "Not available", joined: "Joined", tenure: "Tenure", connected: "Attendance, certifications, feedback, and rewards are linked through this Employee ID.", contact: "Contact information", phone: "Phone", location: "Work location", identity: "Identity", skills: "Skills & competencies", noSkills: "No skill or competency data yet.", certifications: "Certifications", noCertifications: "No certification data yet.", issued: "Issued", expires: "Expires", credential: "Credential ID", viewDocument: "Open document", attendance: "Attendance", noAttendance: "No attendance data yet.", present: "Present", late: "Late", absent: "Absent", feedback: "Feedback & reward", noFeedback: "No feedback or reward data yet.", feedbackRecord: "Feedback", rewardRecord: "Reward", recordedOn: "Recorded",
+    },
+  };
+  const copy = localizedCopy(copyText);
   const { employeeId } = await params;
   const supabase = await createClient();
   const {
@@ -241,7 +270,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
 
   const d3EmployeeId = employee.d3_employee_id;
   const b2RegisterId = employee.b2_register_id;
-  const [skillsResult, certificationsResult, attendancesResult, feedbackRewardsResult] = await Promise.all([
+  const [skillsResult, certificationsResult, attendancesResult, feedbackResult, rewardsResult] = await Promise.all([
     d3EmployeeId
       ? supabase
       .from("d3_employee_skills")
@@ -252,7 +281,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
     d3EmployeeId
       ? supabase
       .from("view_employee_certifications")
-      .select("title, issuing_organization, issue_date, expiry_date, credential_id, status")
+      .select("title, issuing_organization, issue_date, expiry_date, credential_id, status, document_url")
       .eq("employee_id", d3EmployeeId)
       .returns<EmployeeCertification[]>()
       : Promise.resolve({ data: [] as EmployeeCertification[], error: null }),
@@ -266,24 +295,56 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
       : Promise.resolve({ data: [] as EmployeeAttendance[], error: null }),
     d3EmployeeId
       ? supabase
-      .from("feedback_rewards")
-      .select("type, category, title, message, points, created_at")
-      .eq("receiver_id", d3EmployeeId)
+      .from("d3_employee_feedback")
+      .select("id, date, title, feedback_text, feedback_type, category, follow_up_status, created_at")
+      .eq("employee_id", d3EmployeeId)
       .order("created_at", { ascending: false })
-      .returns<EmployeeFeedbackReward[]>()
-      : Promise.resolve({ data: [] as EmployeeFeedbackReward[], error: null }),
+      .returns<EmployeeFeedbackProfileRow[]>()
+      : Promise.resolve({ data: [] as EmployeeFeedbackProfileRow[], error: null }),
+    d3EmployeeId
+      ? supabase
+      .from("d3_employee_rewards")
+      .select("id, date, title, reason, reward_type, status, created_at")
+      .eq("employee_id", d3EmployeeId)
+      .order("created_at", { ascending: false })
+      .returns<EmployeeRewardProfileRow[]>()
+      : Promise.resolve({ data: [] as EmployeeRewardProfileRow[], error: null }),
   ]);
 
   if (skillsResult.error) logRelatedQueryError("d3_employee_skills", skillsResult.error);
   if (certificationsResult.error) logRelatedQueryError("view_employee_certifications", certificationsResult.error);
   if (attendancesResult.error) logRelatedQueryError("d3_attendances", attendancesResult.error);
-  if (feedbackRewardsResult.error) logRelatedQueryError("feedback_rewards", feedbackRewardsResult.error);
+  if (feedbackResult.error) logRelatedQueryError("d3_employee_feedback", feedbackResult.error);
+  if (rewardsResult.error) logRelatedQueryError("d3_employee_rewards", rewardsResult.error);
 
   const skills = skillsResult.data ?? [];
   const certifications = certificationsResult.data ?? [];
   const attendances = attendancesResult.data ?? [];
-  const feedbackRewards = feedbackRewardsResult.data ?? [];
-  const tenure = bilingual((lang) => formatTenure(employee.tenure_years, employee.tenure_months, employee.join_date, lang));
+  const feedbackRewards: EmployeeFeedbackReward[] = [
+    ...(feedbackResult.data ?? []).map((feedback) => ({
+      id: `feedback-${feedback.id}`,
+      record_type: "FEEDBACK" as const,
+      type: feedback.feedback_type,
+      category: feedback.category,
+      title: feedback.title,
+      message: feedback.feedback_text,
+      status: feedback.follow_up_status,
+      date: feedback.date,
+      created_at: feedback.created_at,
+    })),
+    ...(rewardsResult.data ?? []).map((reward) => ({
+      id: `reward-${reward.id}`,
+      record_type: "REWARD" as const,
+      type: reward.reward_type,
+      category: null,
+      title: reward.title,
+      message: reward.reason,
+      status: reward.status,
+      date: reward.date,
+      created_at: reward.created_at,
+    })),
+  ].sort((left, right) => (right.date ?? right.created_at ?? "").localeCompare(left.date ?? left.created_at ?? ""));
+  const tenure = bilingual((language) => formatTenure(employee.tenure_years, employee.tenure_months, employee.join_date, language));
   const attendanceSummary = attendances.reduce(
     (summary, attendance) => {
       const status = attendance.status?.toUpperCase() ?? "";
@@ -363,7 +424,7 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
               <div className="space-y-3">
                 {certifications.map((certification, index) => (
                   <article className="flex flex-col gap-3 border-b border-[#D9E2FC] pb-3 last:border-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between" key={`${certification.credential_id ?? certification.title ?? "certification"}-${index}`}>
-                    <div className="min-w-0"><h3 className="text-sm font-bold text-[#121B2E]">{bilingual((lang) => displayValue(certification.title, lang))}</h3><p className="mt-1 text-xs font-medium text-[#1E3765]">{bilingual((lang) => displayValue(certification.issuing_organization, lang))}</p><p className="mt-2 text-xs leading-5 text-slate-500">{copy.issued} {bilingual((lang) => formatDate(certification.issue_date, lang))} · {copy.expires} {bilingual((lang) => formatDate(certification.expiry_date, lang))}</p>{certification.credential_id && <p className="mt-1 text-[11px] text-slate-500">{copy.credential}: {certification.credential_id}</p>}</div>
+                    <div className="min-w-0"><h3 className="text-sm font-bold text-[#121B2E]">{bilingual((language) => displayValue(certification.title, language))}</h3><p className="mt-1 text-xs font-medium text-[#1E3765]">{bilingual((language) => displayValue(certification.issuing_organization, language))}</p><p className="mt-2 text-xs leading-5 text-slate-500">{copy.issued} {bilingual((language) => formatDate(certification.issue_date, language))} · {copy.expires} {bilingual((language) => formatDate(certification.expiry_date, language))}</p>{certification.credential_id && <p className="mt-1 text-[11px] text-slate-500">{copy.credential}: {certification.credential_id}</p>}{certification.document_url && <a className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-[#155DFC] transition hover:text-[#0D4FDB]" href={certification.document_url} target="_blank" rel="noreferrer"><ExternalLink className="size-3.5" aria-hidden="true" />{copy.viewDocument}</a>}</div>
                     <HrmsStatusPill value={certification.status} />
                   </article>
                 ))}
@@ -380,8 +441,18 @@ export default async function EmployeeProfilePage({ params }: EmployeeProfilePag
           <ProfileSection title={copy.feedback} className="lg:col-span-2">
             {feedbackRewards.length === 0 ? <EmptyState>{copy.noFeedback}</EmptyState> : (
               <div className="grid gap-3 sm:grid-cols-2">
-                {feedbackRewards.map((feedbackReward, index) => (
-                  <article className="rounded-lg border border-[#D9E2FC] bg-[#F5F8FF]/70 p-4" key={`${feedbackReward.created_at ?? "feedback"}-${index}`}><div className="flex items-start justify-between gap-3"><p className="text-sm font-bold text-[#121B2E]">{bilingual((lang) => displayValue(feedbackReward.title, lang))}</p><span className="shrink-0 rounded-full border border-[#577CFC]/35 bg-white px-2 py-1 text-[10px] font-bold text-[#1E3765]">{feedbackReward.points === null ? "—" : `${feedbackReward.points} pts`}</span></div><p className="mt-1 text-[11px] font-semibold text-[#577CFC]">{[feedbackReward.type, feedbackReward.category].filter(Boolean).join(" · ") || "Feedback"}</p>{feedbackReward.message && <p className="mt-2 text-sm leading-5 text-slate-600">{feedbackReward.message}</p>}</article>
+                {feedbackRewards.map((feedbackReward) => (
+                  <article className="min-w-0 rounded-lg border border-[#D9E2FC] bg-[#F5F8FF]/70 p-4" key={feedbackReward.id}>
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-bold text-[#121B2E] [overflow-wrap:anywhere]">{bilingual((language) => displayValue(feedbackReward.title, language))}</p>
+                        <p className="mt-1 break-words text-[11px] font-semibold text-[#577CFC] [overflow-wrap:anywhere]">{feedbackReward.record_type === "REWARD" ? copy.rewardRecord : copy.feedbackRecord} · {[feedbackReward.type, feedbackReward.category].filter(Boolean).join(" · ") || copy.feedbackRecord}</p>
+                      </div>
+                      {feedbackReward.status && <HrmsStatusPill value={feedbackReward.status} />}
+                    </div>
+                    {feedbackReward.message && <p className="mt-2 break-words text-sm leading-5 text-slate-600 [overflow-wrap:anywhere]">{feedbackReward.message}</p>}
+                    <p className="mt-3 text-[11px] font-medium text-slate-500">{copy.recordedOn} {bilingual((language) => formatDate(feedbackReward.date ?? feedbackReward.created_at, language))}</p>
+                  </article>
                 ))}
               </div>
             )}

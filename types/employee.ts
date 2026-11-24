@@ -38,6 +38,7 @@ export interface EmployeeCertification {
   expiry_date: string | null;
   credential_id: string | null;
   status: string | null;
+  document_url: string | null;
 }
 
 export interface EmployeeAttendance {
@@ -49,11 +50,14 @@ export interface EmployeeAttendance {
 }
 
 export interface EmployeeFeedbackReward {
+  id: string;
+  record_type: "FEEDBACK" | "REWARD";
   type: string | null;
   category: string | null;
   title: string | null;
   message: string | null;
-  points: number | null;
+  status: string | null;
+  date: string | null;
   created_at: string | null;
 }
 

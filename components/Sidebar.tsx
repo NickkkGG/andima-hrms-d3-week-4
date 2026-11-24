@@ -14,9 +14,24 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 
+const D3_ROUTE_PREFIXES = [
+  "/employees",
+  "/employee-profile",
+  "/attendance",
+  "/attendance-productivity",
+  "/biometric-enrollment",
+  "/face-biometric-attendance",
+  "/employee-report-ticket",
+  "/feedback-reward",
+];
+
+function isRouteOrChild(pathname: string, route: string) {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
+
 function HrmsLink({ label, href }: { label: ReactNode; href: string }) {
   const pathname = usePathname();
-  const isActive = pathname === href || (href === "/employees" && pathname.startsWith("/employees"));
+  const isActive = isRouteOrChild(pathname, href);
 
   return (
     <Link
@@ -35,15 +50,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const isPublicRoute = pathname === "/login" || pathname === "/register" || pathname.startsWith("/auth/");
-  const isD3Route = pathname.startsWith("/employees") || [
-    "/employee-profile",
-    "/attendance",
-    "/attendance-productivity",
-    "/biometric-enrollment",
-    "/face-biometric-attendance",
-    "/employee-report-ticket",
-    "/feedback-reward",
-  ].includes(pathname);
+  const isD3Route = D3_ROUTE_PREFIXES.some((route) => isRouteOrChild(pathname, route));
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isHrmsOpen, setIsHrmsOpen] = useState(true);
   const [isD3Open, setIsD3Open] = useState(false);
