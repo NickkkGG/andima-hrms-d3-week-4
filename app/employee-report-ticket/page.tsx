@@ -15,12 +15,13 @@ import {
   Ticket,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import HeaderAccount from "@/components/HeaderAccount";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import TablePagination from "@/components/hrms/TablePagination";
+import { PageSkeleton, SkeletonPanel, SkeletonTableRows } from "@/components/hrms/Skeleton";
 
 type TicketStatus = "PENDING" | "TODO" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
 type ViewRole = "manager" | "employee";
@@ -88,6 +89,18 @@ function statusLabel(status: TicketStatus, language: "id" | "en") {
 }
 
 const categories = ["Workplace facility", "System access", "Safety", "Work arrangement", "Operational issue", "Other"];
+// Categories are stored in English (d3_tickets.category); these are the labels shown per language.
+const categoryLabels: Record<string, string> = {
+  "Workplace facility": "Fasilitas kerja",
+  "System access": "Akses sistem",
+  Safety: "Keselamatan",
+  "Work arrangement": "Pengaturan kerja",
+  "Operational issue": "Kendala operasional",
+  Other: "Lainnya",
+};
+function categoryLabel(category: string, language: "id" | "en") {
+  return language === "id" ? categoryLabels[category] ?? category : category;
+}
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const allowedAttachmentTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -145,14 +158,80 @@ function formatDate(value: string, language: "id" | "en", withTime = false) {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+    // Always 24-hour (00–23), the same as the time pickers below (BUG-D3-009).
+    ...(withTime ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" as const } : {}),
   }).format(new Date(value));
 }
 
-function currentLocalDateTime() {
-  const now = new Date();
-  const offset = now.getTimezoneOffset() * 60_000;
-  return new Date(now.getTime() - offset).toISOString().slice(0, 16);
+// "YYYY-MM-DD" for a date in the browser's local time zone.
+function localDateString(date: Date) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, minute) => String(minute).padStart(2, "0"));
+
+type DateTimeValue = { value: string; isPartial: boolean };
+
+function splitDateTimeLocal(value?: string) {
+  const [date = "", time = ""] = (value ?? "").split("T");
+  const [hour = "", minute = ""] = time.split(":");
+  return { date, hour, minute };
+}
+
+// BUG-D3-009: the browser's datetime-local control follows the browser locale
+// (AM/PM on an en-US Chrome) while the ticket detail shows 24-hour times. The
+// time is therefore picked from 00–23 and 00–59 lists. The value has the same
+// "YYYY-MM-DDTHH:mm" shape as datetime-local, so the existing checks still apply.
+// The date input is left uncontrolled on purpose: a controlled date input loses a
+// half-typed date whenever the page re-renders (the ticket list syncs every 15 s).
+function DateTimeField({ id, initialValue, minDate, maxDate, disabled, onChange }: { id: string; initialValue?: string; minDate?: string; maxDate?: string; disabled?: boolean; onChange: (next: DateTimeValue) => void }) {
+  const { language } = useLanguage();
+  const initial = splitDateTimeLocal(initialValue);
+  const [parts, setParts] = useState({ ...initial, isDateIncomplete: false });
+  const labels = language === "id" ? { date: "Tanggal", hour: "Jam", minute: "Menit" } : { date: "Date", hour: "Hour", minute: "Minute" };
+
+  function update(change: Partial<typeof parts>) {
+    const next = { ...parts, ...change };
+    setParts(next);
+    const value = next.date && next.hour && next.minute ? `${next.date}T${next.hour}:${next.minute}` : "";
+    onChange({ value, isPartial: next.isDateIncomplete || (!value && Boolean(next.date || next.hour || next.minute)) });
+  }
+
+  const controlClass = "rounded-lg border border-[#becabd]/60 bg-white px-2 py-2 text-xs font-semibold tabular-nums text-[#121b2e] outline-none focus:border-[#069494] disabled:opacity-60";
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <input id={id} type="date" aria-label={labels.date} disabled={disabled} defaultValue={initial.date} min={minDate} max={maxDate} onChange={(event) => update({ date: event.target.value, isDateIncomplete: event.target.validity.badInput })} className={`${controlClass} min-w-0 flex-1`} />
+      <select aria-label={labels.hour} disabled={disabled} value={parts.hour} onChange={(event) => update({ hour: event.target.value })} className={controlClass}><option value="">--</option>{HOUR_OPTIONS.map((hour) => <option key={hour} value={hour}>{hour}</option>)}</select>
+      <span aria-hidden="true" className="text-xs font-bold text-[#4d5f81]">{language === "id" ? "." : ":"}</span>
+      <select aria-label={labels.minute} disabled={disabled} value={parts.minute} onChange={(event) => update({ minute: event.target.value })} className={controlClass}><option value="">--</option>{MINUTE_OPTIONS.map((minute) => <option key={minute} value={minute}>{minute}</option>)}</select>
+    </div>
+  );
+}
+
+// HR edits the due date as a draft and saves it explicitly, so picking the date,
+// hour, and minute one by one does not trigger three separate saves.
+function DueDateEditor({ ticket, disabled, onSave }: { ticket: TicketItem; disabled: boolean; onSave: (dueAt: string | null) => void }) {
+  const { language } = useLanguage();
+  const copy = language === "id"
+    ? { dueDate: "Batas waktu", save: "Simpan", incomplete: "Lengkapi tanggal, jam, dan menit.", hint: "Format 24 jam. Kosongkan semuanya lalu simpan untuk menghapus batas waktu." }
+    : { dueDate: "Due date", save: "Save", incomplete: "Complete the date, hour, and minute.", hint: "24-hour format. Clear all fields and save to remove the due date." };
+  const saved = toDateTimeLocal(ticket.dueAt);
+  const [draft, setDraft] = useState<DateTimeValue>({ value: saved, isPartial: false });
+  const canSave = !disabled && !draft.isPartial && draft.value !== saved;
+  const fieldId = `due-date-${ticket.dbId}`;
+
+  return (
+    <div className="grid gap-1 text-[11px] font-semibold text-[#4d5f81] sm:col-span-2">
+      <label htmlFor={fieldId}>{copy.dueDate}</label>
+      <div className="flex items-center gap-2">
+        <DateTimeField id={fieldId} initialValue={saved} minDate={localDateString(new Date(ticket.createdAt))} disabled={disabled} onChange={setDraft} />
+        <button type="button" disabled={!canSave} onClick={() => onSave(draft.value || null)} className="shrink-0 rounded-lg bg-[#1e3765] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#0f2342] disabled:cursor-not-allowed disabled:opacity-40">{copy.save}</button>
+      </div>
+      <p className={`text-[10px] font-normal ${draft.isPartial ? "text-[#d64545]" : ""}`}>{draft.isPartial ? copy.incomplete : copy.hint}</p>
+    </div>
+  );
 }
 
 function readTicketNotificationIds(authUserId: string) {
@@ -175,7 +254,7 @@ function toDateTimeLocal(value?: string) {
 
 export default function EmployeeReportTicketPage() {
   const { t, language } = useLanguage();
-  const copy = language === "id" ? { loadingAccess: "Memuat akses HRMS...", search: "Cari tiket, pegawai...", notifications: "Notifikasi tiket", ticketList: "Daftar tiket", description: "Catat, tindak lanjuti, dan pantau kebutuhan pekerjaan secara terstruktur.", all: "Semua", loadingTickets: "Memuat tiket dari database...", noTickets: "Belum ada tiket yang sesuai dengan filter.", showing: "Menampilkan", of: "dari", tickets: "tiket", employee: "Karyawan", submitted: "Diajukan", status: "Status", dueDate: "Batas waktu", noDueDate: "Belum ditentukan", action: "Aksi", view: "Lihat", ticket: "Tiket", create: "Buat tiket", loadError: "Tiket belum dapat dimuat. Silakan coba lagi.", historyError: "Sebagian riwayat tiket belum dapat dimuat.", ticketCreated: "Tiket berhasil diajukan.", followUpAdded: "Tindak lanjut ditambahkan.", hrNewTicket: (name: string, department: string) => `Tiket baru dari ${name}${department && department !== "-" ? ` · ${department}` : ""}.`, hrOverdue: "Melewati batas waktu dan belum selesai.", employeeStatus: (status: TicketStatus) => ({ PENDING: "Status tiket Anda dikembalikan ke Menunggu.", TODO: "Tiket Anda sudah diterima HR dan masuk antrean.", IN_PROGRESS: "Tiket Anda sedang ditangani HR.", RESOLVED: "Tiket Anda sudah diselesaikan.", REJECTED: "Tiket Anda ditolak. Lihat riwayat tiket untuk keterangannya." })[status], employeeFollowUp: (note: string) => `HR menambahkan tindak lanjut: "${shortText(note)}"`, newNotifications: "ada notifikasi baru", dueUpdated: "Batas waktu diperbarui.", dueInvalid: "Batas waktu tidak valid. Pilih waktu setelah tiket diajukan dan paling lambat satu tahun ke depan.", followUpLength: `Tindak lanjut harus ${TICKET_LIMITS.followUpMin}–${TICKET_LIMITS.followUpMax} karakter.`, followUpDateInvalid: "Waktu tindak lanjut tidak valid. Pilih waktu setelah tiket diajukan dan paling lambat satu tahun ke depan.", updateFailed: "Pengaturan tiket belum berhasil diperbarui.", updated: "Pengaturan tiket diperbarui.", followUpFailed: "Tindak lanjut belum berhasil disimpan.", followUpSaved: "Tindak lanjut tersimpan di riwayat tiket.", accessUnavailable: "Akses karyawan belum siap. Login ulang lalu coba lagi.", titleLength: `Judul tiket harus ${TICKET_LIMITS.titleMin}–${TICKET_LIMITS.titleMax} karakter.`, descriptionLength: `Deskripsi harus ${TICKET_LIMITS.descriptionMin}–${TICKET_LIMITS.descriptionMax} karakter.`, categoryInvalid: "Pilih kategori dari daftar yang tersedia.", occurredInvalid: "Waktu kejadian tidak boleh di masa depan atau lebih dari satu tahun yang lalu.", imageType: "Lampiran hanya boleh berupa gambar JPG, PNG, atau WebP.", imageSize: "Lampiran gambar maksimal 5 MB.", createFailed: "Tiket belum berhasil dibuat. Periksa kembali data lalu coba lagi.", attachmentUpload: (id: string) => `${id} dibuat, tetapi lampiran belum berhasil diunggah.`, attachmentMetadata: (id: string) => `${id} dibuat, tetapi metadata lampiran belum tersimpan.`, created: (id: string) => `${id} berhasil dibuat.`, attachmentOpen: "Lampiran belum dapat dibuka." } : { loadingAccess: "Loading HRMS access...", search: "Search tickets or employees...", notifications: "Ticket notifications", ticketList: "Ticket list", description: "Record, follow up, and monitor work needs in a structured workflow.", all: "All", loadingTickets: "Loading tickets from the database...", noTickets: "No tickets match the current filter.", showing: "Showing", of: "of", tickets: "tickets", employee: "Employee", submitted: "Submitted", status: "Status", dueDate: "Due date", noDueDate: "Not set", action: "Action", view: "View", ticket: "Ticket", create: "Create ticket", loadError: "Tickets could not be loaded. Please try again.", historyError: "Some ticket history could not be loaded.", ticketCreated: "Ticket submitted successfully.", followUpAdded: "Follow-up added.", hrNewTicket: (name: string, department: string) => `New ticket from ${name}${department && department !== "-" ? ` · ${department}` : ""}.`, hrOverdue: "Past its due date and not finished yet.", employeeStatus: (status: TicketStatus) => ({ PENDING: "Your ticket was moved back to Pending.", TODO: "HR received your ticket and queued it.", IN_PROGRESS: "HR is working on your ticket.", RESOLVED: "Your ticket has been resolved.", REJECTED: "Your ticket was rejected. Check the ticket history for details." })[status], employeeFollowUp: (note: string) => `HR added a follow-up: "${shortText(note)}"`, newNotifications: "new notifications", dueUpdated: "Due date updated.", dueInvalid: "Invalid due date. Choose a time after the ticket was submitted and within one year from now.", followUpLength: `Follow-up must be ${TICKET_LIMITS.followUpMin}–${TICKET_LIMITS.followUpMax} characters.`, followUpDateInvalid: "Invalid follow-up time. Choose a time after the ticket was submitted and within one year from now.", updateFailed: "Ticket settings could not be updated.", updated: "Ticket settings updated.", followUpFailed: "Follow-up could not be saved.", followUpSaved: "Follow-up saved in ticket history.", accessUnavailable: "Employee access is not ready. Sign in again and retry.", titleLength: `Ticket title must be ${TICKET_LIMITS.titleMin}–${TICKET_LIMITS.titleMax} characters.`, descriptionLength: `Description must be ${TICKET_LIMITS.descriptionMin}–${TICKET_LIMITS.descriptionMax} characters.`, categoryInvalid: "Choose a category from the list.", occurredInvalid: "The occurrence time cannot be in the future or more than one year ago.", imageType: "Attachments must be JPG, PNG, or WebP images.", imageSize: "Image attachments must be at most 5 MB.", createFailed: "Ticket could not be created. Check the details and try again.", attachmentUpload: (id: string) => `${id} was created, but the attachment could not be uploaded.`, attachmentMetadata: (id: string) => `${id} was created, but its attachment metadata could not be saved.`, created: (id: string) => `${id} created successfully.`, attachmentOpen: "Attachment could not be opened." };
+  const copy = language === "id" ? { search: "Cari tiket, pegawai...", employeeFallback: "Pegawai", hrManager: "HR / Manajer", notifications: "Notifikasi tiket", ticketList: "Daftar tiket", description: "Catat, tindak lanjuti, dan pantau kebutuhan pekerjaan secara terstruktur.", all: "Semua", noTickets: "Belum ada tiket yang sesuai dengan filter.", showing: "Menampilkan", of: "dari", tickets: "tiket", employee: "Karyawan", submitted: "Diajukan", status: "Status", dueDate: "Batas waktu", noDueDate: "Belum ditentukan", openDetail: "Buka detail", rowHint: "Klik baris tiket untuk membuka detailnya.", ticket: "Tiket", create: "Buat tiket", loadError: "Tiket belum dapat dimuat. Silakan coba lagi.", historyError: "Sebagian riwayat tiket belum dapat dimuat.", ticketCreated: "Tiket berhasil diajukan.", followUpAdded: "Tindak lanjut ditambahkan.", hrNewTicket: (name: string, department: string) => `Tiket baru dari ${name}${department && department !== "-" ? ` · ${department}` : ""}.`, hrOverdue: "Melewati batas waktu dan belum selesai.", employeeStatus: (status: TicketStatus) => ({ PENDING: "Status tiket Anda dikembalikan ke Menunggu.", TODO: "Tiket Anda sudah diterima HR dan masuk antrean.", IN_PROGRESS: "Tiket Anda sedang ditangani HR.", RESOLVED: "Tiket Anda sudah diselesaikan.", REJECTED: "Tiket Anda ditolak. Lihat riwayat tiket untuk keterangannya." })[status], employeeFollowUp: (note: string) => `HR menambahkan tindak lanjut: "${shortText(note)}"`, newNotifications: "ada notifikasi baru", dueUpdated: "Batas waktu diperbarui.", dueInvalid: "Batas waktu tidak valid. Pilih waktu setelah tiket diajukan dan paling lambat satu tahun ke depan.", followUpLength: `Tindak lanjut harus ${TICKET_LIMITS.followUpMin}–${TICKET_LIMITS.followUpMax} karakter.`, updateFailed: "Pengaturan tiket belum berhasil diperbarui.", updated: "Pengaturan tiket diperbarui.", followUpFailed: "Tindak lanjut belum berhasil disimpan.", followUpSaved: "Tindak lanjut tersimpan di riwayat tiket.", accessUnavailable: "Akses karyawan belum siap. Login ulang lalu coba lagi.", titleLength: `Judul tiket harus ${TICKET_LIMITS.titleMin}–${TICKET_LIMITS.titleMax} karakter.`, descriptionLength: `Deskripsi harus ${TICKET_LIMITS.descriptionMin}–${TICKET_LIMITS.descriptionMax} karakter.`, categoryInvalid: "Pilih kategori dari daftar yang tersedia.", occurredInvalid: "Waktu kejadian tidak boleh di masa depan atau lebih dari satu tahun yang lalu.", imageType: "Lampiran hanya boleh berupa gambar JPG, PNG, atau WebP.", imageSize: "Lampiran gambar maksimal 5 MB.", createFailed: "Tiket belum berhasil dibuat. Periksa kembali data lalu coba lagi.", attachmentUpload: (id: string) => `${id} dibuat, tetapi lampiran belum berhasil diunggah.`, attachmentMetadata: (id: string) => `${id} dibuat, tetapi metadata lampiran belum tersimpan.`, created: (id: string) => `${id} berhasil dibuat.`, attachmentOpen: "Lampiran belum dapat dibuka." } : { search: "Search tickets or employees...", employeeFallback: "Employee", hrManager: "HR / Manager", notifications: "Ticket notifications", ticketList: "Ticket list", description: "Record, follow up, and monitor work needs in a structured workflow.", all: "All", noTickets: "No tickets match the current filter.", showing: "Showing", of: "of", tickets: "tickets", employee: "Employee", submitted: "Submitted", status: "Status", dueDate: "Due date", noDueDate: "Not set", openDetail: "Open details", rowHint: "Click a ticket row to open its details.", ticket: "Ticket", create: "Create ticket", loadError: "Tickets could not be loaded. Please try again.", historyError: "Some ticket history could not be loaded.", ticketCreated: "Ticket submitted successfully.", followUpAdded: "Follow-up added.", hrNewTicket: (name: string, department: string) => `New ticket from ${name}${department && department !== "-" ? ` · ${department}` : ""}.`, hrOverdue: "Past its due date and not finished yet.", employeeStatus: (status: TicketStatus) => ({ PENDING: "Your ticket was moved back to Pending.", TODO: "HR received your ticket and queued it.", IN_PROGRESS: "HR is working on your ticket.", RESOLVED: "Your ticket has been resolved.", REJECTED: "Your ticket was rejected. Check the ticket history for details." })[status], employeeFollowUp: (note: string) => `HR added a follow-up: "${shortText(note)}"`, newNotifications: "new notifications", dueUpdated: "Due date updated.", dueInvalid: "Invalid due date. Choose a time after the ticket was submitted and within one year from now.", followUpLength: `Follow-up must be ${TICKET_LIMITS.followUpMin}–${TICKET_LIMITS.followUpMax} characters.`, updateFailed: "Ticket settings could not be updated.", updated: "Ticket settings updated.", followUpFailed: "Follow-up could not be saved.", followUpSaved: "Follow-up saved in ticket history.", accessUnavailable: "Employee access is not ready. Sign in again and retry.", titleLength: `Ticket title must be ${TICKET_LIMITS.titleMin}–${TICKET_LIMITS.titleMax} characters.`, descriptionLength: `Description must be ${TICKET_LIMITS.descriptionMin}–${TICKET_LIMITS.descriptionMax} characters.`, categoryInvalid: "Choose a category from the list.", occurredInvalid: "The occurrence time cannot be in the future or more than one year ago.", imageType: "Attachments must be JPG, PNG, or WebP images.", imageSize: "Image attachments must be at most 5 MB.", createFailed: "Ticket could not be created. Check the details and try again.", attachmentUpload: (id: string) => `${id} was created, but the attachment could not be uploaded.`, attachmentMetadata: (id: string) => `${id} was created, but its attachment metadata could not be saved.`, created: (id: string) => `${id} created successfully.`, attachmentOpen: "Attachment could not be opened." };
   const router = useRouter();
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -192,7 +271,11 @@ export default function EmployeeReportTicketPage() {
   const [tablePage, setTablePage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [followUp, setFollowUp] = useState("");
-  const [followUpAt, setFollowUpAt] = useState(currentLocalDateTime);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  // The skeleton is shown only for the first load. Later reloads (the 15-second
+  // sync, saving, language switch) refresh in place so the table and an open
+  // form are not replaced while someone is using them.
+  const hasLoadedTicketsRef = useRef(false);
   const [notice, setNotice] = useState("");
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
@@ -200,7 +283,8 @@ export default function EmployeeReportTicketPage() {
 
   async function loadTickets(actorEmployeeId = viewerEmployeeId, actorName = viewerName) {
     const supabase = createClient();
-    setIsTicketLoading(true);
+    if (hasLoadedTicketsRef.current) setIsRefreshing(true);
+    else setIsTicketLoading(true);
     const { data: ticketRows, error: ticketError } = await supabase
       .from("d3_tickets")
       .select("id, ticket_code, employee_id, reporter_name, reporter_employee_code, reporter_department, title, category, description, occurred_at, status, due_at, created_at, updated_at")
@@ -209,6 +293,7 @@ export default function EmployeeReportTicketPage() {
     if (ticketError) {
       showNotice(copy.loadError);
       setIsTicketLoading(false);
+      setIsRefreshing(false);
       return;
     }
 
@@ -225,12 +310,12 @@ export default function EmployeeReportTicketPage() {
       showNotice(copy.historyError);
     }
 
-    const reporterByTicket = new Map((ticketRows ?? []).map((ticket) => [ticket.id, { employeeId: ticket.employee_id as string, name: ticket.reporter_name ?? "Employee" }]));
+    const reporterByTicket = new Map((ticketRows ?? []).map((ticket) => [ticket.id, { employeeId: ticket.employee_id as string, name: ticket.reporter_name ?? copy.employeeFallback }]));
     const actorLabel = (ticketId: string, actorId: string | null) => {
-      if (actorId && actorId === actorEmployeeId) return actorName || "Employee";
+      if (actorId && actorId === actorEmployeeId) return actorName || copy.employeeFallback;
       const reporter = reporterByTicket.get(ticketId);
       if (actorId && reporter && actorId === reporter.employeeId) return reporter.name;
-      return "HR / Manager";
+      return copy.hrManager;
     };
 
     const historiesByTicket = new Map<string, Activity[]>();
@@ -283,8 +368,8 @@ export default function EmployeeReportTicketPage() {
       dbId: ticket.id,
       id: ticket.ticket_code,
       employeeUuid: ticket.employee_id,
-      employeeId: ticket.reporter_employee_code ?? "Employee",
-      employeeName: ticket.reporter_name ?? "Employee",
+      employeeId: ticket.reporter_employee_code ?? "—",
+      employeeName: ticket.reporter_name ?? copy.employeeFallback,
       department: ticket.reporter_department ?? "-",
       title: ticket.title,
       category: ticket.category,
@@ -300,7 +385,9 @@ export default function EmployeeReportTicketPage() {
     setTickets(loadedTickets);
     setLastSyncedAt(Date.now());
     setSelectedId((current) => loadedTickets.some((ticket) => ticket.id === current) ? current : (loadedTickets[0]?.id ?? ""));
+    hasLoadedTicketsRef.current = true;
     setIsTicketLoading(false);
+    setIsRefreshing(false);
   }
 
   useEffect(() => {
@@ -334,7 +421,7 @@ export default function EmployeeReportTicketPage() {
         if (!isMounted) return;
         const role = access.app_role as AppRole;
         const metadataName = userData.user.user_metadata?.full_name;
-        const fallbackName = userData.user.email?.split("@")[0] ?? "User Andima";
+        const fallbackName = userData.user.email?.split("@")[0] ?? copy.employeeFallback;
         const accountName = access.full_name?.trim() || (typeof metadataName === "string" && metadataName.trim() ? metadataName.trim() : fallbackName);
         setViewerName(accountName);
         setAppRole(role);
@@ -362,7 +449,7 @@ export default function EmployeeReportTicketPage() {
     const normalizedQuery = query.trim().toLowerCase();
     return accessibleTickets.filter((ticket) => {
       const isMatchingStatus = statusFilter === "ALL" || ticket.status === statusFilter;
-      const searchable = `${ticket.id} ${ticket.employeeName} ${ticket.title} ${ticket.category}`.toLowerCase();
+      const searchable = `${ticket.id} ${ticket.employeeName} ${ticket.title} ${categoryLabel(ticket.category, language)} ${categoryLabel(ticket.category, language)}`.toLowerCase();
       return isMatchingStatus && (!normalizedQuery || searchable.includes(normalizedQuery));
     });
   }, [accessibleTickets, query, statusFilter]);
@@ -510,23 +597,14 @@ export default function EmployeeReportTicketPage() {
       showNotice(copy.followUpLength);
       return;
     }
-    let followUpTime: number | null = null;
-    if (followUpAt) {
-      followUpTime = parseLocalDateTime(followUpAt);
-      const createdTime = new Date(selectedTicket.createdAt).getTime();
-      // Allow a minute of clock drift between the browser and the ticket timestamp.
-      if (followUpTime === null || followUpTime < createdTime - 60_000 || followUpTime > Date.now() + ONE_YEAR_MS) {
-        showNotice(copy.followUpDateInvalid);
-        return;
-      }
-    }
+    // The follow-up time is not entered by hand (BUG-D3-010): follow_up_at stays
+    // empty and the history uses the row's created_at, the moment it was saved.
     setIsSaving(true);
     const supabase = createClient();
     const { error } = await supabase.from("d3_ticket_followups").insert({
       ticket_id: selectedTicket.dbId,
       actor_employee_id: viewerEmployeeId,
       note,
-      follow_up_at: followUpTime === null ? null : new Date(followUpTime).toISOString(),
     });
     setIsSaving(false);
     if (error) {
@@ -534,7 +612,6 @@ export default function EmployeeReportTicketPage() {
       return;
     }
     setFollowUp("");
-    setFollowUpAt(currentLocalDateTime());
     await loadTickets();
     showNotice(copy.followUpSaved);
   }
@@ -615,7 +692,7 @@ export default function EmployeeReportTicketPage() {
   }
 
   if (isAccountLoading) {
-    return <main className="grid min-h-screen place-items-center bg-[#f7f8ff] text-sm font-semibold text-[#4d5f81]">{copy.loadingAccess}</main>;
+    return <main><PageSkeleton withTopBar layout="split" /></main>;
   }
 
   return (
@@ -624,7 +701,7 @@ export default function EmployeeReportTicketPage() {
         <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 pl-16 pr-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:pr-6 lg:pl-6">
           <div className="flex w-full min-w-0 items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3"><div className="hidden min-w-0 items-center gap-3 sm:flex"><span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span><span className="h-5 border-l border-[#BCD4EE]" /><span className="text-xs font-semibold text-[#3f4940]">HRMS</span><ChevronRight size={13} className="shrink-0 text-[#52749B]/60" /><span className="truncate text-xs font-semibold text-[#0C68D5]">{t("employeeReportTicket")}</span></div><span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">{t("reportTicket")}</span></div>
-            <div className="relative flex items-center gap-2 sm:gap-3"><button onClick={() => setIsNotificationOpen((current) => !current)} className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label={unreadTicketNotifications.length > 0 ? `${copy.notifications}, ${copy.newNotifications}` : copy.notifications} aria-expanded={isNotificationOpen}><Bell size={17} />{unreadTicketNotifications.length > 0 && <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-[#d64545] ring-2 ring-white" aria-hidden="true" />}</button>{isNotificationOpen && <TicketNotificationPanel role={viewRole} notifications={unreadTicketNotifications} isLoading={isTicketLoading} onRefresh={refreshTickets} onReadAll={markAllTicketNotificationsRead} onSelect={openTicketNotification} />}<HeaderAccount /></div>
+            <div className="relative flex items-center gap-2 sm:gap-3"><button onClick={() => setIsNotificationOpen((current) => !current)} className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label={unreadTicketNotifications.length > 0 ? `${copy.notifications}, ${copy.newNotifications}` : copy.notifications} aria-expanded={isNotificationOpen}><Bell size={17} />{unreadTicketNotifications.length > 0 && <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-[#d64545] ring-2 ring-white" aria-hidden="true" />}</button>{isNotificationOpen && <TicketNotificationPanel role={viewRole} notifications={unreadTicketNotifications} isLoading={isTicketLoading || isRefreshing} onRefresh={refreshTickets} onReadAll={markAllTicketNotificationsRead} onSelect={openTicketNotification} />}<HeaderAccount /></div>
           </div>
         </header>
 
@@ -637,12 +714,18 @@ export default function EmployeeReportTicketPage() {
           <div className="mt-5 flex flex-col gap-5 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_400px]">
             <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
               <div className="flex flex-col gap-3 border-b border-[#becabd]/35 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"><label className="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-[#d9e2fc] bg-[#f7f8ff] px-2.5 text-[#1e3765]"><Filter size={14} aria-hidden="true" /><span className="sr-only">{language === "id" ? "Filter status tiket" : "Filter ticket status"}</span><select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as "ALL" | TicketStatus); setTablePage(1); }} className="min-w-30 bg-transparent text-[11px] font-semibold outline-none"><option value="ALL">{copy.all} ({accessibleTickets.length})</option>{(["PENDING", "TODO", "IN_PROGRESS", "RESOLVED", "REJECTED"] as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select></label><label className="flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:hidden"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => { setQuery(event.target.value); setTablePage(1); }} className="w-full bg-transparent text-xs outline-none" placeholder={copy.search} maxLength={TICKET_LIMITS.searchMax} /></label></div>
-              <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.ticket}</th><th className="px-3 py-3">{copy.submitted}</th><th className="px-3 py-3">{copy.dueDate}</th><th className="px-3 py-3">{copy.status}</th><th className="w-16 px-3 py-3">{copy.action}</th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{isTicketLoading ? <tr><td colSpan={6} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.loadingTickets}</td></tr> : paginatedTickets.map((ticket) => <tr key={ticket.id} onClick={() => selectTicket(ticket.id)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selectedTicket?.id === ticket.id ? "bg-[#eaf7f0]" : "bg-white"}`}><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="max-w-[420px] text-xs font-semibold [overflow-wrap:anywhere]">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {ticket.category}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt, language)}</td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5"><button onClick={(event) => { event.stopPropagation(); selectTicket(ticket.id); }} className="rounded-md bg-[#f1f3ff] px-2.5 py-1.5 text-[11px] font-bold text-[#1e3765] transition hover:bg-[#d9e2fc]" aria-label={`${copy.view} ${ticket.id}`}>{copy.view}</button></td></tr>)}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={6} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.noTickets}</td></tr>}</tbody></table></div>
-              <div className="border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81]">{copy.showing} <b className="text-[#121b2e]">{paginatedTickets.length}</b> {copy.of} <b className="text-[#121b2e]">{visibleTickets.length}</b> {copy.tickets}.</div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.ticket}</th><th className="px-3 py-3">{copy.submitted}</th><th className="px-3 py-3">{copy.dueDate}</th><th className="px-3 py-3">{copy.status}</th><th className="w-10 px-3 py-3"><span className="sr-only">{copy.openDetail}</span></th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{isTicketLoading ? <SkeletonTableRows rows={6} columns={6} /> : paginatedTickets.map((ticket) => {
+                // BUG-D3-008: the whole row is the one way to open a ticket. The
+                // chevron and the highlighted row show that, so there is no
+                // separate "View" button doing the same thing.
+                const isSelected = selectedTicket?.id === ticket.id;
+                return <tr key={ticket.id} tabIndex={0} aria-current={isSelected ? "true" : undefined} aria-label={`${copy.openDetail} ${ticket.id}: ${ticket.title}`} onClick={() => selectTicket(ticket.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectTicket(ticket.id); } }} className={`group cursor-pointer outline-none transition hover:bg-[#f7f8ff] focus-visible:bg-[#f1f3ff] focus-visible:shadow-[inset_3px_0_0_#0C68D5] ${isSelected ? "bg-[#eaf7f0] shadow-[inset_3px_0_0_#16834b]" : "bg-white"}`}><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="max-w-[420px] text-xs font-semibold [overflow-wrap:anywhere]">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {categoryLabel(ticket.category, language)}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt, language)}</td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5 text-right"><ChevronRight size={16} aria-hidden="true" className={`inline-block transition ${isSelected ? "text-[#16834b]" : "text-[#9aabc4] group-hover:translate-x-0.5 group-hover:text-[#1e3765]"}`} /></td></tr>;
+              })}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={6} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.noTickets}</td></tr>}</tbody></table></div>
+              <div className="flex flex-col gap-1 border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81] sm:flex-row sm:items-center sm:justify-between"><span>{copy.showing} <b className="text-[#121b2e]">{paginatedTickets.length}</b> {copy.of} <b className="text-[#121b2e]">{visibleTickets.length}</b> {copy.tickets}.</span>{visibleTickets.length > 0 && <span className="text-[11px]">{copy.rowHint}</span>}</div>
               <TablePagination page={currentPage} pageSize={tablePageSize} totalItems={visibleTickets.length} onPageChange={setTablePage} />
             </section>
 
-            <TicketDetail ticket={selectedTicket} role={viewRole} followUp={followUp} followUpAt={followUpAt} isSaving={isSaving} onFollowUpChange={setFollowUp} onFollowUpAtChange={setFollowUpAt} onAddFollowUp={addFollowUp} onUpdateWorkflow={updateTicketWorkflow} onOpenAttachment={openAttachment} onClose={() => setSelectedId("")} />
+            <TicketDetail ticket={selectedTicket} isLoading={isTicketLoading} role={viewRole} followUp={followUp} isSaving={isSaving} onFollowUpChange={setFollowUp} onAddFollowUp={addFollowUp} onUpdateWorkflow={updateTicketWorkflow} onOpenAttachment={openAttachment} onClose={() => setSelectedId("")} />
           </div>
         </div>
       </section>
@@ -674,30 +757,31 @@ function TicketNotificationPanel({ role, notifications, isLoading, onRefresh, on
   </section>;
 }
 
-function TicketDetail({ ticket, role, followUp, followUpAt, isSaving, onFollowUpChange, onFollowUpAtChange, onAddFollowUp, onUpdateWorkflow, onOpenAttachment, onClose }: { ticket?: TicketItem; role: ViewRole; followUp: string; followUpAt: string; isSaving: boolean; onFollowUpChange: (value: string) => void; onFollowUpAtChange: (value: string) => void; onAddFollowUp: () => void; onUpdateWorkflow: (update: { status?: TicketStatus; dueAt?: string | null }) => void; onOpenAttachment: (attachment: { fileName: string; storagePath: string }) => void; onClose: () => void }) {
+function TicketDetail({ ticket, isLoading, role, followUp, isSaving, onFollowUpChange, onAddFollowUp, onUpdateWorkflow, onOpenAttachment, onClose }: { ticket?: TicketItem; isLoading: boolean; role: ViewRole; followUp: string; isSaving: boolean; onFollowUpChange: (value: string) => void; onAddFollowUp: () => void; onUpdateWorkflow: (update: { status?: TicketStatus; dueAt?: string | null }) => void; onOpenAttachment: (attachment: { fileName: string; storagePath: string }) => void; onClose: () => void }) {
   const { language } = useLanguage();
-  const copy = language === "id" ? { empty: "Pilih tiket untuk melihat detail.", details: "Detail tiket", workflow: "Alur laporan karyawan", close: "Tutup detail", current: "Pengaturan tiket", restricted: "Pengaturan hanya dapat diperbarui oleh HR atau Manager.", status: "Status", dueDate: "Batas waktu", noDueDate: "Belum ditentukan", reported: "Dilaporkan", occurred: "Kejadian/pengajuan", history: "Progres & riwayat", noFollowUp: "Belum ada tindak lanjut untuk tiket ini.", add: "Tambah tindak lanjut", placeholder: "Tuliskan tindakan atau informasi tindak lanjut...", at: "Tanggal / waktu tindak lanjut", saving: "Menyimpan...", save: "Simpan tindak lanjut" } : { empty: "Select a ticket to view its details.", details: "Ticket details", workflow: "Employee report workflow", close: "Close details", current: "Ticket settings", restricted: "Settings can be updated by HR or a Manager.", status: "Status", dueDate: "Due date", noDueDate: "Not set", reported: "Reported", occurred: "Occurrence/submission", history: "Progress & history", noFollowUp: "There is no follow-up for this ticket yet.", add: "Add follow-up", placeholder: "Describe the action taken or follow-up information...", at: "Follow-up date / time", saving: "Saving...", save: "Save follow-up" };
-  if (!ticket) return <aside className="rounded-xl border border-[#becabd]/45 bg-white p-6 text-sm text-[#4d5f81]">{copy.empty}</aside>;
+  const copy = language === "id" ? { empty: "Pilih tiket untuk melihat detail.", details: "Detail tiket", workflow: "Alur laporan karyawan", close: "Tutup detail", current: "Pengaturan tiket", restricted: "Pengaturan hanya dapat diperbarui oleh HR atau Manager.", status: "Status", dueDate: "Batas waktu", noDueDate: "Belum ditentukan", reported: "Dilaporkan", occurred: "Kejadian/pengajuan", history: "Progres & riwayat", noFollowUp: "Belum ada tindak lanjut untuk tiket ini.", add: "Tambah tindak lanjut", placeholder: "Tuliskan tindakan atau informasi tindak lanjut...", autoTime: "Waktu tindak lanjut dicatat otomatis saat disimpan.", saving: "Menyimpan...", save: "Simpan tindak lanjut" } : { empty: "Select a ticket to view its details.", details: "Ticket details", workflow: "Employee report workflow", close: "Close details", current: "Ticket settings", restricted: "Settings can be updated by HR or a Manager.", status: "Status", dueDate: "Due date", noDueDate: "Not set", reported: "Reported", occurred: "Occurrence/submission", history: "Progress & history", noFollowUp: "There is no follow-up for this ticket yet.", add: "Add follow-up", placeholder: "Describe the action taken or follow-up information...", autoTime: "The follow-up time is recorded automatically when you save.", saving: "Saving...", save: "Save follow-up" };
+  if (!ticket) return isLoading ? <SkeletonPanel /> : <aside className="rounded-xl border border-[#becabd]/45 bg-white p-6 text-sm text-[#4d5f81]">{copy.empty}</aside>;
   const canManage = role === "manager";
 
   return <aside id="ticket-detail" className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] scroll-mt-20 2xl:sticky 2xl:top-21 2xl:h-fit">
     <div className="flex items-start justify-between bg-[#1e3765] px-5 py-4 text-white"><div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-lg border border-[#069494] bg-[#577c8e]"><Ticket size={15} /></span><div><p className="text-sm font-bold">{copy.details} — {ticket.id}</p><p className="text-[11px] text-[#d9e2fc]">{copy.workflow}</p></div></div><button onClick={onClose} className="rounded p-1 text-[#d9e2fc] hover:bg-white/10" aria-label={copy.close}><X size={16} /></button></div>
     <div className="space-y-5 p-5">
-      <div><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[#4d5f81]">{copy.current}</p><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-[11px] font-semibold text-[#4d5f81]"><span>{copy.status}</span>{canManage ? <select disabled={isSaving} value={ticket.status} onChange={(event) => onUpdateWorkflow({ status: event.target.value as TicketStatus })} className="rounded-lg border border-[#becabd]/60 bg-white px-2.5 py-2 text-xs font-semibold text-[#121b2e] outline-none focus:border-[#069494] disabled:opacity-60">{(Object.keys(statusMeta) as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select> : <StatusBadge status={ticket.status} />}</label><label className="grid gap-1 text-[11px] font-semibold text-[#4d5f81]"><span>{copy.dueDate}</span>{canManage ? <input key={`${ticket.id}-${ticket.dueAt ?? ""}`} disabled={isSaving} min={toDateTimeLocal(ticket.createdAt)} defaultValue={toDateTimeLocal(ticket.dueAt)} onBlur={(event) => onUpdateWorkflow({ dueAt: event.target.value || null })} type="datetime-local" className="rounded-lg border border-[#becabd]/60 bg-white px-2.5 py-2 text-xs font-semibold text-[#121b2e] outline-none focus:border-[#069494] disabled:opacity-60" /> : <span className="text-xs font-semibold text-[#121b2e]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</span>}</label></div>{!canManage && <p className="mt-3 text-xs text-[#4d5f81]">{copy.restricted}</p>}</div>
-      <div className="border-y border-[#becabd]/35 py-4"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId} · {ticket.department}</p></div></div><h2 className="mt-4 text-base font-bold leading-6 [overflow-wrap:anywhere]">{ticket.title}</h2><p className="mt-1 text-xs text-[#4d5f81]">{ticket.category} · {copy.reported} {formatDate(ticket.createdAt, language, true)}</p>{ticket.occurredAt && <p className="mt-1 text-xs text-[#4d5f81]">{copy.occurred}: {formatDate(ticket.occurredAt, language, true)}</p>}<p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#3f4940] [overflow-wrap:anywhere]">{ticket.description}</p>{ticket.attachment && <button onClick={() => onOpenAttachment(ticket.attachment!)} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs font-semibold text-[#1e3765] hover:bg-[#d9e2fc]"><Paperclip size={14} />{ticket.attachment.fileName}</button>}</div>
+      <div><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[#4d5f81]">{copy.current}</p><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-[11px] font-semibold text-[#4d5f81]"><span>{copy.status}</span>{canManage ? <select disabled={isSaving} value={ticket.status} onChange={(event) => onUpdateWorkflow({ status: event.target.value as TicketStatus })} className="rounded-lg border border-[#becabd]/60 bg-white px-2.5 py-2 text-xs font-semibold text-[#121b2e] outline-none focus:border-[#069494] disabled:opacity-60">{(Object.keys(statusMeta) as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select> : <StatusBadge status={ticket.status} />}</label>{canManage ? <DueDateEditor key={`${ticket.id}-${ticket.dueAt ?? ""}`} ticket={ticket} disabled={isSaving} onSave={(dueAt) => onUpdateWorkflow({ dueAt })} /> : <div className="grid gap-1 text-[11px] font-semibold text-[#4d5f81]"><span>{copy.dueDate}</span><span className="text-xs font-semibold text-[#121b2e]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</span></div>}</div>{!canManage && <p className="mt-3 text-xs text-[#4d5f81]">{copy.restricted}</p>}</div>
+      <div className="border-y border-[#becabd]/35 py-4"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId} · {ticket.department}</p></div></div><h2 className="mt-4 text-base font-bold leading-6 [overflow-wrap:anywhere]">{ticket.title}</h2><p className="mt-1 text-xs text-[#4d5f81]">{categoryLabel(ticket.category, language)} · {copy.reported} {formatDate(ticket.createdAt, language, true)}</p>{ticket.occurredAt && <p className="mt-1 text-xs text-[#4d5f81]">{copy.occurred}: {formatDate(ticket.occurredAt, language, true)}</p>}<p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#3f4940] [overflow-wrap:anywhere]">{ticket.description}</p>{ticket.attachment && <button onClick={() => onOpenAttachment(ticket.attachment!)} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs font-semibold text-[#1e3765] hover:bg-[#d9e2fc]"><Paperclip size={14} />{ticket.attachment.fileName}</button>}</div>
       <div><div className="mb-3 flex items-center gap-2"><Clock3 size={15} className="text-[#069494]" /><p className="text-xs font-bold">{copy.history}</p></div>{!ticket.history.some((activity) => activity.kind === "followup") && <p className="mb-3 rounded-lg bg-[#f7f8ff] px-3 py-2 text-xs text-[#4d5f81]">{copy.noFollowUp}</p>}<ol className="space-y-4 border-l border-[#d9e2fc] pl-4">{[...ticket.history].reverse().map((activity) => <li key={activity.id} className="relative"><span className={`absolute -left-[21px] top-1 grid size-3 place-items-center rounded-full ${activity.kind === "status" ? "bg-[#069494]" : activity.kind === "followup" ? "bg-[#16834b]" : "bg-[#b0c6d4]"}`}><span className="size-1 rounded-full bg-white" /></span><p className="whitespace-pre-line text-xs font-semibold text-[#3f4940] [overflow-wrap:anywhere]">{activity.message}</p><p className="mt-1 text-[10px] text-[#4d5f81]">{activity.actor} · {formatDate(activity.at, language, true)}</p></li>)}</ol></div>
-      {canManage && <div className="rounded-lg bg-[#f1f3ff] p-3"><label className="flex items-center gap-2 text-xs font-bold text-[#1e3765]"><MessageSquareText size={14} /> {copy.add}</label><textarea disabled={isSaving} value={followUp} maxLength={TICKET_LIMITS.followUpMax} onChange={(event) => onFollowUpChange(event.target.value)} className="mt-2 min-h-20 w-full resize-none rounded-lg border border-[#d9e2fc] bg-white p-2.5 text-xs outline-none focus:border-[#069494] disabled:opacity-60" placeholder={copy.placeholder} /><p className="mt-1 text-right text-[10px] text-[#4d5f81]">{followUp.length}/{TICKET_LIMITS.followUpMax}</p><label className="mt-2 block text-[11px] font-semibold text-[#4d5f81]">{copy.at}<input disabled={isSaving} value={followUpAt} min={toDateTimeLocal(ticket.createdAt)} onChange={(event) => onFollowUpAtChange(event.target.value)} type="datetime-local" className="mt-1 block w-full rounded-lg border border-[#d9e2fc] bg-white px-2.5 py-2 text-xs font-normal outline-none focus:border-[#069494] disabled:opacity-60" /></label><button disabled={cleanMultilineText(followUp).length < TICKET_LIMITS.followUpMin || isSaving} onClick={onAddFollowUp} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Send size={13} /> {isSaving ? copy.saving : copy.save}</button></div>}</div>
+      {canManage && <div className="rounded-lg bg-[#f1f3ff] p-3"><label className="flex items-center gap-2 text-xs font-bold text-[#1e3765]"><MessageSquareText size={14} /> {copy.add}</label><textarea disabled={isSaving} value={followUp} maxLength={TICKET_LIMITS.followUpMax} onChange={(event) => onFollowUpChange(event.target.value)} className="mt-2 min-h-20 w-full resize-none rounded-lg border border-[#d9e2fc] bg-white p-2.5 text-xs outline-none focus:border-[#069494] disabled:opacity-60" placeholder={copy.placeholder} /><div className="mt-1 flex items-start justify-between gap-3 text-[10px] text-[#4d5f81]"><p className="flex items-center gap-1"><Clock3 size={11} aria-hidden="true" />{copy.autoTime}</p><p className="shrink-0">{followUp.length}/{TICKET_LIMITS.followUpMax}</p></div><button disabled={cleanMultilineText(followUp).length < TICKET_LIMITS.followUpMin || isSaving} onClick={onAddFollowUp} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Send size={13} /> {isSaving ? copy.saving : copy.save}</button></div>}</div>
   </aside>;
 }
 
 function CreateTicketModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (input: CreateTicketInput) => Promise<{ ok: boolean; message?: string }> }) {
   const { language } = useLanguage();
-  const copy = language === "id" ? { required: "Judul, kategori, dan deskripsi wajib diisi sebelum tiket diajukan.", title: "Buat tiket karyawan", subtitle: "ID karyawan akan terhubung otomatis setelah login.", close: "Tutup formulir", ticketTitle: "Judul tiket", titlePlaceholder: "Contoh: Perbaikan kursi kerja di area dispatch", category: "Kategori", choose: "Pilih kategori", occurred: "Tanggal / waktu kejadian", optional: "Opsional", description: "Deskripsi", descriptionPlaceholder: "Jelaskan kondisi, masalah, atau kebutuhan pekerjaan secara singkat dan jelas.", attachment: "Lampiran", attachmentHint: "Opsional, gambar JPG/PNG/WebP maksimal 5 MB", cancel: "Batal", submitting: "Mengajukan...", submit: "Ajukan tiket" } : { required: "Title, category, and description are required before submitting a ticket.", title: "Create employee ticket", subtitle: "Your employee ID will be linked automatically after sign-in.", close: "Close form", ticketTitle: "Ticket title", titlePlaceholder: "Example: Repair the work chair in the dispatch area", category: "Category", choose: "Select a category", occurred: "Occurrence date / time", optional: "Optional", description: "Description", descriptionPlaceholder: "Briefly and clearly describe the condition, issue, or work request.", attachment: "Attachment", attachmentHint: "Optional, JPG/PNG/WebP image up to 5 MB", cancel: "Cancel", submitting: "Submitting...", submit: "Submit ticket" };
+  const copy = language === "id" ? { required: "Judul, kategori, dan deskripsi wajib diisi sebelum tiket diajukan.", createFailed: "Tiket belum berhasil dibuat.", title: "Buat tiket karyawan", subtitle: "ID karyawan akan terhubung otomatis setelah login.", close: "Tutup formulir", ticketTitle: "Judul tiket", titlePlaceholder: "Contoh: Perbaikan kursi kerja di area dispatch", category: "Kategori", choose: "Pilih kategori", occurred: "Tanggal / waktu kejadian", optional: "Opsional, format 24 jam", occurredIncomplete: "Lengkapi tanggal, jam, dan menit kejadian, atau kosongkan ketiganya.", description: "Deskripsi", descriptionPlaceholder: "Jelaskan kondisi, masalah, atau kebutuhan pekerjaan secara singkat dan jelas.", attachment: "Lampiran", attachmentHint: "Opsional, gambar JPG/PNG/WebP maksimal 5 MB", cancel: "Batal", submitting: "Mengajukan...", submit: "Ajukan tiket" } : { required: "Title, category, and description are required before submitting a ticket.", createFailed: "The ticket could not be created.", title: "Create employee ticket", subtitle: "Your employee ID will be linked automatically after sign-in.", close: "Close form", ticketTitle: "Ticket title", titlePlaceholder: "Example: Repair the work chair in the dispatch area", category: "Category", choose: "Select a category", occurred: "Occurrence date / time", optional: "Optional, 24-hour format", occurredIncomplete: "Complete the occurrence date, hour, and minute, or leave all three empty.", description: "Description", descriptionPlaceholder: "Briefly and clearly describe the condition, issue, or work request.", attachment: "Attachment", attachmentHint: "Optional, JPG/PNG/WebP image up to 5 MB", cancel: "Cancel", submitting: "Submitting...", submit: "Submit ticket" };
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const [descriptionValue, setDescriptionValue] = useState("");
-  const [maxOccurredAt] = useState(currentLocalDateTime);
+  const [occurred, setOccurred] = useState<DateTimeValue>({ value: "", isPartial: false });
+  const [occurredRange] = useState(() => ({ max: localDateString(new Date()), min: localDateString(new Date(Date.now() - ONE_YEAR_MS)) }));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -705,20 +789,23 @@ function CreateTicketModal({ onClose, onSubmit }: { onClose: () => void; onSubmi
     const title = titleValue.trim();
     const category = String(formData.get("category") ?? "");
     const description = descriptionValue.trim();
-    const occurredAt = String(formData.get("occurredAt") ?? "");
     const attachmentValue = formData.get("attachment");
     const attachment = attachmentValue instanceof File && attachmentValue.name ? attachmentValue : undefined;
     if (!title || !category || !description) {
       setError(copy.required);
       return;
     }
+    if (occurred.isPartial) {
+      setError(copy.occurredIncomplete);
+      return;
+    }
     setIsSubmitting(true);
-    const result = await onSubmit({ title, category, description, occurredAt: occurredAt || undefined, attachment });
+    const result = await onSubmit({ title, category, description, occurredAt: occurred.value || undefined, attachment });
     setIsSubmitting(false);
-    if (!result.ok) setError(result.message ?? "Ticket belum berhasil dibuat.");
+    if (!result.ok) setError(result.message ?? copy.createFailed);
   }
 
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f2342]/45 p-4"><section role="dialog" aria-modal="true" aria-labelledby="create-ticket-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#d9e2fc] px-6 py-4"><div><h2 id="create-ticket-title" className="text-lg font-bold">{copy.title}</h2><p className="mt-0.5 text-xs text-[#4d5f81]">{copy.subtitle}</p></div><button disabled={isSubmitting} onClick={onClose} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#f1f3ff] disabled:opacity-50" aria-label={copy.close}><X size={18} /></button></div><form noValidate onSubmit={handleSubmit} className="space-y-4 p-6"><Field label={copy.ticketTitle} required><input disabled={isSubmitting} name="title" value={titleValue} onChange={(event) => setTitleValue(event.target.value)} maxLength={TICKET_LIMITS.titleMax} className="field" placeholder={copy.titlePlaceholder} /><span className="mt-1 block text-right text-[10px] font-normal text-[#4d5f81]">{titleValue.length}/{TICKET_LIMITS.titleMax}</span></Field><div className="grid gap-4 sm:grid-cols-2"><Field label={copy.category} required><select disabled={isSubmitting} name="category" defaultValue="" className="field"><option value="" disabled>{copy.choose}</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></Field><Field label={copy.occurred} hint={copy.optional}><input disabled={isSubmitting} name="occurredAt" type="datetime-local" max={maxOccurredAt} className="field" /></Field></div><Field label={copy.description} required><textarea disabled={isSubmitting} name="description" value={descriptionValue} onChange={(event) => setDescriptionValue(event.target.value)} maxLength={TICKET_LIMITS.descriptionMax} className="field min-h-28 resize-y" placeholder={copy.descriptionPlaceholder} /><span className="mt-1 block text-right text-[10px] font-normal text-[#4d5f81]">{descriptionValue.length}/{TICKET_LIMITS.descriptionMax}</span></Field><Field label={copy.attachment} hint={copy.attachmentHint}><input disabled={isSubmitting} name="attachment" type="file" accept="image/jpeg,image/png,image/webp" className="field file:mr-3 file:rounded file:border-0 file:bg-[#eaf7f0] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#006838]" /></Field>{error && <p role="alert" className="rounded-lg bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#d64545]">{error}</p>}<div className="flex justify-end gap-2 border-t border-[#d9e2fc] pt-4"><button disabled={isSubmitting} type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-xs font-bold text-[#4d5f81] hover:bg-[#f1f3ff] disabled:opacity-50">{copy.cancel}</button><button disabled={isSubmitting} type="submit" className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:opacity-50"><FilePlus2 size={14} /> {isSubmitting ? copy.submitting : copy.submit}</button></div></form></section></div>;
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f2342]/45 p-4"><section role="dialog" aria-modal="true" aria-labelledby="create-ticket-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#d9e2fc] px-6 py-4"><div><h2 id="create-ticket-title" className="text-lg font-bold">{copy.title}</h2><p className="mt-0.5 text-xs text-[#4d5f81]">{copy.subtitle}</p></div><button disabled={isSubmitting} onClick={onClose} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#f1f3ff] disabled:opacity-50" aria-label={copy.close}><X size={18} /></button></div><form noValidate onSubmit={handleSubmit} className="space-y-4 p-6"><Field label={copy.ticketTitle} required><input disabled={isSubmitting} name="title" value={titleValue} onChange={(event) => setTitleValue(event.target.value)} maxLength={TICKET_LIMITS.titleMax} className="field" placeholder={copy.titlePlaceholder} /><span className="mt-1 block text-right text-[10px] font-normal text-[#4d5f81]">{titleValue.length}/{TICKET_LIMITS.titleMax}</span></Field><Field label={copy.category} required><select disabled={isSubmitting} name="category" defaultValue="" className="field"><option value="" disabled>{copy.choose}</option>{categories.map((category) => <option key={category} value={category}>{categoryLabel(category, language)}</option>)}</select></Field><div className="block text-xs font-bold text-[#3f4940]"><label htmlFor="ticket-occurred-at">{copy.occurred}</label><span className="ml-2 font-normal text-[#4d5f81]">{copy.optional}</span><div className="mt-1.5 flex"><DateTimeField id="ticket-occurred-at" minDate={occurredRange.min} maxDate={occurredRange.max} disabled={isSubmitting} onChange={setOccurred} /></div></div><Field label={copy.description} required><textarea disabled={isSubmitting} name="description" value={descriptionValue} onChange={(event) => setDescriptionValue(event.target.value)} maxLength={TICKET_LIMITS.descriptionMax} className="field min-h-28 resize-y" placeholder={copy.descriptionPlaceholder} /><span className="mt-1 block text-right text-[10px] font-normal text-[#4d5f81]">{descriptionValue.length}/{TICKET_LIMITS.descriptionMax}</span></Field><Field label={copy.attachment} hint={copy.attachmentHint}><input disabled={isSubmitting} name="attachment" type="file" accept="image/jpeg,image/png,image/webp" className="field file:mr-3 file:rounded file:border-0 file:bg-[#eaf7f0] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#006838]" /></Field>{error && <p role="alert" className="rounded-lg bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#d64545]">{error}</p>}<div className="flex justify-end gap-2 border-t border-[#d9e2fc] pt-4"><button disabled={isSubmitting} type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-xs font-bold text-[#4d5f81] hover:bg-[#f1f3ff] disabled:opacity-50">{copy.cancel}</button><button disabled={isSubmitting} type="submit" className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:opacity-50"><FilePlus2 size={14} /> {isSubmitting ? copy.submitting : copy.submit}</button></div></form></section></div>;
 }
 
 function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
