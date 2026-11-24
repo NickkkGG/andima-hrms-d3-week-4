@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import HeaderAccount from "@/components/HeaderAccount";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { SkeletonBlock } from "@/components/hrms/Skeleton";
 import { createClient } from "@/utils/supabase/client";
 
 type Mode = "enrollment" | "attendance";
@@ -113,11 +114,17 @@ const TEMPLATE_TOP_MATCHES = 3;
 const REQUIRED_LIVENESS_CHALLENGES = 2;
 const MIN_ENROLLMENT_SAMPLE_SIMILARITY = 0.62;
 const ATTENDANCE_VERIFICATION_TIMEOUT_MS = 15000;
+// Maximum scan time, counted from the moment the camera is live and scanning
+// starts (BUG-D3-019, BUG-D3-020; UC-D3-FBA-001 E-2, UC-D3-FBA-002/003 E-3).
+// Registration must finish saving and attendance must reach a verified face
+// within this time; otherwise the scan stops and nothing is recorded.
+const ENROLLMENT_SCAN_TIMEOUT_MS = 90_000;
+const ATTENDANCE_SCAN_TIMEOUT_MS = 60_000;
 
-function waitForUpload<T>(upload: Promise<T>, timeoutMs = STORAGE_UPLOAD_TIMEOUT_MS) {
+function waitForUpload<T>(upload: Promise<T>, language: "id" | "en", timeoutMs = STORAGE_UPLOAD_TIMEOUT_MS) {
   return new Promise<T>((resolve, reject) => {
     const timeoutId = window.setTimeout(() => {
-      reject(new Error("Unggahan ke penyimpanan privat terlalu lama."));
+      reject(new Error(language === "id" ? "Unggahan ke penyimpanan privat terlalu lama." : "The upload to private storage took too long."));
     }, timeoutMs);
 
     upload.then(
@@ -178,8 +185,8 @@ function getJakartaDate(timestamp = new Date()) {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
-function formatJakartaTime(timestamp: string) {
-  return new Intl.DateTimeFormat("id-ID", {
+function formatJakartaTime(timestamp: string, language: "id" | "en") {
+  return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", {
     timeZone: "Asia/Jakarta",
     hour: "2-digit",
     minute: "2-digit",
@@ -188,9 +195,10 @@ function formatJakartaTime(timestamp: string) {
   }).format(new Date(timestamp));
 }
 
-function requestAttendanceLocation(): Promise<AttendanceLocationPayload> {
+function requestAttendanceLocation(language: "id" | "en"): Promise<AttendanceLocationPayload> {
+  const text = (indonesian: string, english: string) => language === "id" ? indonesian : english;
   if (typeof navigator === "undefined" || !navigator.geolocation) {
-    return Promise.reject(new Error("Perangkat ini tidak mendukung lokasi. Gunakan perangkat atau browser yang mendukung GPS."));
+    return Promise.reject(new Error(text("Perangkat ini tidak mendukung lokasi. Gunakan perangkat atau browser yang mendukung GPS.", "This device does not support location. Use a device or browser with GPS support.")));
   }
 
   return new Promise((resolve, reject) => {
@@ -202,10 +210,10 @@ function requestAttendanceLocation(): Promise<AttendanceLocationPayload> {
       }),
       (error) => {
         const message = error.code === error.PERMISSION_DENIED
-          ? "Izin lokasi diperlukan untuk mencatat clock-in atau clock-out."
+          ? text("Izin lokasi diperlukan untuk mencatat clock-in atau clock-out.", "Location permission is required to record clock-in or clock-out.")
           : error.code === error.TIMEOUT
-            ? "Lokasi belum ditemukan tepat waktu. Pastikan GPS aktif lalu coba kembali."
-            : "Lokasi belum dapat dibaca. Pastikan GPS dan koneksi perangkat aktif.";
+            ? text("Lokasi belum ditemukan tepat waktu. Pastikan GPS aktif lalu coba kembali.", "Location was not found in time. Make sure GPS is on and try again.")
+            : text("Lokasi belum dapat dibaca. Pastikan GPS dan koneksi perangkat aktif.", "Location could not be read. Make sure GPS and the device connection are on.");
         reject(new Error(message));
       },
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 15_000 },
@@ -232,13 +240,13 @@ function RealtimeAttendanceClock({ variant = "header", frozenAt = null }: { vari
   const displayTime = frozenAt ?? now;
   const time = displayTime
     ? new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(displayTime)
-    : "--:--:--";
+    : null;
   const date = displayTime
     ? new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", { timeZone: "Asia/Jakarta", weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(displayTime)
-    : language === "id" ? "Memuat waktu…" : "Loading time…";
+    : null;
 
   if (variant === "inline") {
-    return <p className="mt-0.5 font-mono text-[11px] font-bold tracking-[0.06em] text-[#0b5fbf]">{time} WIB</p>;
+    return time ? <p className="mt-0.5 font-mono text-[11px] font-bold tracking-[0.06em] text-[#0b5fbf]">{time} WIB</p> : <SkeletonBlock className="mt-1 h-3 w-24" />;
   }
 
   return (
@@ -246,8 +254,8 @@ function RealtimeAttendanceClock({ variant = "header", frozenAt = null }: { vari
       <div className="grid size-9 place-items-center rounded-xl border border-[#9dc9f8] bg-[#e1f0ff] text-[#0c68d5] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"><Clock3 size={18} /></div>
       <div>
         <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[#41658f]">{language === "id" ? "Waktu presensi · WIB" : "Attendance time · WIB"}</p>
-        <p className="mt-0.5 font-mono text-xl font-bold tracking-[0.08em] text-[#0a2446] sm:text-2xl">{time}</p>
-        <p className="mt-0.5 text-[10px] font-medium text-[#58769c]">{date}</p>
+        {time ? <p className="mt-0.5 font-mono text-xl font-bold tracking-[0.08em] text-[#0a2446] sm:text-2xl">{time}</p> : <SkeletonBlock className="mx-auto mt-1.5 h-6 w-28" />}
+        {date ? <p className="mt-0.5 text-[10px] font-medium text-[#58769c]">{date}</p> : <SkeletonBlock className="mx-auto mt-1.5 h-2.5 w-40" />}
       </div>
     </div>
   );
@@ -292,8 +300,8 @@ function median(values: number[]) {
 export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const { t, language } = useLanguage();
   const copy = language === "id" ? {
-    savingRegistration: "Menyimpan registrasi biometrik", processingSample: "Memproses sampel wajah…", doNotClose: "Jangan menutup halaman sampai proses selesai.", registration: "Registrasi biometrik", registrationHelp: "Selesaikan liveness, lalu hadap lurus sampai sampel tersimpan.", liveIdentity: "Input identitas langsung", camera: "Kamera verifikasi", scanning: "MEMINDAI", preparing: "MENYIAPKAN MODEL", complete: "SELESAI", ready: "SIAP", faceRejected: "WAJAH TIDAK TERVERIFIKASI", cameraInactive: "Kamera belum aktif", cameraHelp: "Tekan mulai untuk memberi izin kamera dan memuat model.", liveness: "Liveness", recordingSample: "Merekam sampel", stayStill: "tetap diam", verifying: "Memverifikasi wajah…", faceVerified: "WAJAH TERVERIFIKASI", retry: "Coba kembali", preparingCamera: "Menyiapkan kamera & model…", cancelScan: "Batalkan pemindaian", startNewScan: "Mulai pemindaian baru", startCamera: "Mulai kamera", noTemplate: "Belum ada template untuk akun ini. Daftarkan biometrik.", verifiedFace: "Wajah terverifikasi", employee: "Karyawan", loadingEmployee: "Memuat pegawai…", attendanceTime: "Waktu kehadiran", waitingClockIn: "Menunggu clock-in", location: "Lokasi", gpsReady: "GPS siap direkam", locationRecorded: "Titik lokasi dicatat saat tombol ditekan.", dayComplete: "Clock-in dan clock-out hari ini sudah lengkap.", continueToRecord: "Lanjutkan untuk mencatat presensi dan lokasi perangkat ini.", readingLocation: "Membaca lokasi…", attendanceComplete: "Presensi selesai", clockOutNow: "Clock-out sekarang", clockInNow: "Clock-in sekarang", rejectionHelp: "Pastikan pemilik akun yang terdaftar berada di depan kamera.", statusComplete: "Presensi hari ini selesai", statusWorking: "Sedang bekerja", statusReady: "Siap clock-in" } : {
-    savingRegistration: "Saving biometric registration", processingSample: "Processing face samples…", doNotClose: "Do not close this page until the process is complete.", registration: "Biometric Registration", registrationHelp: "Complete liveness, then face forward until samples are saved.", liveIdentity: "Live identity input", camera: "Verification camera", scanning: "SCANNING", preparing: "PREPARING MODEL", complete: "COMPLETE", ready: "READY", faceRejected: "FACE NOT VERIFIED", cameraInactive: "Camera is inactive", cameraHelp: "Press start to allow camera access and load the model.", liveness: "Liveness", recordingSample: "Recording samples", stayStill: "stay still", verifying: "Verifying face…", faceVerified: "FACE VERIFIED", retry: "Try again", preparingCamera: "Preparing camera & model…", cancelScan: "Cancel scan", startNewScan: "Start a new scan", startCamera: "Start camera", noTemplate: "No template exists for this account. Register biometrics.", verifiedFace: "Face verified", employee: "Employee", loadingEmployee: "Loading employee…", attendanceTime: "Attendance time", waitingClockIn: "Waiting for clock-in", location: "Location", gpsReady: "GPS ready to record", locationRecorded: "Location is recorded when the button is pressed.", dayComplete: "Today's clock-in and clock-out are complete.", continueToRecord: "Continue to record attendance and this device's location.", readingLocation: "Reading location…", attendanceComplete: "Attendance complete", clockOutNow: "Clock out now", clockInNow: "Clock in now", rejectionHelp: "Make sure the registered account owner is in front of the camera.", statusComplete: "Today's attendance is complete", statusWorking: "Working", statusReady: "Ready to clock in" };
+    savingRegistration: "Menyimpan registrasi biometrik", processingSample: "Memproses sampel wajah…", doNotClose: "Jangan menutup halaman sampai proses selesai.", registration: "Registrasi biometrik", registrationHelp: "Selesaikan liveness, lalu hadap lurus sampai sampel tersimpan.", liveIdentity: "Input identitas langsung", camera: "Kamera verifikasi", scanning: "MEMINDAI", preparing: "MENYIAPKAN MODEL", complete: "SELESAI", ready: "SIAP", faceRejected: "WAJAH TIDAK TERVERIFIKASI", cameraInactive: "Kamera belum aktif", cameraHelp: "Tekan mulai untuk memberi izin kamera dan memuat model.", liveness: "Liveness", recordingSample: "Merekam sampel", stayStill: "tetap diam", verifying: "Memverifikasi wajah…", faceVerified: "WAJAH TERVERIFIKASI", retry: "Coba kembali", preparingCamera: "Menyiapkan kamera & model…", cancelScan: "Batalkan pemindaian", startNewScan: "Mulai pemindaian baru", startCamera: "Mulai kamera", noTemplate: "Belum ada template untuk akun ini. Daftarkan biometrik.", verifiedFace: "Wajah terverifikasi", employee: "Karyawan", attendanceTime: "Waktu kehadiran", waitingClockIn: "Menunggu clock-in", location: "Lokasi", gpsReady: "GPS siap direkam", locationRecorded: "Titik lokasi dicatat saat tombol ditekan.", dayComplete: "Clock-in dan clock-out hari ini sudah lengkap.", continueToRecord: "Lanjutkan untuk mencatat presensi dan lokasi perangkat ini.", readingLocation: "Membaca lokasi…", attendanceComplete: "Presensi selesai", clockOutNow: "Clock-out sekarang", clockInNow: "Clock-in sekarang", rejectionHelp: "Pastikan pemilik akun yang terdaftar berada di depan kamera.", statusComplete: "Presensi hari ini selesai", statusWorking: "Sedang bekerja", statusReady: "Siap clock-in", identityLockActive: "Kunci identitas aktif", faceLock: "KUNCI WAJAH", timedOut: "WAKTU HABIS", timeLeft: (seconds: number) => `Sisa waktu pemindaian ${seconds} detik` } : {
+    savingRegistration: "Saving biometric registration", processingSample: "Processing face samples…", doNotClose: "Do not close this page until the process is complete.", registration: "Biometric Registration", registrationHelp: "Complete liveness, then face forward until samples are saved.", liveIdentity: "Live identity input", camera: "Verification camera", scanning: "SCANNING", preparing: "PREPARING MODEL", complete: "COMPLETE", ready: "READY", faceRejected: "FACE NOT VERIFIED", cameraInactive: "Camera is inactive", cameraHelp: "Press start to allow camera access and load the model.", liveness: "Liveness", recordingSample: "Recording samples", stayStill: "stay still", verifying: "Verifying face…", faceVerified: "FACE VERIFIED", retry: "Try again", preparingCamera: "Preparing camera & model…", cancelScan: "Cancel scan", startNewScan: "Start a new scan", startCamera: "Start camera", noTemplate: "No template exists for this account. Register biometrics.", verifiedFace: "Face verified", employee: "Employee", attendanceTime: "Attendance time", waitingClockIn: "Waiting for clock-in", location: "Location", gpsReady: "GPS ready to record", locationRecorded: "Location is recorded when the button is pressed.", dayComplete: "Today's clock-in and clock-out are complete.", continueToRecord: "Continue to record attendance and this device's location.", readingLocation: "Reading location…", attendanceComplete: "Attendance complete", clockOutNow: "Clock out now", clockInNow: "Clock in now", rejectionHelp: "Make sure the registered account owner is in front of the camera.", statusComplete: "Today's attendance is complete", statusWorking: "Working", statusReady: "Ready to clock in", identityLockActive: "Identity lock active", faceLock: "FACE LOCK", timedOut: "TIME UP", timeLeft: (seconds: number) => `${seconds} seconds of scan time left` };
   const localized = useCallback((indonesian: string, english: string) => language === "id" ? indonesian : english, [language]);
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -316,6 +324,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const stableMatchFramesRef = useRef(0);
   const mismatchFramesRef = useRef(0);
   const attendanceVerificationStartedAtRef = useRef<number | null>(null);
+  const enrollmentSavingRef = useRef(false);
   const verificationLockedAtRef = useRef<number | null>(null);
   const similarityWindowRef = useRef<number[]>([]);
   const identityVerifiedRef = useRef(false);
@@ -347,6 +356,9 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [savingStage, setSavingStage] = useState("");
   const [isAttendanceRejected, setIsAttendanceRejected] = useState(false);
+  const [scanStartedAt, setScanStartedAt] = useState<number | null>(null);
+  const [isScanTimedOut, setIsScanTimedOut] = useState(false);
+  const [scanClock, setScanClock] = useState(() => Date.now());
   const [isRecordingAttendance, setIsRecordingAttendance] = useState(false);
 
   const isEnrollment = mode === "enrollment";
@@ -392,6 +404,45 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     if (videoRef.current) videoRef.current.srcObject = null;
     isDetectingRef.current = false;
   }, []);
+
+  // Scan deadline (BUG-D3-019 / BUG-D3-020). The deadline stops counting once
+  // the scan has reached its goal in time: a verified face for attendance, or
+  // the registration save for enrollment.
+  const scanTimeoutMs = isEnrollment ? ENROLLMENT_SCAN_TIMEOUT_MS : ATTENDANCE_SCAN_TIMEOUT_MS;
+  const scanGoalReached = isEnrollment ? isSavingTemplate : verificationLockedAt !== null;
+  const scanDeadlineActive = scanState === "scanning" && scanStartedAt !== null && !scanGoalReached;
+
+  useEffect(() => {
+    if (!scanDeadlineActive || scanStartedAt === null) return;
+    const remaining = Math.max(0, scanStartedAt + scanTimeoutMs - Date.now());
+    const timer = window.setTimeout(() => {
+      // Re-check through refs: the goal may have been reached in the same tick.
+      if (isEnrollment ? enrollmentSavingRef.current : verificationLockedAtRef.current !== null) return;
+      stopCamera();
+      setScanState("error");
+      setIsScanTimedOut(true);
+      setErrorMessage(isEnrollment
+        ? localized(
+          "Waktu pemindaian habis (90 detik) dan wajah belum berhasil didaftarkan. Registrasi biometrik tidak disimpan. Tekan Coba kembali untuk mengulang.",
+          "Scan time is up (90 seconds) and the face was not registered. The biometric registration was not saved. Press Try again to restart.",
+        )
+        : localized(
+          "Waktu pemindaian habis (60 detik) dan wajah belum terverifikasi. Clock-in atau clock-out tidak dicatat. Tekan Coba kembali untuk mengulang.",
+          "Scan time is up (60 seconds) and the face was not verified. No clock-in or clock-out was recorded. Press Try again to restart.",
+        ));
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [isEnrollment, localized, scanDeadlineActive, scanStartedAt, scanTimeoutMs, stopCamera]);
+
+  useEffect(() => {
+    if (!scanDeadlineActive) return;
+    const interval = window.setInterval(() => setScanClock(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [scanDeadlineActive]);
+
+  const scanSecondsLeft = scanDeadlineActive && scanStartedAt !== null
+    ? Math.max(0, Math.ceil((scanStartedAt + scanTimeoutMs - scanClock) / 1000))
+    : null;
 
   const captureFaceSample = useCallback((video: HTMLVideoElement, box: HumanFace["box"], descriptor: number[]) => {
     if (!box || faceSampleCapturePendingRef.current || faceSamplePhotosRef.current.length >= REQUIRED_FACE_SAMPLES) return;
@@ -695,6 +746,8 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     setErrorMessage("");
     setActionMessage("");
     setIsAttendanceRejected(false);
+    setIsScanTimedOut(false);
+    setScanStartedAt(null);
     if (!currentUser) {
       setErrorMessage(localized("Sesi akun tidak ditemukan. Silakan login kembali.", "Account session not found. Please sign in again."));
       router.replace("/login");
@@ -801,6 +854,9 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
         human.load(),
         Promise.resolve(human.warmup?.()),
       ]);
+      const startedAt = Date.now();
+      setScanStartedAt(startedAt);
+      setScanClock(startedAt);
       setScanState("scanning");
       startDetection();
     } catch (error) {
@@ -817,6 +873,8 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     stopCamera();
     setScanState("idle");
     setIsAttendanceRejected(false);
+    setIsScanTimedOut(false);
+    setScanStartedAt(null);
     challengeOrderRef.current = [];
     completedChallengesRef.current = [];
     setCompletedChallenges([]);
@@ -862,6 +920,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
       setErrorMessage(localized(`Selesaikan liveness lalu hadap lurus ke kamera sampai ${REQUIRED_FACE_SAMPLES} sampel wajah otomatis terkumpul.`, `Complete liveness, then face the camera until ${REQUIRED_FACE_SAMPLES} face samples are collected automatically.`));
       return;
     }
+    enrollmentSavingRef.current = true;
     setIsSavingTemplate(true);
     setSavingStage(localized("Memastikan sesi akun…", "Confirming account session…"));
     setErrorMessage("");
@@ -957,7 +1016,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
           .upload(path, photo, { contentType: "image/webp", cacheControl: "31536000", upsert: false });
 
         try {
-          const { error: uploadError } = await waitForUpload(uploadPromise);
+          const { error: uploadError } = await waitForUpload(uploadPromise, language);
           if (uploadError) {
             storageFailure = uploadError.message;
             break;
@@ -1006,6 +1065,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
         : localized("Template biometrik multi-kondisi berhasil tersimpan.", "The multi-condition biometric template was saved."));
       stopCamera();
     } finally {
+      enrollmentSavingRef.current = false;
       setIsSavingTemplate(false);
       setSavingStage("");
     }
@@ -1029,7 +1089,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
     try {
       // The browser asks permission at this point only. The app never tracks a
       // user in the background or after this attendance action is finished.
-      const location = await requestAttendanceLocation();
+      const location = await requestAttendanceLocation(language);
       const supabase = createClient();
       const recordedAt = new Date().toISOString();
       const attendanceDate = getJakartaDate();
@@ -1145,7 +1205,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
           b2RegisterId: account.id,
           employeeId: b2Context?.employee_uuid ?? "",
           employeeCode: account.employee_id ?? b2Context?.employee_code ?? "—",
-          fullName: account.full_name ?? b2Context?.full_name ?? account.email ?? b2Context?.email ?? data.user.email ?? "Employee",
+          fullName: account.full_name ?? b2Context?.full_name ?? account.email ?? b2Context?.email ?? data.user.email ?? (language === "id" ? "Pegawai" : "Employee"),
         };
         const { data: existingAttendance } = await supabase
           .from("d3_attendances")
@@ -1265,7 +1325,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
           <section className="flex w-full flex-col overflow-hidden rounded-3xl border border-[#b9d4f0] bg-white/72 shadow-[0_16px_42px_rgba(30,79,134,0.14)] backdrop-blur-xl">
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#cddff3] bg-[linear-gradient(90deg,rgba(246,251,255,0.88),rgba(226,241,255,0.72))] px-4 py-3 sm:px-5">
               <div><p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[#5080b6]">{copy.liveIdentity}</p><h3 className="mt-0.5 text-sm font-bold text-[#0a2446]">{copy.camera}</h3></div>
-              <span className={`rounded-full border px-3 py-1 font-mono text-[10px] font-bold tracking-[0.08em] ${scanState === "scanning" ? "border-[#9acbff] bg-[#e3f1ff] text-[#0865cc]" : scanState === "error" ? "border-red-200 bg-red-50 text-red-600" : "border-[#cfddec] bg-white/75 text-[#54708f]"}`}>{scanState === "scanning" ? copy.scanning : scanState === "loading" ? copy.preparing : scanState === "complete" ? copy.complete : copy.ready}</span>
+              <span className={`rounded-full border px-3 py-1 font-mono text-[10px] font-bold tracking-[0.08em] ${scanState === "scanning" ? "border-[#9acbff] bg-[#e3f1ff] text-[#0865cc]" : scanState === "error" ? "border-red-200 bg-red-50 text-red-600" : "border-[#cfddec] bg-white/75 text-[#54708f]"}`}>{scanState === "scanning" ? copy.scanning : scanState === "loading" ? copy.preparing : scanState === "complete" ? copy.complete : isScanTimedOut ? copy.timedOut : copy.ready}{scanSecondsLeft !== null && <> · <span aria-hidden="true">{Math.floor(scanSecondsLeft / 60)}:{String(scanSecondsLeft % 60).padStart(2, "0")}</span><span className="sr-only">{copy.timeLeft(scanSecondsLeft)}</span></>}</span>
             </div>
 
             <div className={`relative mx-auto shrink-0 transition-all duration-500 ${compactCamera ? "p-3 sm:p-4" : "p-5 sm:p-7"}`} style={{ width: cameraDiameter, height: cameraDiameter, flex: "0 0 auto" }}>
@@ -1298,7 +1358,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
                 {isEnrollment && allChallengesCompleted && !isSavingTemplate && <div className="pointer-events-none absolute left-1/2 top-4 w-[62%] -translate-x-1/2 rounded-xl border border-[#9ed1ff]/35 bg-[#061326]/85 px-3 py-1.5 text-center text-[10px] font-bold leading-4 text-white shadow-lg">{copy.recordingSample} {faceSampleCount}/{REQUIRED_FACE_SAMPLES} · {copy.stayStill}</div>}
                 {!isEnrollment && allChallengesCompleted && !identityVerified && <div className="pointer-events-none absolute left-1/2 top-4 max-w-[calc(100%-2rem)] -translate-x-1/2 whitespace-nowrap rounded-full border border-[#9ed1ff]/35 bg-[#061326]/85 px-3 py-1.5 text-center text-[10px] font-bold text-white shadow-lg">{copy.verifying}</div>}
                 {attendanceReady && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500/90 px-3 py-1 text-[9px] font-bold tracking-[0.12em] text-white">{copy.faceVerified}</div>}
-                {!attendanceReady && !activePrompt && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#061326]/75 px-3 py-1 text-[9px] font-bold tracking-[0.14em] text-[#dcefff]">FACE LOCK</div>}
+                {!attendanceReady && !activePrompt && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#061326]/75 px-3 py-1 text-[9px] font-bold tracking-[0.14em] text-[#dcefff]">{copy.faceLock}</div>}
               </>}
               </div>
             </div>
@@ -1311,19 +1371,19 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
               ) : scanState === "scanning" ? (
                 <button type="button" onClick={resetScan} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#f0b9bd] bg-red-50/85 px-4 py-2.5 text-xs font-bold text-[#b4232b] transition hover:bg-red-100 active:scale-[0.98]"><VideoOff size={16} /> {copy.cancelScan}</button>
               ) : (
-                <button type="button" onClick={() => void startScan()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0b67d1] px-4 py-2.5 text-xs font-bold text-white shadow-[0_7px_18px_rgba(11,103,209,0.3)] transition hover:bg-[#075ab9] active:scale-[0.98]"><Video size={16} /> {scanState === "complete" ? copy.startNewScan : copy.startCamera}</button>
+                <button type="button" onClick={() => void startScan()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0b67d1] px-4 py-2.5 text-xs font-bold text-white shadow-[0_7px_18px_rgba(11,103,209,0.3)] transition hover:bg-[#075ab9] active:scale-[0.98]"><Video size={16} /> {scanState === "complete" ? copy.startNewScan : isScanTimedOut ? copy.retry : copy.startCamera}</button>
               )}
               {!isEnrollment && !template && <Link href="/biometric-enrollment" className="text-xs font-semibold text-[#1971c2] underline underline-offset-4">{copy.noTemplate}</Link>}
             </div>
 
             {attendanceReady && <section className="mx-4 mb-3 shrink-0 rounded-2xl border border-emerald-200 bg-[linear-gradient(135deg,rgba(242,255,249,0.98),rgba(224,247,240,0.86))] p-2.5 shadow-[0_8px_20px_rgba(0,138,79,0.08)] sm:mx-5 sm:p-3">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-2">
-                <div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-emerald-600 text-white shadow-[0_4px_10px_rgba(0,138,79,0.22)]"><CheckCircle2 size={15} /></span><div><p className="text-xs font-bold text-emerald-950">{copy.verifiedFace}</p><p className="font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-emerald-700">Identity lock active</p></div></div>
+                <div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-emerald-600 text-white shadow-[0_4px_10px_rgba(0,138,79,0.22)]"><CheckCircle2 size={15} /></span><div><p className="text-xs font-bold text-emerald-950">{copy.verifiedFace}</p><p className="font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-emerald-700">{copy.identityLockActive}</p></div></div>
                 <span className="rounded-full border border-emerald-200 bg-white/70 px-2.5 py-1 text-[9px] font-bold text-emerald-800">{attendanceStatus}</span>
               </div>
               <div className="mt-2 grid grid-cols-3 gap-1.5">
-                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><UserRound size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">{copy.employee}</p></div><p className="mt-0.5 truncate text-xs font-bold text-[#123b2a]">{currentUser?.fullName ?? copy.loadingEmployee}</p><p className="mt-0.5 font-mono text-[10px] text-[#4d7567]">ID · {currentUser?.employeeCode ?? "—"}</p></div>
-                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><Clock3 size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">{copy.attendanceTime}</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">{hasClockedIn ? `Clock-in · ${formatJakartaTime(todayAttendance!.clock_in)} WIB` : copy.waitingClockIn}</p>{hasClockedIn && attendanceCompleted ? <p className="mt-0.5 text-[10px] text-[#4d7567]">Clock-out · {formatJakartaTime(todayAttendance!.clock_out!)} WIB</p> : <RealtimeAttendanceClock variant="inline" frozenAt={verificationLockedAt} />}</div>
+                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><UserRound size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">{copy.employee}</p></div><p className="mt-0.5 truncate text-xs font-bold text-[#123b2a]">{currentUser?.fullName ?? <SkeletonBlock className="mt-1 h-3 w-24" />}</p><p className="mt-0.5 font-mono text-[10px] text-[#4d7567]">ID · {currentUser?.employeeCode ?? "—"}</p></div>
+                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><Clock3 size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">{copy.attendanceTime}</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">{hasClockedIn ? `Clock-in · ${formatJakartaTime(todayAttendance!.clock_in, language)} WIB` : copy.waitingClockIn}</p>{hasClockedIn && attendanceCompleted ? <p className="mt-0.5 text-[10px] text-[#4d7567]">Clock-out · {formatJakartaTime(todayAttendance!.clock_out!, language)} WIB</p> : <RealtimeAttendanceClock variant="inline" frozenAt={verificationLockedAt} />}</div>
                 <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><MapPin size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">{copy.location}</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">{copy.gpsReady}</p><p className="mt-0.5 text-[10px] leading-3 text-[#4d7567]">{copy.locationRecorded}</p></div>
               </div>
               <div className="mt-2 flex flex-col gap-2 border-t border-emerald-200/80 pt-2 sm:flex-row sm:items-center sm:justify-between"><p className="text-[10px] text-emerald-800">{attendanceCompleted ? copy.dayComplete : copy.continueToRecord}</p><button type="button" disabled={isRecordingAttendance || attendanceCompleted} onClick={() => void recordAttendance()} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#008a4f] px-4 py-2 text-xs font-bold text-white shadow-[0_7px_16px_rgba(0,138,79,0.24)] transition hover:bg-[#007842] disabled:cursor-not-allowed disabled:opacity-55 active:scale-[0.98]">{isRecordingAttendance ? <LoaderCircle size={16} className="animate-spin" /> : <Clock3 size={16} />}{isRecordingAttendance ? copy.readingLocation : attendanceCompleted ? copy.attendanceComplete : nextAttendanceAction === "CLOCK_OUT" ? copy.clockOutNow : copy.clockInNow}</button></div>
