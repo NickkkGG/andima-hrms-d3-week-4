@@ -55,11 +55,16 @@ canvas {
   max-width: 100%;
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
+/* Element defaults live in the base layer so Tailwind classes (text-xs,
+   font-semibold, font-mono…) on buttons, inputs and selects still apply.
+   Unlayered, these rules overrode every size and weight class on controls. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 }
 
 button:not(:disabled),
@@ -106,15 +111,17 @@ button:not(:disabled),
   }
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-button,
-[role="button"],
-input[type="button"],
-input[type="submit"] {
-  font-family: var(--font-poppins);
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"] {
+    font-family: var(--font-poppins);
+  }
 }
