@@ -24,7 +24,7 @@ export default async function FeedbackListPage({ searchParams }: { searchParams:
     <section className="space-y-5">
       <FeedbackRewardHeader eyebrow="HRMS · Feedback" title={<LocalizedText id="Feedback saya" en="My feedback" />} description={<LocalizedText id="Lihat feedback dan tindak lanjut yang ditujukan kepada Anda." en="View feedback and follow-ups addressed to you." />} />
       <FeedbackRewardTabs active="feedback" />
-      <p className="text-sm font-semibold text-[#60718B]"><strong className="text-[#121b2e]">{data.count}</strong> {copy.found}</p>
+      <p className="text-sm font-semibold text-slate-500"><strong className="text-slate-900">{data.count}</strong> {copy.found}</p>
       <FeedbackListView records={data.records as never[]} />
       <FeedbackPagination page={data.page} totalPages={totalPages} previousLabel={copy.previous} nextLabel={copy.next} hrefForPage={hrefForPage} />
     </section>
