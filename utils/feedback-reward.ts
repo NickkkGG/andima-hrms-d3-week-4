@@ -110,18 +110,27 @@ export async function getOverview(params: SearchParams = {}) {
   const pageSize = 3;
   const feedbackPage = Math.max(1, Math.min(100000, Number.parseInt(param(params, "feedback_page"), 10) || 1));
   const rewardPage = Math.max(1, Math.min(100000, Number.parseInt(param(params, "reward_page"), 10) || 1));
-  if (!b2EmployeeIds.length) return { feedback: [], rewards: [], feedbackCount: 0, rewardCount: 0, feedbackPage, rewardPage, pageSize };
-  const [feedback, rewards] = await Promise.all([
+  const emptyFollowUps = { NEW: 0, READ: 0, IN_PROGRESS: 0, SUBMITTED: 0 };
+  if (!b2EmployeeIds.length) return { feedback: [], rewards: [], feedbackCount: 0, rewardCount: 0, followUps: emptyFollowUps, feedbackPage, rewardPage, pageSize };
+  const [feedback, rewards, newFeedback, readFeedback, inProgressFeedback, submittedRewards] = await Promise.all([
     supabase.from("d3_employee_feedback").select(feedbackFields, { count: "exact" }).in("employee_id", b2EmployeeIds).order("date", { ascending: false }).order("id", { ascending: false }).range((feedbackPage - 1) * pageSize, feedbackPage * pageSize - 1).returns<Feedback[]>(),
     supabase.from("d3_employee_rewards").select(rewardFields, { count: "exact" }).in("employee_id", b2EmployeeIds).order("date", { ascending: false }).order("id", { ascending: false }).range((rewardPage - 1) * pageSize, rewardPage * pageSize - 1).returns<Reward[]>(),
+    supabase.from("d3_employee_feedback").select("id", { count: "exact", head: true }).in("employee_id", b2EmployeeIds).eq("follow_up_status", "NEW"),
+    supabase.from("d3_employee_feedback").select("id", { count: "exact", head: true }).in("employee_id", b2EmployeeIds).eq("follow_up_status", "READ"),
+    supabase.from("d3_employee_feedback").select("id", { count: "exact", head: true }).in("employee_id", b2EmployeeIds).eq("follow_up_status", "IN_PROGRESS"),
+    supabase.from("d3_employee_rewards").select("id", { count: "exact", head: true }).in("employee_id", b2EmployeeIds).eq("status", "SUBMITTED"),
   ]);
   if (feedback.error) queryError("recent feedback", feedback.error);
   if (rewards.error) queryError("recent rewards", rewards.error);
-  return { feedback: feedback.data ?? [], rewards: rewards.data ?? [], feedbackCount: feedback.count ?? 0, rewardCount: rewards.count ?? 0, feedbackPage, rewardPage, pageSize };
+  for (const result of [newFeedback, readFeedback, inProgressFeedback, submittedRewards]) {
+    if (result.error) queryError("follow-up counts", result.error);
+  }
+  const followUps = { NEW: newFeedback.count ?? 0, READ: readFeedback.count ?? 0, IN_PROGRESS: inProgressFeedback.count ?? 0, SUBMITTED: submittedRewards.count ?? 0 };
+  return { feedback: feedback.data ?? [], rewards: rewards.data ?? [], feedbackCount: feedback.count ?? 0, rewardCount: rewards.count ?? 0, followUps, feedbackPage, rewardPage, pageSize };
 }
 
 export async function getRecords(kind: "feedback" | "reward", params: SearchParams) {
-  const { supabase } = await getFeedbackContext();
+  const { supabase, access } = await getFeedbackContext();
   const b2EmployeeIds = await getB2EmployeeIds(supabase);
   if (!b2EmployeeIds.length) return { records: [], count: 0, page: pageNumber(params), pageSize: kind === "reward" ? 10 : 5 };
   const page = pageNumber(params);
@@ -131,12 +140,17 @@ export async function getRecords(kind: "feedback" | "reward", params: SearchPara
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query: any;
   const pageSize = kind === "reward" ? 10 : 5;
-  if (kind === "feedback") query = supabase.from("d3_employee_feedback").select(feedbackFields, { count: "exact" }).order("date", { ascending: false }).order("id", { ascending: false });
+  // Embedded filters normally leave unmatched parent rows in the result.
+  // Only require a matching employee relation when actually searching.
+  const searchFields = search ? feedbackFields.replace("d3_employee_feedback_employee_id_fkey(", "d3_employee_feedback_employee_id_fkey!inner(") : feedbackFields;
+  if (kind === "feedback") query = supabase.from("d3_employee_feedback").select(searchFields, { count: "exact" }).order("date", { ascending: false }).order("id", { ascending: false });
   else query = supabase.from("d3_employee_rewards").select(rewardFields, { count: "exact" }).order("date", { ascending: false }).order("id", { ascending: false });
   query = query.in("employee_id", b2EmployeeIds);
+  if (access.app_role === "EMPLOYEE") query = query.eq("employee_id", access.employee_id);
   if (bounds) query = query.gte("date", bounds.start).lt("date", bounds.end);
   if (search) {
-    const safeSearch = search.replace(/[,%()]/g, "");
+    const safeSearch = search.replace(/[,\%_()*"\\]/g, "").trim();
+    if (!safeSearch) return { records: [], count: 0, page, pageSize };
     query = query.or(`full_name.ilike.%${safeSearch}%,employee_id.ilike.%${safeSearch}%`, { referencedTable: "employee" });
   }
   const dateFrom = param(params, "date_from");
@@ -169,7 +183,7 @@ export async function getRecords(kind: "feedback" | "reward", params: SearchPara
 
 export async function getRecord(kind: "feedback" | "reward", id: string) {
   if (!/^[1-9]\d*$/.test(id)) notFound();
-  const { supabase } = await getFeedbackContext();
+  const { supabase, access } = await getFeedbackContext();
   const b2EmployeeIds = await getB2EmployeeIds(supabase);
   if (!b2EmployeeIds.length) notFound();
   // Keep the two shaped selects separate from the generated union type.
@@ -177,6 +191,7 @@ export async function getRecord(kind: "feedback" | "reward", id: string) {
   const query: any = kind === "feedback"
     ? supabase.from("d3_employee_feedback").select(feedbackFields).eq("id", id).in("employee_id", b2EmployeeIds)
     : supabase.from("d3_employee_rewards").select(rewardFields).eq("id", id).in("employee_id", b2EmployeeIds);
+  if (access.app_role === "EMPLOYEE") query.eq("employee_id", access.employee_id);
   const { data, error } = await query.maybeSingle();
   if (error) queryError(`${kind} detail`, error);
   if (!data) notFound();

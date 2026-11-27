@@ -23,7 +23,7 @@ export function FeedbackRewardTabs({ active }: { active: Tab }) {
         const Icon = config.icon;
         const selected = active === tab;
         return (
-          <Link key={tab} href={config.href} className={`${segmentedClass.item} ${selected ? segmentedClass.active : segmentedClass.idle}`}>
+          <Link key={tab} href={config.href} aria-current={selected ? "page" : undefined} className={`${segmentedClass.item} ${selected ? segmentedClass.active : segmentedClass.idle}`}>
             <Icon className="size-3.5" aria-hidden="true" />
             <TranslatedText textKey={config.key} />
           </Link>

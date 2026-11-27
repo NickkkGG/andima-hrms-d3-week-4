@@ -31,7 +31,9 @@ export default function LoginPage() {
         ? 'Profil karyawan akun ini sudah tidak aktif atau belum terhubung. Hubungi HR Admin.'
         : reason === 'idle'
           ? 'Sesi Anda berakhir karena tidak ada aktivitas selama 30 menit. Silakan login kembali.'
-          : '';
+          : reason === 'manual'
+            ? 'Anda telah logout. Silakan login kembali jika ingin melanjutkan.'
+            : '';
 
     // The URL is a browser-only external source; this keeps the static login
     // route free from a search-params suspense boundary.

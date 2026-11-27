@@ -75,7 +75,7 @@ export default function SessionIdleGuard() {
   const isSigningOut = useRef(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
 
-  const signOutForPolicy = useCallback(async (reason: "idle" | "location" | "profile" = "idle") => {
+  const signOutForPolicy = useCallback(async (reason: "idle" | "location" | "profile" | "manual" = "idle") => {
     if (isSigningOut.current) return;
     isSigningOut.current = true;
 
@@ -144,6 +144,8 @@ export default function SessionIdleGuard() {
   }, [applyActiveSession, signOutForPolicy]);
 
   useEffect(() => {
+    // The RPC updates state asynchronously after the server responds.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void resolveCurrentStatus();
   }, [resolveCurrentStatus]);
 
@@ -168,6 +170,9 @@ export default function SessionIdleGuard() {
   useEffect(() => {
     const onActivity = (event: Event) => {
       if (!event.isTrusted) return;
+      // Let the dialog buttons finish their own actions before extending the
+      // session. Otherwise pointerdown can dismiss the dialog before click.
+      if (event.target instanceof Element && event.target.closest("[data-idle-session-dialog]")) return;
       void touchSession();
     };
 
@@ -211,7 +216,7 @@ export default function SessionIdleGuard() {
   if (!session || !isWarningVisible) return null;
 
   return (
-    <div className={idleOverlayClass} role="dialog" aria-modal="true" aria-labelledby="idle-session-title">
+    <div data-idle-session-dialog className={idleOverlayClass} role="dialog" aria-modal="true" aria-labelledby="idle-session-title">
       <section className={`${modalClass.panel} max-w-md p-6`}>
         <p className="text-xs font-bold uppercase tracking-[0.08em] text-amber-700">Peringatan sesi</p>
         <h2 id="idle-session-title" className={`mt-2 ${modalClass.title}`}>Sesi Anda akan berakhir</h2>
@@ -224,7 +229,7 @@ export default function SessionIdleGuard() {
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
-            onClick={() => void signOutForPolicy()}
+            onClick={() => void signOutForPolicy("manual")}
             className={buttonClass("secondary")}
           >
             Logout sekarang

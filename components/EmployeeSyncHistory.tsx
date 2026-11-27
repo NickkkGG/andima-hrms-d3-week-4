@@ -14,11 +14,23 @@ function formatTimestamp(value: string, language: "id" | "en") {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
+  // Build the text ourselves: Intl's date/time separator can differ between
+  // Node and browsers even when both use the same locale and time zone.
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
     timeZone: "Asia/Jakarta",
-  }).format(date);
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  const months = language === "id"
+    ? ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+    : ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = months[Number(part("month")) - 1];
+  return `${part("day")} ${month} ${part("year")}, ${part("hour")}:${part("minute")}`;
 }
 
 function eventLabel(kind: string, language: "id" | "en") {
