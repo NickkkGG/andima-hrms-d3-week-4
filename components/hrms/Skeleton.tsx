@@ -11,7 +11,7 @@ export function SkeletonBlock({ className = "" }: { className?: string }) {
   // Default corner radius only when the caller sets none, so "rounded-full"
   // (avatars) is not overridden by the default.
   const rounding = /(^|\s)rounded(-|\s|$)/.test(className) ? "" : "rounded-md";
-  return <span aria-hidden="true" className={`block animate-pulse bg-[#e2ebf7] motion-reduce:animate-none ${rounding} ${className}`} />;
+  return <span aria-hidden="true" className={`block animate-pulse bg-slate-200 motion-reduce:animate-none ${rounding} ${className}`} />;
 }
 
 function LoadingStatus() {
@@ -50,10 +50,10 @@ export function SkeletonTable({ rows = 6, columns = 5, announce = true }: { rows
   return (
     <div role={announce ? "status" : undefined} aria-live={announce ? "polite" : undefined} aria-busy="true">
       {announce && <LoadingStatus />}
-      <div className="flex gap-6 border-b border-[#becabd]/35 bg-[#f7f8ff] px-4 py-3" aria-hidden="true">
+      <div className="flex gap-6 border-b border-slate-200 bg-slate-50 px-4 py-3" aria-hidden="true">
         {Array.from({ length: columns }, (_, column) => <SkeletonBlock key={column} className="h-2.5 w-16" />)}
       </div>
-      <div className="divide-y divide-[#becabd]/25" aria-hidden="true">
+      <div className="divide-y divide-slate-100" aria-hidden="true">
         {Array.from({ length: rows }, (_, row) => (
           <div key={row} className="flex items-center gap-6 px-4 py-3.5">
             <div className="flex w-40 shrink-0 items-center gap-2">
@@ -74,7 +74,7 @@ export function SkeletonStatCards({ count = 4 }: { count?: number }) {
   return (
     <div className={`grid gap-4 sm:grid-cols-2 ${count >= 4 ? "xl:grid-cols-4" : "xl:grid-cols-3"}`} aria-hidden="true">
       {Array.from({ length: count }, (_, card) => (
-        <div key={card} className="rounded-xl border border-[#becabd]/45 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+        <div key={card} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
           <SkeletonBlock className="h-2.5 w-20" />
           <SkeletonBlock className="mt-3 h-7 w-14" />
           <SkeletonBlock className="mt-2.5 h-2.5 w-28" />
@@ -87,8 +87,8 @@ export function SkeletonStatCards({ count = 4 }: { count?: number }) {
 // Side panel placeholder (ticket detail, attendance detail).
 export function SkeletonPanel() {
   return (
-    <aside className="h-fit overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]" aria-hidden="true">
-      <div className="flex items-center gap-3 border-b border-[#becabd]/35 px-5 py-4">
+    <aside className="h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs" aria-hidden="true">
+      <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
         <SkeletonBlock className="size-8 rounded-lg" />
         <div className="space-y-1.5"><SkeletonBlock className="h-3 w-36" /><SkeletonBlock className="h-2.5 w-24" /></div>
       </div>
@@ -105,17 +105,18 @@ export function SkeletonPanel() {
 // The sticky top bar (breadcrumb + account), for pages whose own header is not
 // rendered yet.
 export function SkeletonTopBar() {
+  // Same 58px height and layout as components/AppHeader.tsx.
   return (
-    <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#bcd4ee]/80 bg-white/72 pl-16 pr-4 backdrop-blur-2xl sm:pr-6 lg:pl-6" aria-hidden="true">
-      <div className="flex items-center gap-3"><SkeletonBlock className="h-3.5 w-24" /><SkeletonBlock className="hidden h-3 w-40 sm:block" /></div>
-      <div className="flex items-center gap-3"><SkeletonBlock className="h-7 w-16 rounded-full" /><SkeletonBlock className="size-8 rounded-full" /><SkeletonBlock className="hidden h-3 w-20 sm:block" /></div>
+    <div className="sticky top-0 z-20 flex h-[58px] items-center justify-between border-b border-[#E2E8F0] bg-white px-3.5 sm:pr-4" aria-hidden="true">
+      <div className="flex items-center gap-4"><SkeletonBlock className="size-7 rounded-[6px]" /><SkeletonBlock className="h-3.5 w-24" /><SkeletonBlock className="hidden h-3 w-40 md:block" /></div>
+      <div className="flex items-center gap-4"><SkeletonBlock className="h-6 w-16 rounded-lg" /><SkeletonBlock className="size-6 rounded-lg" /><SkeletonBlock className="size-8 rounded-full" /><SkeletonBlock className="hidden h-3 w-20 sm:block" /></div>
     </div>
   );
 }
 
 function SkeletonForm() {
   return (
-    <div className="space-y-5 rounded-xl border border-[#becabd]/45 bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)]" aria-hidden="true">
+    <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs" aria-hidden="true">
       {[0, 1, 2].map((field) => <div key={field} className="space-y-2"><SkeletonBlock className="h-3 w-28" /><SkeletonBlock className="h-10" /></div>)}
       <div className="space-y-2"><SkeletonBlock className="h-3 w-28" /><SkeletonBlock className="h-28" /></div>
       <div className="flex justify-end gap-2"><SkeletonBlock className="h-9 w-20" /><SkeletonBlock className="h-9 w-28" /></div>
@@ -136,7 +137,7 @@ type PageSkeletonProps = {
 export function PageSkeleton({ withTopBar = false, stats = 0, layout = "table", contained = true }: PageSkeletonProps) {
   const body = (
     <div className="space-y-5">
-      <div className="space-y-2.5 border-b border-[#d9e2fc] pb-5" aria-hidden="true">
+      <div className="space-y-2.5 pb-1" aria-hidden="true">
         <SkeletonBlock className="h-4 w-28 rounded-full" />
         <SkeletonBlock className="h-7 w-64 max-w-full" />
         <SkeletonBlock className="h-3.5 w-96 max-w-full" />
@@ -144,8 +145,8 @@ export function PageSkeleton({ withTopBar = false, stats = 0, layout = "table", 
       {stats > 0 && <SkeletonStatCards count={stats} />}
       {layout === "form" ? <SkeletonForm /> : (
         <div className={layout === "split" ? "flex flex-col gap-5 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_400px]" : ""}>
-          <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center justify-between border-b border-[#becabd]/35 px-4 py-3.5" aria-hidden="true"><SkeletonBlock className="h-8 w-36" /><SkeletonBlock className="hidden h-8 w-56 md:block" /></div>
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3.5" aria-hidden="true"><SkeletonBlock className="h-8 w-36" /><SkeletonBlock className="hidden h-8 w-56 md:block" /></div>
             <SkeletonTable rows={7} columns={5} announce={false} />
           </section>
           {layout === "split" && <SkeletonPanel />}
@@ -155,7 +156,7 @@ export function PageSkeleton({ withTopBar = false, stats = 0, layout = "table", 
   );
 
   return (
-    <div className={withTopBar ? "min-h-screen bg-[#eaf2fc]" : undefined} role="status" aria-live="polite" aria-busy="true">
+    <div className={withTopBar ? "min-h-screen bg-white" : undefined} role="status" aria-live="polite" aria-busy="true">
       <LoadingStatus />
       {withTopBar && <SkeletonTopBar />}
       {contained ? <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">{body}</div> : body}

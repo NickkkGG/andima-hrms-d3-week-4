@@ -1,8 +1,7 @@
 "use client";
 
 import type { D3AppRole } from "@/utils/employee-access";
-import { ChevronRight } from "lucide-react";
-import HeaderAccount from "@/components/HeaderAccount";
+import AppHeader from "@/components/AppHeader";
 import { pageTitleKey, useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface HrmsShellProps {
@@ -22,21 +21,9 @@ export default function HrmsShell({ children, userEmail, userRole, pageTitle = "
   void userRole;
 
   return (
-    <div className="min-h-screen bg-[#EAF2FC] font-sans text-[#121B2E]">
-      <header className="sticky top-0 z-20 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 pl-16 pr-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:pr-6 lg:pl-6">
-        <div className="flex w-full min-w-0 items-center justify-between gap-3">
-          <div className="hidden min-w-0 items-center gap-3 sm:flex">
-            <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span>
-            <span className="h-5 border-l border-[#BCD4EE]" />
-            <span className="text-xs font-semibold text-[#3F4940]">HRMS</span>
-            <ChevronRight size={13} className="shrink-0 text-[#52749B]/60" />
-            <span className="truncate text-xs font-semibold text-[#0C68D5]">{localizedPageTitle}</span>
-          </div>
-          <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">{localizedPageTitle}</span>
-          <HeaderAccount />
-        </div>
-      </header>
-      <main className={contentClassName ?? "px-5 py-7 lg:px-8 lg:py-8"}>{children}</main>
+    <div className="min-h-screen bg-white font-sans text-slate-800">
+      <AppHeader pageTitle={localizedPageTitle} />
+      <main className={contentClassName ?? "px-4 py-6 sm:px-6 lg:px-8 lg:py-8"}>{children}</main>
     </div>
   );
 }

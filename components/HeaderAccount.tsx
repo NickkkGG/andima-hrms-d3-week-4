@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import LanguageToggle from "@/components/i18n/LanguageToggle";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { SkeletonBlock } from "@/components/hrms/Skeleton";
 
@@ -86,26 +85,25 @@ export default function HeaderAccount() {
     };
   }, []);
 
+  // Account chip from the class design system: 32px initials circle, name and
+  // role. Not clickable; logout lives in the sidebar.
+  if (!account) {
+    return (
+      <div className="flex items-center gap-2.5">
+        <SkeletonBlock className="size-8 rounded-full" />
+        <div className="hidden space-y-1.5 sm:block"><SkeletonBlock className="h-3 w-24" /><SkeletonBlock className="h-2.5 w-14" /></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-2 sm:gap-3">
-      <LanguageToggle />
-      <div className="hidden items-center gap-2 border-l border-[#BCD4EE] pl-3 sm:flex">
-        {account ? (
-          <>
-            <span className="grid size-8 place-items-center rounded-full border border-[#0C68D5]/25 bg-[#E6F1FF] text-xs font-bold text-[#0C68D5]">
-              {account.initials}
-            </span>
-            <div className="min-w-0 text-left">
-              <p className="max-w-40 truncate text-xs font-bold text-[#172033]">{account.name ?? t("hrmsUser")}</p>
-              <p className="text-[10px] text-[#4d5f81]">{roleLabel(account.appRole, t)}</p>
-            </div>
-          </>
-        ) : (
-          <>
-            <SkeletonBlock className="size-8 rounded-full" />
-            <div className="space-y-1.5"><SkeletonBlock className="h-3 w-24" /><SkeletonBlock className="h-2.5 w-14" /></div>
-          </>
-        )}
+    <div className="flex items-center gap-2.5">
+      <span className="flex size-8 shrink-0 select-none items-center justify-center rounded-full border border-[#BFDBFE] bg-[#DBEAFE] text-[13px] font-semibold text-[#121B2E]">
+        {account.initials}
+      </span>
+      <div className="hidden min-w-0 flex-col text-left leading-tight sm:flex">
+        <span className="max-w-36 truncate text-[12px] font-bold tracking-[-0.01em] text-[#121B2E]">{account.name ?? t("hrmsUser")}</span>
+        <span className="mt-0.5 max-w-36 truncate text-[10.5px] font-normal text-[#64748B]">{roleLabel(account.appRole, t)}</span>
       </div>
     </div>
   );

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import CustomButton from "@/components/CustomButton";
 import {
   employmentStatuses,
   type DepartmentOption,
@@ -13,6 +12,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 import { hrmsStatusLabel } from "@/components/hrms/HrmsStatusPill";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { buttonClass, inputClass, labelClass, modalClass } from "@/components/ui/styles";
 
 interface EmployeeCreateFormProps {
   departments: DepartmentOption[];
@@ -51,12 +51,10 @@ const initialFormState: EmployeeFormState = {
   workLocation: "",
 };
 
+// The error colours carry "!" so they win over the neutral border and focus
+// colours that inputClass already sets.
 function fieldClassName(hasError: boolean) {
-  return `mt-1 h-11 w-full rounded-xl border bg-white px-3.5 text-sm font-medium text-[#172033] outline-none transition focus:ring-4 disabled:cursor-not-allowed disabled:bg-slate-100 ${
-    hasError
-      ? "border-red-500 focus:border-red-600 focus:ring-red-600"
-      : "border-[#BCD4EE] focus:border-[#0C68D5] focus:ring-[#0C68D5]/10"
-  }`;
+  return inputClass(hasError ? "border-red-500! focus:border-red-600! focus:ring-red-100!" : "");
 }
 
 export default function EmployeeCreateForm({ departments, positions }: EmployeeCreateFormProps) {
@@ -167,46 +165,46 @@ export default function EmployeeCreateForm({ departments, positions }: EmployeeC
     <form className="space-y-4" onSubmit={handleSubmit} noValidate>
       <fieldset disabled={isSubmitting}>
         <section>
-          <div className="border-b-2 border-[#1E3765]/70 pb-3">
-            <h2 className="text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{copy.title}</h2>
-            <p className="mt-1 text-sm text-[#4d5f81]">{copy.description}</p>
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className={modalClass.title}>{copy.title}</h2>
+            <p className="mt-1 text-sm text-slate-500">{copy.description}</p>
           </div>
-          <div className="mt-3 grid gap-x-5 gap-y-2 md:grid-cols-2">
-            <label className="text-sm font-semibold text-[#1E3765] md:col-span-2">{language === "id" ? "ID Pegawai" : "Employee ID"} <span className="text-[#A70407]">*</span><input placeholder={language === "id" ? "mis. EMP - XXX" : "e.g. EMP - XXX"} className={fieldClassName(Boolean(errorMessage && !formData.employeeId.trim()))} value={formData.employeeId} onChange={(event) => updateField("employeeId", event.target.value)} required /></label>
-            <label className="text-sm font-semibold text-[#1E3765] md:col-span-2">{copy.employeeName} <span className="text-[#A70407]">*</span><input placeholder={copy.employeeName} className={fieldClassName(Boolean(errorMessage && !formData.fullName.trim()))} value={formData.fullName} onChange={(event) => updateField("fullName", event.target.value)} required /></label>
-            <label className="text-sm font-semibold text-[#1E3765] md:col-span-2">{copy.identity} <span className="text-[#A70407]">*</span><input placeholder={copy.identityNumber} className={fieldClassName(Boolean(errorMessage && !formData.identityNumber.trim()))} value={formData.identityNumber} onChange={(event) => updateField("identityNumber", event.target.value)} required /></label>
-            <label className="text-sm font-semibold text-[#1E3765]">{copy.phone} <span className="text-[#A70407]">*</span><input placeholder="xxxx-xxxx-xxxx" className={fieldClassName(Boolean(errorMessage && !formData.phone.trim()))} type="tel" value={formData.phone} onChange={(event) => updateField("phone", event.target.value)} required /></label>
-            <label className="text-sm font-semibold text-[#121B2E]">Email <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.email.trim()))} type="email" value={formData.email} onChange={(event) => updateField("email", event.target.value)} required /></label>
-            <label className="text-sm font-semibold text-[#121B2E]">{copy.joinDate} <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.join_date))} type="date" name="join_date" value={formData.join_date} onChange={(event) => updateField("join_date", event.target.value)} required /></label>
-            <label className="text-sm font-semibold text-[#121B2E]">{copy.employmentStatus} <span className="text-[#E5484D]">*</span><select className={fieldClassName(Boolean(errorMessage && !formData.employmentStatus))} value={formData.employmentStatus} onChange={(event) => updateField("employmentStatus", event.target.value as EmploymentStatus | "")} required><option value="">{copy.selectStatus}</option>{employmentStatuses.map((status) => <option key={status} value={status}>{hrmsStatusLabel(status, language)}</option>)}</select></label>
-            <label className="text-sm font-semibold text-[#121B2E]">{copy.department} <span className="text-[#E5484D]">*</span><select className={fieldClassName(Boolean(errorMessage && !formData.departmentId))} value={formData.departmentId} onChange={(event) => { const departmentId = event.target.value; setFormData((current) => ({ ...current, departmentId, positionId: current.positionId && positions.find((position) => position.id === current.positionId)?.department_id === departmentId ? current.positionId : "" })); }} required><option value="">{copy.selectDepartment}</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name} ({department.code})</option>)}</select></label>
-            <label className="text-sm font-semibold text-[#121B2E]">{copy.workLocation} <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.workLocation.trim()))} value={formData.workLocation} onChange={(event) => updateField("workLocation", event.target.value)} required /></label>
-            <label className="text-sm font-semibold text-[#121B2E] md:col-span-2">{copy.position} <span className="text-[#E5484D]">*</span><select className={fieldClassName(Boolean(errorMessage && !formData.positionId))} value={formData.positionId} onChange={(event) => updateField("positionId", event.target.value)} disabled={!formData.departmentId} required><option value="">{formData.departmentId ? copy.selectPosition : copy.chooseDepartmentFirst}</option>{availablePositions.map((position) => <option key={position.id} value={position.id}>{position.title} ({position.code})</option>)}</select></label>
+          <div className="mt-5 grid gap-x-5 gap-y-4 md:grid-cols-2">
+            <label className="block md:col-span-2"><span className={labelClass}>{language === "id" ? "ID Pegawai" : "Employee ID"} <span className="text-red-600">*</span></span><input placeholder={language === "id" ? "mis. EMP - XXX" : "e.g. EMP - XXX"} className={fieldClassName(Boolean(errorMessage && !formData.employeeId.trim()))} value={formData.employeeId} onChange={(event) => updateField("employeeId", event.target.value)} required /></label>
+            <label className="block md:col-span-2"><span className={labelClass}>{copy.employeeName} <span className="text-red-600">*</span></span><input placeholder={copy.employeeName} className={fieldClassName(Boolean(errorMessage && !formData.fullName.trim()))} value={formData.fullName} onChange={(event) => updateField("fullName", event.target.value)} required /></label>
+            <label className="block md:col-span-2"><span className={labelClass}>{copy.identity} <span className="text-red-600">*</span></span><input placeholder={copy.identityNumber} className={fieldClassName(Boolean(errorMessage && !formData.identityNumber.trim()))} value={formData.identityNumber} onChange={(event) => updateField("identityNumber", event.target.value)} required /></label>
+            <label className="block"><span className={labelClass}>{copy.phone} <span className="text-red-600">*</span></span><input placeholder="xxxx-xxxx-xxxx" className={fieldClassName(Boolean(errorMessage && !formData.phone.trim()))} type="tel" value={formData.phone} onChange={(event) => updateField("phone", event.target.value)} required /></label>
+            <label className="block"><span className={labelClass}>Email <span className="text-red-600">*</span></span><input className={fieldClassName(Boolean(errorMessage && !formData.email.trim()))} type="email" value={formData.email} onChange={(event) => updateField("email", event.target.value)} required /></label>
+            <label className="block"><span className={labelClass}>{copy.joinDate} <span className="text-red-600">*</span></span><input className={fieldClassName(Boolean(errorMessage && !formData.join_date))} type="date" name="join_date" value={formData.join_date} onChange={(event) => updateField("join_date", event.target.value)} required /></label>
+            <label className="block"><span className={labelClass}>{copy.employmentStatus} <span className="text-red-600">*</span></span><select className={fieldClassName(Boolean(errorMessage && !formData.employmentStatus))} value={formData.employmentStatus} onChange={(event) => updateField("employmentStatus", event.target.value as EmploymentStatus | "")} required><option value="">{copy.selectStatus}</option>{employmentStatuses.map((status) => <option key={status} value={status}>{hrmsStatusLabel(status, language)}</option>)}</select></label>
+            <label className="block"><span className={labelClass}>{copy.department} <span className="text-red-600">*</span></span><select className={fieldClassName(Boolean(errorMessage && !formData.departmentId))} value={formData.departmentId} onChange={(event) => { const departmentId = event.target.value; setFormData((current) => ({ ...current, departmentId, positionId: current.positionId && positions.find((position) => position.id === current.positionId)?.department_id === departmentId ? current.positionId : "" })); }} required><option value="">{copy.selectDepartment}</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name} ({department.code})</option>)}</select></label>
+            <label className="block"><span className={labelClass}>{copy.workLocation} <span className="text-red-600">*</span></span><input className={fieldClassName(Boolean(errorMessage && !formData.workLocation.trim()))} value={formData.workLocation} onChange={(event) => updateField("workLocation", event.target.value)} required /></label>
+            <label className="block md:col-span-2"><span className={labelClass}>{copy.position} <span className="text-red-600">*</span></span><select className={fieldClassName(Boolean(errorMessage && !formData.positionId))} value={formData.positionId} onChange={(event) => updateField("positionId", event.target.value)} disabled={!formData.departmentId} required><option value="">{formData.departmentId ? copy.selectPosition : copy.chooseDepartmentFirst}</option>{availablePositions.map((position) => <option key={position.id} value={position.id}>{position.title} ({position.code})</option>)}</select></label>
           </div>
         </section>
       </fieldset>
 
       {errorMessage && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
           {errorMessage}
         </p>
       )}
       {successMessage && (
-        <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700" role="status">
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700" role="status">
           {successMessage}
         </p>
       )}
 
-      <div className="flex flex-col-reverse gap-3 border-t border-[#D9E2FC] pt-6 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
         <Link
-          className="inline-flex h-11 items-center justify-center rounded-xl border border-[#BCD4EE] bg-white px-5 text-sm font-bold text-[#0B2548] transition hover:border-[#0C68D5] hover:bg-[#EAF2FC]"
+          className={buttonClass("secondary")}
           href="/employees"
         >
           {copy.cancel}
         </Link>
-        <CustomButton type="submit" fullWidth={false} disabled={isSubmitting}>
+        <button className={buttonClass("primary")} type="submit" disabled={isSubmitting}>
           {isSubmitting ? t("saving") : copy.save}
-        </CustomButton>
+        </button>
       </div>
     </form>
   );

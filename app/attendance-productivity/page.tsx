@@ -7,16 +7,20 @@ import {
   UserX,
   CalendarDays,
   TrendingUp,
-  ChevronRight,
   Search,
   AlertCircle,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { SkeletonBlock, SkeletonTable } from "@/components/hrms/Skeleton";
-import HeaderAccount from "@/components/HeaderAccount";
+import AppHeader from "@/components/AppHeader";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import LocationMapPreview from "@/components/attendance/LocationMapPreview";
 import TablePagination from "@/components/hrms/TablePagination";
+import { badgeClass, cardClass, inputClass, labelClass, pageTitleClass, searchInputClass, tableClass, type BadgeTone } from "@/components/ui/styles";
+
+// Small caption above a card title or stat value.
+const cardEyebrowClass = "text-xs font-semibold text-slate-500";
+// Selected table row: light blue fill with a blue bar on the left.
 
 type AttendanceStatus = "PRESENT" | "UNDER_MINIMUM" | "ABSENT" | "LEAVE" | string;
 type AppRole = "EMPLOYEE" | "HR" | "MANAGER";
@@ -66,8 +70,8 @@ function statusConfig(status: AttendanceStatus, language: "id" | "en") {
   const labels = language === "id"
     ? { PRESENT: "Hadir", UNDER_MINIMUM: "Di bawah 7 jam", ABSENT: "Tidak hadir", LEAVE: "Izin / cuti" }
     : { PRESENT: "Present", UNDER_MINIMUM: "Under 7 hours", ABSENT: "Absent", LEAVE: "Leave" };
-  const classes: Record<string, string> = { PRESENT: "bg-[#eaf7f0] text-[#16834b]", UNDER_MINIMUM: "bg-[#fef9c3] text-[#b7791f]", ABSENT: "bg-[#fff0f0] text-[#d64545]", LEAVE: "bg-[#edf6ff] text-[#1971c2]" };
-  return { label: labels[status as keyof typeof labels] ?? status, className: classes[status] ?? "bg-slate-100 text-slate-700" };
+  const tones: Record<string, BadgeTone> = { PRESENT: "green", UNDER_MINIMUM: "amber", ABSENT: "red", LEAVE: "blue" };
+  return { label: labels[status as keyof typeof labels] ?? status, className: badgeClass(tones[status] ?? "slate") };
 }
 
 function toDateInputValue(date: Date) {
@@ -373,49 +377,20 @@ export default function AttendanceProductivityPage() {
   }, [filteredData]);
 
   return (
-    <div className="min-h-screen bg-[#eaf2fc] text-[#121b2e]">
+    <div className="min-h-screen bg-white text-slate-800">
       {/* HEADER */}
-      <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 pl-16 pr-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:pr-6 lg:pl-6">
-        <div className="flex w-full min-w-0 items-center justify-between gap-3">
-          <div className="hidden min-w-0 items-center gap-3 sm:flex">
-            <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">
-              ANDIMA HRMS
-            </span>
-
-            <span className="h-5 border-l border-[#BCD4EE]" />
-
-            <span className="text-xs font-semibold text-[#3f4940]">
-              HRMS
-            </span>
-
-            <ChevronRight
-              size={13}
-              className="shrink-0 text-[#52749B]/60"
-            />
-
-            <span className="truncate text-xs font-semibold text-[#0C68D5]">
-              {t("attendanceProductivity")}
-            </span>
-          </div>
-
-          <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">
-            {t("attendanceProductivity")}
-          </span>
-
-          <div className="flex items-center gap-2 sm:gap-3"><HeaderAccount /></div>
-        </div>
-      </header>
+      <AppHeader pageTitle={t("attendanceProductivity")} />
 
       {/* PAGE TITLE */}
-      <section className="border-b border-[#d9e2fc] bg-white px-4 py-5 sm:px-6">
+      <section className="px-4 pt-6 sm:px-6">
         <div className="mx-auto max-w-[1600px]">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
             <div>
-              <h1 className="text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">
+              <h1 className={pageTitleClass.title}>
                 {copy.title}
               </h1>
 
-              <p className="mt-1 max-w-3xl text-sm text-[#4d5f81]">
+              <p className={`max-w-3xl ${pageTitleClass.subtitle}`}>
                 {copy.description}
               </p>
             </div>
@@ -426,7 +401,7 @@ export default function AttendanceProductivityPage() {
           </div>
 
           {errorMessage && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               <AlertCircle size={16} className="shrink-0" />
               <span>{errorMessage}</span>
             </div>
@@ -436,41 +411,41 @@ export default function AttendanceProductivityPage() {
           <div className="mt-5 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div>
-                <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+                <label className={labelClass}>
                   {copy.from}
                 </label>
 
                 <div className="relative">
                   <CalendarDays
                     size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4d5f81]"
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                   />
 
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => { setStartDate(e.target.value); setTablePage(1); }}
-                    className="rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15"
+                    className={inputClass("pl-10 text-xs")}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+                <label className={labelClass}>
                   {copy.until}
                 </label>
 
                 <div className="relative">
                   <CalendarDays
                     size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4d5f81]"
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                   />
 
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => { setEndDate(e.target.value); setTablePage(1); }}
-                    className="rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] py-2 pl-9 pr-3 text-xs outline-none focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15"
+                    className={inputClass("pl-10 text-xs")}
                   />
                 </div>
               </div>
@@ -478,8 +453,7 @@ export default function AttendanceProductivityPage() {
 
             <div className="relative w-full xl:w-72">
               <Search
-                size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#4d5f81]"
+                className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400"
               />
 
               <input
@@ -487,7 +461,7 @@ export default function AttendanceProductivityPage() {
                 placeholder={copy.search}
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setTablePage(1); }}
-                className="w-full rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] py-2 pl-9 pr-3 text-xs outline-none transition placeholder:text-[#4d5f81]/70 focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15"
+                className={searchInputClass}
               />
             </div>
           </div>
@@ -498,115 +472,115 @@ export default function AttendanceProductivityPage() {
         {/* SUMMARY CARDS */}
         <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
           {/* Total Data */}
-          <div className="rounded-xl border border-[#d9e2fc] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <div className="flex items-start justify-between">
+          <div className={`${cardClass} p-4 sm:p-5`}>
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+                <p className={cardEyebrowClass}>
                   {copy.totalData}
                 </p>
 
-                <p className="mt-2 text-2xl font-bold text-[#121b2e]">
+                <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
                   {loading ? <SkeletonBlock className="h-7 w-12" /> : filteredData.length}
                 </p>
 
-                <p className="mt-1 text-[10px] text-[#4d5f81]">
+                <p className="mt-1 text-[11px] text-slate-500">
                   {copy.attendanceRecords}
                 </p>
               </div>
 
-              <div className="grid size-9 place-items-center rounded-lg bg-[#edf6ff] text-[#1971c2]">
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
                 <UsersRound size={18} />
               </div>
             </div>
           </div>
 
           {/* Hadir */}
-          <div className="rounded-xl border border-[#d9e2fc] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <div className="flex items-start justify-between">
+          <div className={`${cardClass} p-4 sm:p-5`}>
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+                <p className={cardEyebrowClass}>
                   {copy.present}
                 </p>
 
-                <p className="mt-2 text-2xl font-bold text-[#16834b]">
+                <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-700">
                   {loading ? <SkeletonBlock className="h-7 w-12" /> : summary.present}
                 </p>
 
-                <p className="mt-1 text-[10px] text-[#4d5f81]">
+                <p className="mt-1 text-[11px] text-slate-500">
                   {copy.attendanceRecorded}
                 </p>
               </div>
 
-              <div className="grid size-9 place-items-center rounded-lg bg-[#eaf7f0] text-[#16834b]">
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
                 <UserCheck size={18} />
               </div>
             </div>
           </div>
 
           {/* Di bawah minimum */}
-          <div className="rounded-xl border border-[#d9e2fc] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <div className="flex items-start justify-between">
+          <div className={`${cardClass} p-4 sm:p-5`}>
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+                <p className={cardEyebrowClass}>
                   {copy.underSeven}
                 </p>
 
-                <p className="mt-2 text-2xl font-bold text-[#b7791f]">
+                <p className="mt-2 text-2xl font-bold tracking-tight text-amber-700">
                   {loading ? <SkeletonBlock className="h-7 w-12" /> : summary.underMinimum}
                 </p>
 
-                <p className="mt-1 text-[10px] text-[#4d5f81]">
+                <p className="mt-1 text-[11px] text-slate-500">
                   {copy.durationBelow}
                 </p>
               </div>
 
-              <div className="grid size-9 place-items-center rounded-lg bg-[#fef9c3] text-[#b7791f]">
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600">
                 <TrendingUp size={18} />
               </div>
             </div>
           </div>
 
           {/* Tidak Hadir */}
-          <div className="rounded-xl border border-[#d9e2fc] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <div className="flex items-start justify-between">
+          <div className={`${cardClass} p-4 sm:p-5`}>
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+                <p className={cardEyebrowClass}>
                   {copy.absent}
                 </p>
 
-                <p className="mt-2 text-2xl font-bold text-[#d64545]">
+                <p className="mt-2 text-2xl font-bold tracking-tight text-red-700">
                   {loading ? <SkeletonBlock className="h-7 w-12" /> : summary.absent}
                 </p>
 
-                <p className="mt-1 text-[10px] text-[#4d5f81]">
+                <p className="mt-1 text-[11px] text-slate-500">
                   {copy.noAttendance}
                 </p>
               </div>
 
-              <div className="grid size-9 place-items-center rounded-lg bg-[#fff0f0] text-[#d64545]">
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-red-50 text-red-600">
                 <UserX size={18} />
               </div>
             </div>
           </div>
 
           {/* Izin / Cuti */}
-          <div className="rounded-xl border border-[#d9e2fc] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <div className="flex items-start justify-between">
+          <div className={`${cardClass} p-4 sm:p-5`}>
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+                <p className={cardEyebrowClass}>
                   {copy.leave}
                 </p>
 
-                <p className="mt-2 text-2xl font-bold text-[#1971c2]">
+                <p className="mt-2 text-2xl font-bold tracking-tight text-blue-700">
                   {loading ? <SkeletonBlock className="h-7 w-12" /> : summary.leave}
                 </p>
 
-                <p className="mt-1 text-[10px] text-[#4d5f81]">
+                <p className="mt-1 text-[11px] text-slate-500">
                   {copy.leaveData}
                 </p>
               </div>
 
-              <div className="grid size-9 place-items-center rounded-lg bg-[#edf6ff] text-[#1971c2]">
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
                 <CalendarDays size={18} />
               </div>
             </div>
@@ -615,29 +589,29 @@ export default function AttendanceProductivityPage() {
 
         {/* PRODUCTIVITY CHARTS */}
         <div className="mt-5 grid gap-5 xl:grid-cols-[1.25fr_1fr]">
-          <div className="rounded-xl border border-[#d9e2fc] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <div className="flex items-start justify-between">
-              <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.workTrend}</p><h2 className="mt-1 text-lg font-bold">{copy.averageDaily}</h2><p className="mt-1 text-xs text-[#4d5f81]">{copy.followsDate}</p></div><TrendingUp size={19} className="text-[#006838]" />
+          <div className={`${cardClass} p-5`}>
+            <div className="flex items-start justify-between gap-3">
+              <div><p className={cardEyebrowClass}>{copy.workTrend}</p><h2 className="mt-1 text-lg font-bold text-slate-900">{copy.averageDaily}</h2><p className="mt-1 text-xs text-slate-500">{copy.followsDate}</p></div><TrendingUp size={19} className="shrink-0 text-slate-400" />
             </div>
-            {productivitySeries.daily.length === 0 ? <div className="flex h-48 items-center justify-center text-xs text-[#4d5f81]">{copy.noWorkHours}</div> : <div className="mt-6 flex h-52 items-end gap-2 border-b border-l border-[#d9e2fc] px-3 pb-0 pt-4">{productivitySeries.daily.map((point) => { const max = Math.max(...productivitySeries.daily.map((item) => item.hours), 7); const height = Math.max((point.hours / max) * 100, 4); return <div key={point.date} className="group flex h-full min-w-7 flex-1 flex-col items-center justify-end gap-1"><span className="text-[9px] font-bold text-[#4d5f81] opacity-0 transition group-hover:opacity-100">{point.hours.toFixed(1)}{language === "id" ? "j" : "h"}</span><div className="w-full rounded-t-md bg-[#069494] transition group-hover:bg-[#006838]" style={{ height: `${height}%` }} /><span className="text-[9px] text-[#4d5f81]">{point.date.slice(5)}</span></div> })}</div>}
+            {productivitySeries.daily.length === 0 ? <div className="mt-6 flex h-48 items-center justify-center rounded-lg border border-dashed border-slate-300 text-xs text-slate-500">{copy.noWorkHours}</div> : <div className="mt-6 flex h-52 items-end gap-2 border-b border-l border-slate-200 px-3 pb-0 pt-4">{productivitySeries.daily.map((point) => { const max = Math.max(...productivitySeries.daily.map((item) => item.hours), 7); const height = Math.max((point.hours / max) * 100, 4); return <div key={point.date} className="group flex h-full min-w-7 flex-1 flex-col items-center justify-end gap-1"><span className="text-[10px] font-bold text-slate-600 opacity-0 transition group-hover:opacity-100">{point.hours.toFixed(1)}{language === "id" ? "j" : "h"}</span><div className="w-full rounded-t-md bg-[#3B6FF5] transition group-hover:bg-blue-700" style={{ height: `${height}%` }} /><span className="text-[10px] text-slate-500">{point.date.slice(5)}</span></div> })}</div>}
           </div>
-          <div className="rounded-xl border border-[#d9e2fc] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.productivityComparison}</p><h2 className="mt-1 text-lg font-bold">{copy.averagePerEmployee}</h2><p className="mt-1 text-xs text-[#4d5f81]">{copy.sortedAverage}</p>
-            <div className="mt-5 space-y-3">{productivitySeries.employees.length === 0 ? <p className="py-12 text-center text-xs text-[#4d5f81]">{copy.noData}</p> : productivitySeries.employees.map((employee) => { const width = Math.min((employee.hours / 9) * 100, 100); return <div key={employee.name}><div className="mb-1 flex justify-between gap-2 text-[10px]"><span className="truncate font-semibold text-[#3f4940]">{employee.name}</span><span className="font-bold text-[#121b2e]">{employee.hours.toFixed(1)} {language === "id" ? "jam" : "hours"}</span></div><div className="h-2 overflow-hidden rounded-full bg-[#edf0f7]"><div className="h-full rounded-full bg-[#16834b]" style={{ width: `${width}%` }} /></div></div> })}</div>
+          <div className={`${cardClass} p-5`}>
+            <p className={cardEyebrowClass}>{copy.productivityComparison}</p><h2 className="mt-1 text-lg font-bold text-slate-900">{copy.averagePerEmployee}</h2><p className="mt-1 text-xs text-slate-500">{copy.sortedAverage}</p>
+            <div className="mt-5 space-y-3">{productivitySeries.employees.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 py-12 text-center text-xs text-slate-500">{copy.noData}</p> : productivitySeries.employees.map((employee) => { const width = Math.min((employee.hours / 9) * 100, 100); return <div key={employee.name}><div className="mb-1 flex justify-between gap-2 text-[11px]"><span className="truncate font-semibold text-slate-700">{employee.name}</span><span className="shrink-0 font-bold text-slate-900">{employee.hours.toFixed(1)} {language === "id" ? "jam" : "hours"}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${width}%` }} /></div></div> })}</div>
           </div>
         </div>
 
         {/* HISTORY + DETAIL */}
         <div className="mt-5 flex flex-col gap-5 xl:flex-row">
           {/* TABLE */}
-          <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-[#d9e2fc] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center justify-between border-b border-[#d9e2fc] px-5 py-4">
+          <div className={`min-w-0 flex-1 overflow-hidden ${cardClass}`}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div>
-                <h2 className="text-sm font-bold text-[#121b2e]">
+                <h2 className="text-sm font-bold text-slate-900">
                   {copy.history}
                 </h2>
 
-                <p className="mt-0.5 text-[10px] text-[#4d5f81]">
+                <p className="mt-0.5 text-xs text-slate-500">
                   {filteredData.length} {copy.found}
                 </p>
               </div>
@@ -650,46 +624,46 @@ export default function AttendanceProductivityPage() {
                 <div>
                   <CalendarDays
                     size={32}
-                    className="mx-auto text-[#becabd]"
+                    className="mx-auto text-slate-300"
                   />
 
-                  <p className="mt-3 text-sm font-bold text-[#121b2e]">
+                  <p className="mt-3 text-sm font-semibold text-slate-700">
                     {copy.unavailable}
                   </p>
 
-                  <p className="mt-1 text-xs text-[#4d5f81]">
+                  <p className="mt-1 text-xs text-slate-500">
                     {copy.noResults}
                   </p>
                 </div>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-xs">
+                <table className={`${tableClass.table} min-w-[760px]`}>
                   <thead>
-                    <tr className="border-b border-[#d9e2fc] bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                      <th className="px-5 py-3">
+                    <tr className={tableClass.head}>
+                      <th className={tableClass.headCell}>
                         {copy.employee}
                       </th>
 
-                      <th className="px-3 py-3">
+                      <th className={tableClass.headCell}>
                         {copy.date}
                       </th>
 
-                      <th className="px-3 py-3">
+                      <th className={tableClass.headCell}>
                         {copy.status}
                       </th>
 
-                      <th className="px-3 py-3">
+                      <th className={tableClass.headCell}>
                         {copy.clock}
                       </th>
 
-                      <th className="px-3 py-3">
+                      <th className={tableClass.headCell}>
                         {copy.workHours}
                       </th>
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody>
                     {paginatedData.map((row) => {
                       const isSelected = selectedItem?.id === row.id;
 
@@ -699,33 +673,31 @@ export default function AttendanceProductivityPage() {
                         <tr
                           key={row.id}
                           onClick={() => setSelectedItem(row)}
-                          className={`cursor-pointer transition hover:bg-[#f7f8ff] ${
-                            isSelected ? "bg-[#eaf7f0]" : ""
-                          }`}
+                          className={`${isSelected ? tableClass.rowSelected : tableClass.row} cursor-pointer`}
                         >
-                          <td className="px-5 py-3.5">
-                            <div className="text-xs font-bold text-[#121b2e]">
+                          <td className={tableClass.cell}>
+                            <div className="font-semibold text-slate-900">
                               {row.full_name}
                             </div>
 
-                            <div className="mt-0.5 text-[10px] text-[#4d5f81]">
+                            <div className="mt-0.5 text-xs text-slate-500">
                               {row.employee_id} • {row.department}
                             </div>
                           </td>
 
-                          <td className="px-3 py-3.5 font-medium text-[#3f4940]">
+                          <td className={`${tableClass.cell} font-medium`}>
                             {row.date}
                           </td>
 
-                          <td className="px-3 py-3.5">
+                          <td className={tableClass.cell}>
                             <span
-                              className={`inline-flex rounded px-2 py-1 text-[10px] font-bold ${status.className}`}
+                              className={status.className}
                             >
                               {status.label}
                             </span>
                           </td>
 
-                          <td className="px-3 py-3.5 text-[#4d5f81]">
+                          <td className={tableClass.cell}>
                             <div>
                               {copy.in}: {row.clock_in ? `${row.clock_in} WIB` : "-"}
                             </div>
@@ -735,13 +707,13 @@ export default function AttendanceProductivityPage() {
                             </div>
                           </td>
 
-                          <td className="px-3 py-3.5">
+                          <td className={tableClass.cell}>
                             {row.work_hours !== null ? (
-                              <span className="font-semibold text-[#121b2e]">
+                              <span className="font-semibold text-slate-900">
                                 {row.work_hours.toFixed(1)} {language === "id" ? "jam" : "hours"}
                               </span>
                             ) : (
-                              <span className="text-[#4d5f81]">-</span>
+                              <span className="text-slate-400">-</span>
                             )}
                           </td>
                         </tr>
@@ -756,26 +728,24 @@ export default function AttendanceProductivityPage() {
 
           {/* DETAIL */}
           {selectedItem && (
-            <div className="w-full shrink-0 rounded-xl border border-[#d9e2fc] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] xl:w-[360px]">
-              <div className="border-b border-[#d9e2fc] pb-4">
-                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+            <div className={`w-full shrink-0 p-5 ${cardClass} xl:w-[360px]`}>
+              <div className="border-b border-slate-100 pb-4">
+                <span className={cardEyebrowClass}>
                   {copy.attendanceDetail}
                 </span>
 
-                <h3 className="mt-1 text-base font-bold text-[#121b2e]">
+                <h3 className="mt-1 text-base font-bold text-slate-900">
                   {selectedItem.full_name}
                 </h3>
 
-                <p className="mt-0.5 text-xs text-[#4d5f81]">
+                <p className="mt-0.5 text-xs text-slate-500">
                   {selectedItem.employee_id} • {selectedItem.department}
                 </p>
               </div>
 
               <div className="mt-4">
                 <span
-                  className={`inline-flex rounded px-2.5 py-1 text-[10px] font-bold ${
-                    statusConfig(selectedItem.status, language).className
-                  }`}
+                  className={statusConfig(selectedItem.status, language).className}
                 >
                   {statusConfig(selectedItem.status, language).label}
                 </span>
@@ -829,34 +799,34 @@ export default function AttendanceProductivityPage() {
               </div>
 
               {/* PRODUCTIVITY */}
-              <div className="mt-5 rounded-xl border border-dashed border-[#becabd] bg-[#f7f8ff] p-4">
+              <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center gap-2">
                   <TrendingUp
                     size={15}
-                    className="text-[#4d5f81]"
+                    className="text-slate-400"
                   />
 
-                  <span className="text-xs font-bold text-[#121b2e]">
+                  <span className="text-xs font-bold text-slate-900">
                     {copy.productivityInfo}
                   </span>
                 </div>
 
-                <p className="mt-2 text-[11px] leading-relaxed text-[#4d5f81]">
+                <p className="mt-2 text-xs leading-relaxed text-slate-600">
                   {copy.flexibleDuration}
                 </p>
 
-                <span className={`mt-3 inline-flex rounded px-2 py-1 text-[9px] font-bold ${selectedItem.work_hours !== null && selectedItem.work_hours >= 7 ? 'bg-[#eaf7f0] text-[#16834b]' : 'bg-[#fef9c3] text-[#b7791f]'}`}>
+                <span className={badgeClass(selectedItem.work_hours !== null && selectedItem.work_hours >= 7 ? "green" : "amber", "mt-3")}>
                   {selectedItem.work_hours !== null && selectedItem.work_hours >= 7 ? copy.meetsSeven : copy.belowSeven}
                 </span>
               </div>
 
               {/* NOTE */}
-              <div className="mt-4 rounded-xl border border-[#b9d6ff] bg-[#edf6ff] p-3">
-                <p className="text-[10px] font-bold text-[#1971c2]">
+              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                <p className="text-xs font-bold text-blue-700">
                   {copy.information}
                 </p>
 
-                <p className="mt-1 text-[10px] leading-relaxed text-[#4d5f81]">
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
                   {copy.disclaimer}
                 </p>
               </div>
@@ -880,12 +850,12 @@ function DetailRow({
   value: string;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-[#f0f2f7] pb-2">
-      <span className="text-xs text-[#4d5f81]">
+    <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+      <span className="text-xs text-slate-500">
         {label}
       </span>
 
-      <span className="text-right text-xs font-semibold text-[#121b2e]">
+      <span className="text-right text-xs font-semibold text-slate-900">
         {value}
       </span>
     </div>

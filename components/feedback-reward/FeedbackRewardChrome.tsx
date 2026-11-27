@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { Award, ChevronLeft, ClipboardCheck, Gift, MessageSquareText } from "lucide-react";
+import { Award, ChevronLeft, ChevronRight, ClipboardCheck, Gift, MessageSquareText } from "lucide-react";
 import type { ReactNode } from "react";
 import { TranslatedText } from "@/components/i18n/LocalizedText";
+import BackLink from "@/components/ui/BackLink";
+import { pageList, paginationClass as p } from "@/components/ui/pagination";
+import { cardClass, pageTitleClass, segmentedClass } from "@/components/ui/styles";
 import type { TranslationKey } from "@/lib/i18n";
 
 type Tab = "overview" | "feedback" | "reward";
@@ -14,14 +17,14 @@ const tabConfig: Record<Tab, { href: string; icon: typeof ClipboardCheck; key: T
 
 export function FeedbackRewardTabs({ active }: { active: Tab }) {
   return (
-    <nav className="flex min-w-0 gap-1 overflow-x-auto rounded-2xl border border-[#D7E4F4] bg-white p-1.5 shadow-[0_6px_18px_rgba(13,47,91,0.04)]" aria-label="Feedback and reward navigation">
+    <nav className={segmentedClass.group} aria-label="Feedback and reward navigation">
       {(Object.keys(tabConfig) as Tab[]).map((tab) => {
         const config = tabConfig[tab];
         const Icon = config.icon;
         const selected = active === tab;
         return (
-          <Link key={tab} href={config.href} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3.5 text-sm font-bold transition sm:px-4 ${selected ? "bg-[#113665] text-white shadow-[0_4px_10px_rgba(17,54,101,0.22)]" : "text-[#60718B] hover:bg-[#F1F6FC] hover:text-[#113665]"}`}>
-            <Icon size={16} />
+          <Link key={tab} href={config.href} className={`${segmentedClass.item} ${selected ? segmentedClass.active : segmentedClass.idle}`}>
+            <Icon className="size-3.5" aria-hidden="true" />
             <TranslatedText textKey={config.key} />
           </Link>
         );
@@ -32,13 +35,13 @@ export function FeedbackRewardTabs({ active }: { active: Tab }) {
 
 export function FeedbackRewardHeader({ eyebrow, title, description, backHref, backLabel, action }: { eyebrow?: ReactNode; title: ReactNode; description: ReactNode; backHref?: string; backLabel?: ReactNode; action?: ReactNode }) {
   return (
-    <header className="rounded-[24px] border border-[#D7E4F4] bg-[linear-gradient(112deg,#FFFFFF_0%,#F2F7FE_100%)] px-5 py-6 shadow-[0_10px_28px_rgba(13,47,91,0.06)] sm:px-7 sm:py-7">
-      {backHref && backLabel && <Link href={backHref} className="mb-5 inline-flex items-center gap-1.5 text-sm font-bold text-[#1B67C9] transition hover:text-[#113665]"><ChevronLeft size={16} />{backLabel}</Link>}
-      <div className="flex flex-wrap items-end justify-between gap-5">
+    <header className="space-y-4">
+      {backHref && backLabel && <BackLink href={backHref}>{backLabel}</BackLink>}
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="max-w-3xl">
-          {eyebrow && <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#1B67C9]">{eyebrow}</p>}
-          <h1 className="mt-1 text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{title}</h1>
-          <p className="mt-1 text-sm text-[#4d5f81]">{description}</p>
+          {eyebrow && <p className={pageTitleClass.eyebrow}>{eyebrow}</p>}
+          <h1 className={`mt-1 ${pageTitleClass.title}`}>{title}</h1>
+          <p className={pageTitleClass.subtitle}>{description}</p>
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
@@ -49,16 +52,37 @@ export function FeedbackRewardHeader({ eyebrow, title, description, backHref, ba
 export function FeedbackMetric({ label, value, icon, tone = "blue", detail }: { label: ReactNode; value: number; icon: "feedback" | "reward" | "followup" | "notification"; tone?: "blue" | "green" | "amber" | "navy"; detail?: ReactNode }) {
   const Icon = icon === "feedback" ? MessageSquareText : icon === "reward" ? Award : icon === "followup" ? ClipboardCheck : Gift;
   const toneStyle = {
-    blue: "bg-[#E8F2FF] text-[#1B67C9]",
-    green: "bg-[#E9F8F0] text-[#16804B]",
-    amber: "bg-[#FFF5E5] text-[#A65E00]",
-    navy: "bg-[#EAF0F8] text-[#113665]",
+    blue: "bg-blue-50 text-blue-600",
+    green: "bg-emerald-50 text-emerald-600",
+    amber: "bg-amber-50 text-amber-600",
+    navy: "bg-slate-100 text-slate-700",
   }[tone];
-  return <article className="min-w-0 rounded-2xl border border-[#D7E4F4] bg-white p-4 shadow-[0_6px_18px_rgba(13,47,91,0.04)] sm:p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-[#60718B]">{label}</p><p className="mt-2 text-2xl font-bold text-[#121b2e]">{value}</p>{detail && <p className="mt-1 text-xs text-[#8292A8]">{detail}</p>}</div><span className={`grid size-10 shrink-0 place-items-center rounded-xl ${toneStyle}`}><Icon size={19} /></span></div></article>;
+  return <article className={`min-w-0 ${cardClass} p-5`}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-semibold text-slate-600">{label}</p><p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{value}</p>{detail && <p className="mt-1 text-xs text-slate-500">{detail}</p>}</div><span className={`grid size-10 shrink-0 place-items-center rounded-xl ${toneStyle}`}><Icon className="size-5" aria-hidden="true" /></span></div></article>;
 }
 
+// Same capsule as components/hrms/TablePagination.tsx, with links because the
+// feedback lists keep the page in the URL.
 export function FeedbackPagination({ page, totalPages, previousLabel, nextLabel, hrefForPage }: { page: number; totalPages: number; previousLabel: ReactNode; nextLabel: ReactNode; hrefForPage: (page: number) => string }) {
   if (totalPages <= 1) return null;
-  const pages = Array.from({ length: Math.min(totalPages, 5) }, (_, index) => Math.max(1, Math.min(totalPages - 4, page - 2)) + index);
-  return <nav className="flex flex-wrap items-center justify-center gap-2" aria-label="Pagination"><Link aria-disabled={page <= 1} className={`inline-flex h-10 items-center rounded-xl border px-3 text-sm font-bold ${page <= 1 ? "pointer-events-none border-slate-200 text-slate-300" : "border-[#C9DCEF] bg-white text-[#113665] hover:bg-[#F1F6FC]"}`} href={hrefForPage(Math.max(1, page - 1))}>{previousLabel}</Link>{pages.map((item) => <Link key={item} aria-current={item === page ? "page" : undefined} className={`grid size-10 place-items-center rounded-xl text-sm font-bold ${item === page ? "bg-[#113665] text-white shadow-[0_4px_10px_rgba(17,54,101,0.22)]" : "border border-[#C9DCEF] bg-white text-[#113665] hover:bg-[#F1F6FC]"}`} href={hrefForPage(item)}>{item}</Link>)}<Link aria-disabled={page >= totalPages} className={`inline-flex h-10 items-center rounded-xl border px-3 text-sm font-bold ${page >= totalPages ? "pointer-events-none border-slate-200 text-slate-300" : "border-[#C9DCEF] bg-white text-[#113665] hover:bg-[#F1F6FC]"}`} href={hrefForPage(Math.min(totalPages, page + 1))}>{nextLabel}</Link></nav>;
+  const isFirst = page <= 1;
+  const isLast = page >= totalPages;
+  return (
+    <nav className="flex justify-center md:justify-end" aria-label="Pagination">
+      <div className={p.capsule}>
+        <Link aria-disabled={isFirst} className={`${p.arrow} ${isFirst ? p.arrowDisabled : p.arrowEnabled}`} href={hrefForPage(Math.max(1, page - 1))}>
+          <ChevronLeft className="size-4" aria-hidden="true" /><span className="sr-only">{previousLabel}</span>
+        </Link>
+        <div className="flex items-center gap-1">
+          {pageList(page, totalPages).map((item, index) => item === "..." ? (
+            <span key={`gap-${index}`} className={p.ellipsis}>...</span>
+          ) : (
+            <Link key={item} aria-current={item === page ? "page" : undefined} className={`${p.page} ${item === page ? p.pageActive : p.pageIdle}`} href={hrefForPage(item)}>{item}</Link>
+          ))}
+        </div>
+        <Link aria-disabled={isLast} className={`${p.arrow} ${isLast ? p.arrowDisabled : p.arrowEnabled}`} href={hrefForPage(Math.min(totalPages, page + 1))}>
+          <ChevronRight className="size-4" aria-hidden="true" /><span className="sr-only">{nextLabel}</span>
+        </Link>
+      </div>
+    </nav>
+  );
 }

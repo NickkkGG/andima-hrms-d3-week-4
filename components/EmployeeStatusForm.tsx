@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import CustomButton from "@/components/CustomButton";
 import HrmsStatusPill, { hrmsStatusLabel } from "@/components/hrms/HrmsStatusPill";
 import { updateEmployeeEmploymentStatus } from "@/app/employees/actions";
 import { employmentStatuses, type EmploymentStatus } from "@/types/employee";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { buttonClass, cardClass, inputClass, labelClass } from "@/components/ui/styles";
 
 interface EmployeeStatusFormProps {
   employee: {
@@ -85,9 +85,9 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-      <section className="rounded-2xl border border-[#BCD4EE] bg-white p-5 shadow-[0_8px_24px_rgba(31,77,130,0.08)] sm:p-7">
-        <h2 className="text-base font-bold text-[#121b2e]">{copy.title}</h2>
-        <dl className="mt-5 grid gap-4 rounded-xl border border-[#DCE7F3] bg-[#F8FBFF] p-4 sm:grid-cols-3">
+      <section className={`p-5 sm:p-6 ${cardClass}`}>
+        <h2 className="text-base font-bold text-slate-900">{copy.title}</h2>
+        <dl className="mt-5 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3">
           <div>
             <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{language === "id" ? "ID Pegawai" : "Employee ID"}</dt>
             <dd className="mt-1 text-sm font-semibold text-slate-900">{employee.employee_id}</dd>
@@ -102,12 +102,10 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
           </div>
         </dl>
 
-        <label className="mt-6 block text-sm font-semibold text-[#121B2E]">
-          {copy.new} <span className="text-[#E5484D]">*</span>
+        <label className="mt-6 block">
+          <span className={labelClass}>{copy.new} <span className="text-red-600">*</span></span>
           <select
-            className={`mt-2 h-11 w-full rounded-[15px] border bg-[#155DFC]/10 px-3.5 text-sm font-medium text-[#121B2E] outline-none transition focus:bg-white focus:ring-2 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 ${
-              errorMessage ? "border-red-500 focus:border-red-600 focus:ring-red-600" : "border-[#D9E2FC] focus:border-[#1E3765] focus:ring-[#1E3765]"
-            }`}
+            className={inputClass(errorMessage ? "border-red-500! focus:border-red-600! focus:ring-red-100!" : "")}
             value={selectedStatus}
             onChange={(event) => setSelectedStatus(event.target.value as EmploymentStatus | "")}
             disabled={isSubmitting || isFinalStatus}
@@ -127,26 +125,26 @@ export default function EmployeeStatusForm({ employee }: EmployeeStatusFormProps
       </section>
 
       {errorMessage && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
           {errorMessage}
         </p>
       )}
       {successMessage && (
-        <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700" role="status">
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700" role="status">
           {successMessage}
         </p>
       )}
 
-      <div className="flex flex-col-reverse gap-3 border-t border-[#D9E2FC] pt-6 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
         <Link
-          className="inline-flex h-11 items-center justify-center rounded-[15px] border border-[#155DFC] bg-[#EEF4FF] px-5 text-sm font-bold text-[#155DFC] transition hover:bg-[#DCE8FF]"
+          className={buttonClass("secondary")}
           href={profileUrl}
         >
           {copy.cancel}
         </Link>
-        <CustomButton type="submit" fullWidth={false} disabled={isSubmitting || isUnchanged || isFinalStatus}>
+        <button className={buttonClass("primary")} type="submit" disabled={isSubmitting || isUnchanged || isFinalStatus}>
           {isSubmitting ? t("saving") : copy.save}
-        </CustomButton>
+        </button>
       </div>
     </form>
   );

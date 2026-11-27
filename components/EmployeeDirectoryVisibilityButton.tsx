@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Ellipsis } from "lucide-react";
 import { setEmployeeDirectoryVisibility } from "@/app/employees/actions";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { buttonClass } from "@/components/ui/styles";
 
 interface EmployeeDirectoryVisibilityButtonProps {
   employeeUuid: string;
@@ -39,14 +41,14 @@ export default function EmployeeDirectoryVisibilityButton({
 
   return (
     <details className="relative flex flex-col items-stretch gap-1.5 sm:items-end">
-      <summary className="inline-flex h-11 cursor-pointer list-none items-center justify-center rounded-[15px] border border-slate-300 bg-white px-4 text-sm font-bold text-[#1E3765] transition hover:border-[#155DFC] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#155DFC]">⋯ {copy.more}</summary>
-      <div className="absolute right-0 top-12 z-10 min-w-64 rounded-xl border border-[#D9E2FC] bg-white p-2 shadow-lg">
+      <summary className={buttonClass("secondary", "md", "list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3B6FF5]/40")}><Ellipsis className="size-4" aria-hidden="true" />{copy.more}</summary>
+      <div className="absolute right-0 top-11 z-10 min-w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
         <button
-        className={`inline-flex h-11 items-center justify-center rounded-[15px] border px-5 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+        className={
           isHidden
-            ? "border-[#16A37A] bg-[#ECFDF5] text-[#117A5A] hover:bg-[#DDF8EF]"
-            : "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100"
-        }`}
+            ? "inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-xs transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+            : buttonClass("dangerOutline", "md", "w-full")
+        }
         disabled={isSubmitting}
         onClick={handleClick}
         type="button"
@@ -58,7 +60,7 @@ export default function EmployeeDirectoryVisibilityButton({
             : copy.hideButton}
       </button>
       </div>
-      {message && <p aria-live="polite" className={`max-w-72 text-right text-xs font-medium ${isHidden ? "text-[#117A5A]" : "text-rose-700"}`}>{message}</p>}
+      {message && <p aria-live="polite" className={`max-w-72 text-right text-xs font-medium ${isHidden ? "text-emerald-700" : "text-red-700"}`}>{message}</p>}
     </details>
   );
 }

@@ -1,13 +1,19 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { ChevronRight, AlertCircle, CheckCircle2, Clock3, FilePlus2, X, CalendarDays, History, LockKeyhole, Unlock, Search, Minus } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock3, FilePlus2, X, History, LockKeyhole, Unlock, Search, Minus } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import HeaderAccount from '@/components/HeaderAccount'
+import AppHeader from '@/components/AppHeader'
 import { useLanguage } from '@/components/i18n/LanguageProvider'
 import LocationMapPreview from '@/components/attendance/LocationMapPreview'
 import TablePagination from '@/components/hrms/TablePagination'
 import { PageSkeleton, SkeletonTable } from '@/components/hrms/Skeleton'
+import { badgeClass, buttonClass, cardClass, iconButtonClass, inputClass, modalClass, pageTitleClass, searchInputClass, segmentedClass, tableClass, type BadgeTone } from '@/components/ui/styles'
+
+// Inline notices in the class design system style.
+const noticeClass = 'flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-lg'
+const errorNoticeClass = 'flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700'
+// Selected table row: light blue fill with a blue bar on the left.
 
 type CorrectionType = 'CLOCK_IN' | 'CLOCK_OUT' | 'FULL_DAY' | string
 type CorrectionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | string
@@ -128,12 +134,18 @@ export default function AttendancePageUI() {
     return formatAttendanceTime(value)
   }
   const correctionStatusLabel = (status: CorrectionStatus) => ({ PENDING: language === 'id' ? 'Menunggu persetujuan' : 'Awaiting approval', APPROVED: copy.approved, REJECTED: language === 'id' ? 'Ditolak' : 'Rejected' }[status] ?? status)
-  const correctionStatusClass = (status: CorrectionStatus) => status === 'APPROVED'
-    ? 'bg-emerald-100 text-emerald-800'
+  const correctionStatusTone = (status: CorrectionStatus): BadgeTone => status === 'APPROVED'
+    ? 'green'
     : status === 'REJECTED'
-    ? 'bg-red-100 text-red-800'
-    : 'bg-[#b9d6ff] text-[#1971c2]'
-  const correctionStatusBadgeClass = (status: CorrectionStatus) => `rounded px-2 py-0.5 text-[10px] font-bold ${correctionStatusClass(status)}`
+    ? 'red'
+    : 'amber'
+  const correctionStatusBadgeClass = (status: CorrectionStatus) => badgeClass(correctionStatusTone(status))
+  // Tinted frame for the correction request box, same color meaning as the badge.
+  const correctionPanelClass = (status: CorrectionStatus) => status === 'APPROVED'
+    ? 'border-emerald-200 bg-emerald-50/60'
+    : status === 'REJECTED'
+    ? 'border-red-200 bg-red-50/60'
+    : 'border-amber-200 bg-amber-50/60'
   const [attendances, setAttendances] = useState<AttendanceItem[]>([])
   const [selectedItem, setSelectedItem] = useState<AttendanceItem | null>(null)
   const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL')
@@ -618,52 +630,35 @@ export default function AttendancePageUI() {
 
     return (
       <>
-        <div className="min-h-screen bg-[#eaf2fc] text-[#121b2e]">
-          <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 pl-16 pr-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:pr-6 lg:pl-6">
-            <div className="flex w-full min-w-0 items-center justify-between gap-3">
-              <div className="hidden min-w-0 items-center gap-3 sm:flex"><span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span><span className="h-5 border-l border-[#BCD4EE]" /><span className="text-xs font-semibold text-[#3f4940]">HRMS</span><ChevronRight size={13} className="shrink-0 text-[#52749B]/60" /><span className="truncate text-xs font-semibold text-[#0C68D5]">{t('myAttendance')}</span></div>
-              <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">{t('myAttendance')}</span>
-              <div className="flex items-center gap-2 sm:gap-3"><HeaderAccount /></div>
-            </div>
-          </header>
-          <section className="border-b border-[#d9e2fc] bg-white px-4 py-5 sm:px-6"><div className="mx-auto flex max-w-[1600px] flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#006838]">{copy.selfService}</p><h1 className="mt-1 text-2xl font-bold tracking-[-0.4px]">{copy.myHistory}</h1><p className="mt-1 text-sm text-[#4d5f81]">{copy.greeting}, {viewerName || copy.employee}. {copy.reviewMy}</p></div><div className="flex flex-wrap items-end justify-end gap-2"><label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-[#4d5f81]"><span>{copy.fromDate}</span><input aria-label={copy.fromDate} type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-2 text-xs font-normal normal-case tracking-normal" /></label><label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-[#4d5f81]"><span>{copy.toDate}</span><input aria-label={copy.toDate} type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-2 text-xs font-normal normal-case tracking-normal" /></label>{(dateFrom || dateTo) && <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-3 text-xs font-bold text-[#4d5f81] hover:bg-[#f7f8ff]">{copy.clearFilter}</button>}</div></div></section>
-          {actionMessage && <div className={`mx-4 mt-4 flex items-center gap-2 rounded-lg border p-3 text-xs font-semibold sm:mx-6 ${actionMessage.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'}`}><CheckCircle2 size={16} />{actionMessage.text}</div>}
-          {errorMessage && <div className="mx-4 mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 sm:mx-6"><AlertCircle size={16} />{errorMessage}</div>}
-          <main className="mx-auto grid max-w-[1600px] gap-5 px-4 py-6 xl:grid-cols-[minmax(0,1fr)_390px] sm:px-6">
-            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center justify-between border-b border-[#becabd]/35 px-5 py-4"><div><h2 className="text-sm font-bold">{copy.attendanceHistory}</h2><p className="mt-1 text-xs text-[#4d5f81]">{filteredEmployeeData.length} {copy.recorded}</p></div><span className="rounded-full bg-[#edf6ff] px-2.5 py-1 text-[10px] font-bold text-[#1971c2]">{pendingCount} {copy.pendingCorrections}</span></div>{loading ? <SkeletonTable rows={6} columns={5} /> : filteredEmployeeData.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{attendances.length === 0 ? copy.noHistory : copy.noResults}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-xs"><thead><tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.clock}</th><th className="px-3 py-3">{copy.duration}</th><th className="px-3 py-3">{copy.durationStatus}</th><th className="px-3 py-3">{copy.correctionStatus}</th></tr></thead><tbody className="divide-y divide-slate-100">{paginatedAttendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`cursor-pointer transition hover:bg-[#f7f8ff] ${selected ? 'bg-[#eaf7f0]' : ''}`}><td className="px-4 py-3.5 font-semibold">{row.date}</td><td className="px-3 py-3.5 text-[#4d5f81]">{formatAttendanceTime(row.clock_in)} WIB <span className="mx-1 text-[#becabd]">/</span> {row.clock_out ? `${formatAttendanceTime(row.clock_out)} WIB` : '-'}</td><td className="px-3 py-3.5"><span className={duration.isUnderMin ? 'font-semibold text-[#b7791f]' : 'font-semibold'}>{duration.text}</span></td><td className="px-3 py-3.5"><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'}`}>{duration.isUnderMin ? copy.underSeven : copy.meetsSeven}</span></td><td className="px-3 py-3.5"><div className="flex flex-wrap items-center gap-1">{isDateClosed(row.date) && <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">{copy.closedPeriod}</span>}{row.correction ? <span className={correctionStatusBadgeClass(row.correction.status)}>{copy.correction}: {correctionStatusLabel(row.correction.status)}</span> : !isDateClosed(row.date) ? <span className="inline-flex items-center text-[#94a3b8]" aria-label={copy.noCorrectionForDate}><Minus size={14} strokeWidth={2.5} /></span> : null}</div></td></tr> })}</tbody></table></div>}<TablePagination page={employeeCurrentPage} pageSize={tablePageSize} totalItems={filteredEmployeeData.length} onPageChange={setTablePage} /></section>
-            {employeeItem && <aside className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,77,130,0.05)]"><div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3"><div><span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">{copy.attendanceDetail}</span><h2 className="mt-1 text-sm font-bold">{employeeItem.date}</h2><p className="text-xs text-[#4d5f81]">{employeeItem.employee_id} • {employeeItem.department}</p></div><Clock3 size={18} className="text-[#006838]" /></div><div className="mt-4 space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs"><div className="flex justify-between text-[#4d5f81]"><span>{copy.clockInLabel}</span><strong>{formatAttendanceTime(employeeItem.clock_in)} WIB</strong></div><div className="flex justify-between text-[#4d5f81]"><span>{copy.clockOutLabel}</span><strong>{employeeItem.clock_out ? `${formatAttendanceTime(employeeItem.clock_out)} WIB` : copy.noScan}</strong></div><div className="flex justify-between border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span>{copy.source}</span><strong className="text-[#1971c2]">{copy.attendanceSource}</strong></div>{employeeItem.notes && <div className="border-t border-[#becabd]/35 pt-2 text-[#4d5f81]"><span className="font-semibold">{copy.incentiveNotes}:</span><p className="mt-1 text-[#121b2e]">{employeeItem.notes}</p></div>}{isDateClosed(employeeItem.date) && <div className="flex items-center gap-2 border-t border-amber-200 pt-2 font-bold text-amber-700"><LockKeyhole size={13} />{copy.closedPeriod}</div>}</div><LocationMapPreview className="mt-4" clockIn={{ latitude: employeeItem.clock_in_latitude, longitude: employeeItem.clock_in_longitude, accuracyMeters: employeeItem.clock_in_accuracy_meters }} clockOut={{ latitude: employeeItem.clock_out_latitude, longitude: employeeItem.clock_out_longitude, accuracyMeters: employeeItem.clock_out_accuracy_meters }} />{employeeItem.correction ? <div className={`mt-4 rounded-xl border p-3.5 text-xs ${correctionStatusClass(employeeItem.correction?.status ?? "PENDING").replace("bg-[#b9d6ff] text-[#1971c2]", "border-[#b9d6ff] bg-[#edf6ff]").replace("bg-emerald-200 text-emerald-900", "border-emerald-200 bg-emerald-50/70").replace("bg-red-200 text-red-900", "border-red-200 bg-red-50/70")}`}><div className="flex justify-between font-bold text-[#1e3765]"><span>{copy.correctionRequest}</span><span className={`rounded px-2 py-0.5 text-[10px] font-bold ${correctionStatusClass(employeeItem.correction.status)}`}>{correctionStatusLabel(employeeItem.correction.status)}</span></div><p className="mt-2 text-[#4d5f81]">{employeeItem.correction.reason}</p></div> : <p className="mt-4 rounded-xl border border-dashed border-[#becabd] p-3 text-center text-xs italic text-[#4d5f81]">{copy.noCorrectionForDate}</p>}<button type="button" disabled={!!employeeItem.correction || isSubmittingCorrection || isDateClosed(employeeItem.date)} onClick={() => { if (isDateClosed(employeeItem.date)) { setActionMessage({ type: 'error', text: copy.closedPeriod }); return }; setCorrectionType('CLOCK_IN'); setIsCorrectionOpen(true) }} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#16834b] py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:cursor-not-allowed disabled:opacity-50"><FilePlus2 size={14} />{isDateClosed(employeeItem.date) ? copy.closedPeriod : employeeItem.correction ? copy.correctionSubmitted : copy.submitCorrection}</button></aside>}
+        <div className="min-h-screen bg-white text-slate-800">
+          <AppHeader pageTitle={t('myAttendance')} />
+          <div className="mx-auto max-w-[1600px] space-y-5 px-4 py-6 sm:px-6">
+          <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className={pageTitleClass.eyebrow}>{copy.selfService}</p><h1 className={`mt-1 ${pageTitleClass.title}`}>{copy.myHistory}</h1><p className={pageTitleClass.subtitle}>{copy.greeting}, {viewerName || copy.employee}. {copy.reviewMy}</p></div><div className="flex flex-wrap items-end justify-end gap-2"><label className="grid gap-1.5 text-xs font-semibold text-slate-700"><span>{copy.fromDate}</span><input aria-label={copy.fromDate} type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setTablePage(1) }} className={inputClass('text-xs font-normal')} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-700"><span>{copy.toDate}</span><input aria-label={copy.toDate} type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setTablePage(1) }} className={inputClass('text-xs font-normal')} /></label>{(dateFrom || dateTo) && <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); setTablePage(1) }} className={buttonClass('secondary')}>{copy.clearFilter}</button>}</div></section>
+          {actionMessage && <div className={noticeClass}>{actionMessage.type === 'success' ? <CheckCircle2 size={16} className="shrink-0 text-emerald-600" /> : <AlertCircle size={16} className="shrink-0 text-red-600" />}{actionMessage.text}</div>}
+          {errorMessage && <div className={errorNoticeClass}><AlertCircle size={16} className="shrink-0" />{errorMessage}</div>}
+          <main className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+            <section className={`overflow-hidden ${cardClass}`}><div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4"><div><h2 className="text-sm font-bold text-slate-900">{copy.attendanceHistory}</h2><p className="mt-1 text-xs text-slate-500">{filteredEmployeeData.length} {copy.recorded}</p></div><span className={badgeClass('blue')}>{pendingCount} {copy.pendingCorrections}</span></div>{loading ? <SkeletonTable rows={6} columns={5} /> : filteredEmployeeData.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs font-medium text-slate-500">{attendances.length === 0 ? copy.noHistory : copy.noResults}</div> : <div className="overflow-x-auto"><table className={`${tableClass.table} min-w-[650px]`}><thead><tr className={tableClass.head}><th className={tableClass.headCell}>{copy.date}</th><th className={tableClass.headCell}>{copy.clock}</th><th className={tableClass.headCell}>{copy.duration}</th><th className={tableClass.headCell}>{copy.durationStatus}</th><th className={tableClass.headCell}>{copy.correctionStatus}</th></tr></thead><tbody>{paginatedAttendances.map((row) => { const duration = calculateDuration(row.clock_in, row.clock_out); const selected = employeeItem?.id === row.id; return <tr key={row.id} onClick={() => setSelectedItem(row)} className={`${selected ? tableClass.rowSelected : tableClass.row} cursor-pointer`}><td className={`${tableClass.cell} font-semibold`}>{row.date}</td><td className={tableClass.cell}>{formatAttendanceTime(row.clock_in)} WIB <span className="mx-1 text-slate-300">/</span> {row.clock_out ? `${formatAttendanceTime(row.clock_out)} WIB` : '-'}</td><td className={tableClass.cell}><span className={duration.isUnderMin ? 'font-semibold text-amber-700' : 'font-semibold text-slate-900'}>{duration.text}</span></td><td className={tableClass.cell}><span className={badgeClass(duration.isUnderMin ? 'amber' : 'green')}>{duration.isUnderMin ? copy.underSeven : copy.meetsSeven}</span></td><td className={tableClass.cell}><div className="flex flex-wrap items-center gap-1">{isDateClosed(row.date) && <span className={badgeClass('slate')}>{copy.closedPeriod}</span>}{row.correction ? <span className={correctionStatusBadgeClass(row.correction.status)}>{copy.correction}: {correctionStatusLabel(row.correction.status)}</span> : !isDateClosed(row.date) ? <span className="inline-flex items-center text-slate-400" aria-label={copy.noCorrectionForDate}><Minus size={14} strokeWidth={2.5} /></span> : null}</div></td></tr> })}</tbody></table></div>}<TablePagination page={employeeCurrentPage} pageSize={tablePageSize} totalItems={filteredEmployeeData.length} onPageChange={setTablePage} /></section>
+            {employeeItem && <aside className={`h-fit p-5 ${cardClass}`}><div className="flex items-start justify-between border-b border-slate-100 pb-3"><div><span className="text-xs font-semibold text-slate-500">{copy.attendanceDetail}</span><h2 className="mt-1 text-sm font-bold text-slate-900">{employeeItem.date}</h2><p className="text-xs text-slate-500">{employeeItem.employee_id} • {employeeItem.department}</p></div><Clock3 size={18} className="text-slate-400" /></div><div className="mt-4 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs"><div className="flex justify-between text-slate-500"><span>{copy.clockInLabel}</span><strong className="text-slate-800">{formatAttendanceTime(employeeItem.clock_in)} WIB</strong></div><div className="flex justify-between text-slate-500"><span>{copy.clockOutLabel}</span><strong className="text-slate-800">{employeeItem.clock_out ? `${formatAttendanceTime(employeeItem.clock_out)} WIB` : copy.noScan}</strong></div><div className="flex justify-between border-t border-slate-200 pt-2 text-slate-500"><span>{copy.source}</span><strong className="text-blue-700">{copy.attendanceSource}</strong></div>{employeeItem.notes && <div className="border-t border-slate-200 pt-2 text-slate-500"><span className="font-semibold">{copy.incentiveNotes}:</span><p className="mt-1 text-slate-800">{employeeItem.notes}</p></div>}{isDateClosed(employeeItem.date) && <div className="flex items-center gap-2 border-t border-amber-200 pt-2 font-bold text-amber-700"><LockKeyhole size={13} />{copy.closedPeriod}</div>}</div><LocationMapPreview className="mt-4" clockIn={{ latitude: employeeItem.clock_in_latitude, longitude: employeeItem.clock_in_longitude, accuracyMeters: employeeItem.clock_in_accuracy_meters }} clockOut={{ latitude: employeeItem.clock_out_latitude, longitude: employeeItem.clock_out_longitude, accuracyMeters: employeeItem.clock_out_accuracy_meters }} />{employeeItem.correction ? <div className={`mt-4 rounded-xl border p-3.5 text-xs ${correctionPanelClass(employeeItem.correction?.status ?? "PENDING")}`}><div className="flex items-center justify-between gap-2 font-bold text-slate-900"><span>{copy.correctionRequest}</span><span className={correctionStatusBadgeClass(employeeItem.correction.status)}>{correctionStatusLabel(employeeItem.correction.status)}</span></div><p className="mt-2 text-slate-600">{employeeItem.correction.reason}</p></div> : <p className="mt-4 rounded-xl border border-dashed border-slate-300 p-3 text-center text-xs text-slate-500">{copy.noCorrectionForDate}</p>}<button type="button" disabled={!!employeeItem.correction || isSubmittingCorrection || isDateClosed(employeeItem.date)} onClick={() => { if (isDateClosed(employeeItem.date)) { setActionMessage({ type: 'error', text: copy.closedPeriod }); return }; setCorrectionType('CLOCK_IN'); setIsCorrectionOpen(true) }} className={buttonClass('primary', 'md', 'mt-4 w-full')}><FilePlus2 size={14} />{isDateClosed(employeeItem.date) ? copy.closedPeriod : employeeItem.correction ? copy.correctionSubmitted : copy.submitCorrection}</button></aside>}
           </main>
+          </div>
         </div>
-        {isCorrectionOpen && employeeItem && <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f2342]/45 p-4"><section role="dialog" aria-modal="true" className="w-full max-w-lg rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#d9e2fc] px-5 py-4"><div><h2 className="text-lg font-bold">{copy.submitAttendanceCorrection}</h2><p className="mt-1 text-xs text-[#4d5f81]">{interpolate(copy.sentToHr, { date: employeeItem.date })}</p></div><button type="button" onClick={() => setIsCorrectionOpen(false)} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label={copy.close}><X size={18} /></button></div><form onSubmit={handleSubmitCorrection} className="space-y-4 p-5"><div className="rounded-lg border border-[#d9e2fc] bg-[#f7f8ff] p-3 text-xs"><p className="mb-2 font-bold text-[#1e3765]">{copy.originalLog}</p><div className="grid grid-cols-2 gap-3 text-[#4d5f81]"><div><span className="block text-[10px] uppercase tracking-wide">{copy.clockInLabel}</span><strong className="text-[#121b2e]">{formatAttendanceTime(employeeItem.clock_in)} WIB</strong></div><div><span className="block text-[10px] uppercase tracking-wide">{copy.clockOutLabel}</span><strong className="text-[#121b2e]">{employeeItem.clock_out ? `${formatAttendanceTime(employeeItem.clock_out)} WIB` : copy.noScan}</strong></div></div></div><label className="block text-xs font-bold text-[#121b2e]">{copy.correctionType}<select value={correctionType} onChange={(event) => { const nextType = event.target.value as CorrectionType; setCorrectionType(nextType); if (nextType === 'CLOCK_IN') setProposedClockOut(''); if (nextType === 'CLOCK_OUT') setProposedClockIn('') }} className="mt-1 w-full rounded-lg border border-[#d9e2fc] bg-white px-3 py-2.5 text-xs font-normal outline-none focus:border-[#069494]"><option value="CLOCK_IN">{copy.correctClockIn}</option><option value="CLOCK_OUT">{copy.correctClockOut}</option><option value="FULL_DAY">{copy.correctFullDay}</option></select></label><div className="grid gap-3 sm:grid-cols-2">{(correctionType === 'CLOCK_IN' || correctionType === 'FULL_DAY') && <label className="text-xs font-bold">{copy.correctClockInLabel}<input required type="time" value={proposedClockIn} onChange={(event) => setProposedClockIn(event.target.value)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] px-3 py-2.5 text-xs font-normal" /></label>}{(correctionType === 'CLOCK_OUT' || correctionType === 'FULL_DAY') && <label className="text-xs font-bold">{copy.correctClockOutLabel}<input required type="time" value={proposedClockOut} onChange={(event) => setProposedClockOut(event.target.value)} className="mt-1 w-full rounded-lg border border-[#d9e2fc] px-3 py-2.5 text-xs font-normal" /></label>}</div><label className="block text-xs font-bold">{copy.overtimeNote}<textarea maxLength={1000} value={incentiveNote} onChange={(event) => setIncentiveNote(event.target.value)} className="mt-1 min-h-16 w-full resize-y rounded-lg border border-[#d9e2fc] p-3 text-xs font-normal outline-none focus:border-[#069494]" placeholder={copy.overtimePlaceholder} /></label><label className="block text-xs font-bold">{copy.requestReason}<textarea required minLength={10} maxLength={1000} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} className="mt-1 min-h-24 w-full resize-y rounded-lg border border-[#d9e2fc] p-3 text-xs font-normal outline-none focus:border-[#069494]" placeholder={copy.reasonPlaceholder} /></label><div className="flex justify-end gap-2 border-t border-[#d9e2fc] pt-4"><button type="button" onClick={() => setIsCorrectionOpen(false)} className="rounded-lg px-3 py-2 text-xs font-bold text-[#4d5f81] hover:bg-[#f1f3ff]">{copy.cancel}</button><button type="submit" disabled={isSubmittingCorrection || correctionReason.trim().length < 10} className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"><FilePlus2 size={14} />{isSubmittingCorrection ? copy.sending : copy.sendRequest}</button></div></form></section></div>}
+        {isCorrectionOpen && employeeItem && <div className={modalClass.overlay}><section role="dialog" aria-modal="true" className={`${modalClass.panel} max-h-[90vh] max-w-lg overflow-y-auto`}><div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><h2 className={modalClass.title}>{copy.submitAttendanceCorrection}</h2><p className="mt-1 text-xs text-slate-500">{interpolate(copy.sentToHr, { date: employeeItem.date })}</p></div><button type="button" onClick={() => setIsCorrectionOpen(false)} className={iconButtonClass()} aria-label={copy.close}><X className="size-5" /></button></div><form onSubmit={handleSubmitCorrection} className="space-y-4 p-5"><div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs"><p className="mb-2 font-bold text-slate-900">{copy.originalLog}</p><div className="grid grid-cols-2 gap-3 text-slate-500"><div><span className="block text-[10px] font-bold uppercase tracking-wider">{copy.clockInLabel}</span><strong className="text-slate-900">{formatAttendanceTime(employeeItem.clock_in)} WIB</strong></div><div><span className="block text-[10px] font-bold uppercase tracking-wider">{copy.clockOutLabel}</span><strong className="text-slate-900">{employeeItem.clock_out ? `${formatAttendanceTime(employeeItem.clock_out)} WIB` : copy.noScan}</strong></div></div></div><label className="block text-xs font-semibold text-slate-700">{copy.correctionType}<select value={correctionType} onChange={(event) => { const nextType = event.target.value as CorrectionType; setCorrectionType(nextType); if (nextType === 'CLOCK_IN') setProposedClockOut(''); if (nextType === 'CLOCK_OUT') setProposedClockIn('') }} className={inputClass('mt-1.5 font-normal')}><option value="CLOCK_IN">{copy.correctClockIn}</option><option value="CLOCK_OUT">{copy.correctClockOut}</option><option value="FULL_DAY">{copy.correctFullDay}</option></select></label><div className="grid gap-3 sm:grid-cols-2">{(correctionType === 'CLOCK_IN' || correctionType === 'FULL_DAY') && <label className="block text-xs font-semibold text-slate-700">{copy.correctClockInLabel}<input required type="time" value={proposedClockIn} onChange={(event) => setProposedClockIn(event.target.value)} className={inputClass('mt-1.5 font-normal')} /></label>}{(correctionType === 'CLOCK_OUT' || correctionType === 'FULL_DAY') && <label className="block text-xs font-semibold text-slate-700">{copy.correctClockOutLabel}<input required type="time" value={proposedClockOut} onChange={(event) => setProposedClockOut(event.target.value)} className={inputClass('mt-1.5 font-normal')} /></label>}</div><label className="block text-xs font-semibold text-slate-700">{copy.overtimeNote}<textarea maxLength={1000} value={incentiveNote} onChange={(event) => setIncentiveNote(event.target.value)} className={inputClass('mt-1.5 min-h-16 resize-y font-normal')} placeholder={copy.overtimePlaceholder} /></label><label className="block text-xs font-semibold text-slate-700">{copy.requestReason}<textarea required minLength={10} maxLength={1000} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} className={inputClass('mt-1.5 min-h-24 resize-y font-normal')} placeholder={copy.reasonPlaceholder} /></label><div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={() => setIsCorrectionOpen(false)} className={buttonClass('secondary')}>{copy.cancel}</button><button type="submit" disabled={isSubmittingCorrection || correctionReason.trim().length < 10} className={buttonClass('primary')}><FilePlus2 size={14} />{isSubmittingCorrection ? copy.sending : copy.sendRequest}</button></div></form></section></div>}
       </>
     )
   }
 
   return (
     <>
-      <div className="min-h-screen bg-[#eaf2fc] text-[#121b2e]">
+      <div className="min-h-screen bg-white text-slate-800">
         {/* HEADER */}
-        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 pl-16 pr-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:pr-6 lg:pl-6">
-          <div className="flex w-full min-w-0 items-center justify-between gap-3">
-            <div className="hidden min-w-0 items-center gap-3 sm:flex">
-              <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span>
-              <span className="h-5 border-l border-[#BCD4EE]" />
-              <span className="text-xs font-semibold text-[#3f4940]">HRMS</span>
-              <ChevronRight size={13} className="shrink-0 text-[#52749B]/60" />
-              <span className="truncate text-xs font-semibold text-[#0C68D5]">{t('attendanceHistoryCorrection')}</span>
-            </div>
-            <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">{t('attendanceHistoryCorrection')}</span>
-
-            <div className="flex items-center gap-2 sm:gap-3"><HeaderAccount /></div>
-          </div>
-        </header>
+        <AppHeader pageTitle={t('attendanceHistoryCorrection')} />
 
         {/* SECTION TITLE & TABS */}
-        <section className="border-b border-[#d9e2fc] bg-white px-4 py-5 sm:px-6">
-          <div className="mx-auto flex max-w-[1600px] flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <section className="mx-auto max-w-[1600px] px-4 pt-6 sm:px-6">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
             <div>
-              <h1 className="text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{copy.managementTitle}</h1>
-              <p className="mt-1 text-sm text-[#4d5f81]">
+              <h1 className={pageTitleClass.title}>{copy.managementTitle}</h1>
+              <p className={pageTitleClass.subtitle}>
                 {copy.managementDescription}
               </p>
             </div>
@@ -672,110 +667,107 @@ export default function AttendancePageUI() {
             </span> */}
           </div>
 
-          <div className="mx-auto mt-5 flex max-w-[1600px] flex-wrap items-center justify-between gap-3 border-b border-[#d9e2fc] pb-3">
-            <div className="flex flex-wrap gap-1 text-xs font-semibold">
+          <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
+            <div className={segmentedClass.group}>
               {([['ATTENDANCE', copy.attendanceTab], ['AUDIT', copy.auditTab], ['CLOSING', copy.closingTab]] as [ManagementView, string][]).map(([view, label]) => (
-                <button key={view} type="button" onClick={() => setManagementView(view)} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${managementView === view ? 'bg-[#eaf7f0] font-bold text-[#006838]' : 'text-[#4d5f81] hover:bg-[#f7f8ff] hover:text-[#121b2e]'}`}>
+                <button key={view} type="button" onClick={() => setManagementView(view)} className={`${segmentedClass.item} ${managementView === view ? segmentedClass.active : segmentedClass.idle}`}>
                   {view === 'AUDIT' ? <History size={14} /> : view === 'CLOSING' ? <LockKeyhole size={14} /> : <Clock3 size={14} />}{label}
                 </button>
               ))}
             </div>
             <div className="flex flex-wrap items-end gap-2">
-              <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-[#4d5f81]">{copy.fromDate}<input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-2 text-xs font-normal normal-case tracking-normal" /></label>
-              <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-[#4d5f81]">{copy.toDate}<input type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-2 text-xs font-normal normal-case tracking-normal" /></label>
-              {(dateFrom || dateTo) && <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); setTablePage(1) }} className="h-9 rounded-lg border border-[#d9e2fc] px-3 text-xs font-bold text-[#4d5f81] hover:bg-[#f7f8ff]">{copy.clearFilter}</button>}
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-700">{copy.fromDate}<input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setTablePage(1) }} className={inputClass('text-xs font-normal')} /></label>
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-700">{copy.toDate}<input type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setTablePage(1) }} className={inputClass('text-xs font-normal')} /></label>
+              {(dateFrom || dateTo) && <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); setTablePage(1) }} className={buttonClass('secondary')}>{copy.clearFilter}</button>}
             </div>
           </div>
 
           {actionMessage && (
-            <div
-              className={`mx-auto mt-4 flex max-w-[1600px] items-center gap-2 rounded-lg border p-3 text-xs font-semibold ${
-                actionMessage.type === 'success'
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                  : 'border-red-200 bg-red-50 text-red-800'
-              }`}
-            >
-              {actionMessage.type === 'success' ? <CheckCircle2 size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+            <div className={`mt-4 ${noticeClass}`}>
+              {actionMessage.type === 'success' ? <CheckCircle2 size={16} className="shrink-0 text-emerald-600" /> : <AlertCircle size={16} className="shrink-0 text-red-600" />}
               <span>{actionMessage.text}</span>
             </div>
           )}
 
           {errorMessage && (
-            <div className="mx-auto mt-4 flex max-w-[1600px] items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+            <div className={`mt-4 ${errorNoticeClass}`}>
               <AlertCircle size={16} className="shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          {managementView === 'ATTENDANCE' && <div className="mx-auto mt-5 flex max-w-[1600px] flex-col justify-between gap-3 sm:flex-row sm:items-end">
-            <div className="flex flex-wrap gap-1 border-b border-[#d9e2fc] text-xs font-semibold">
+          {managementView === 'ATTENDANCE' && <div className="mt-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+            <div className={segmentedClass.group}>
               <button
                 onClick={() => { setActiveTab('ALL'); setTablePage(1) }}
-                className={`pb-2 px-3 transition ${
+                className={`${segmentedClass.item} ${
                   activeTab === 'ALL'
-                    ? 'border-b-2 border-[#069494] text-[#006838] font-bold'
-                    : 'text-[#4d5f81] hover:text-[#121b2e]'
+                    ? segmentedClass.active
+                    : segmentedClass.idle
                 }`}
               >
                 {copy.all} ({attendances.length})
               </button>
               <button
                 onClick={() => { setActiveTab('PENDING'); setTablePage(1) }}
-                className={`pb-2 px-3 transition ${
+                className={`${segmentedClass.item} ${
                   activeTab === 'PENDING'
-                    ? 'border-b-2 border-[#069494] text-[#006838] font-bold'
-                    : 'text-[#4d5f81] hover:text-[#121b2e]'
+                    ? segmentedClass.active
+                    : segmentedClass.idle
                 }`}
               >
                 {copy.awaitingApproval} ({attendances.filter((i) => i.correction?.status === 'PENDING').length})
               </button>
               <button
                 onClick={() => { setActiveTab('APPROVED'); setTablePage(1) }}
-                className={`pb-2 px-3 transition ${
+                className={`${segmentedClass.item} ${
                   activeTab === 'APPROVED'
-                    ? 'border-b-2 border-[#069494] text-[#006838] font-bold'
-                    : 'text-[#4d5f81] hover:text-[#121b2e]'
+                    ? segmentedClass.active
+                    : segmentedClass.idle
                 }`}
               >
                 {copy.approved} ({attendances.filter((i) => i.correction?.status === 'APPROVED').length})
               </button>
             </div>
 
-            <input
-              type="text"
-              placeholder={copy.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setTablePage(1) }}
-              className="w-full rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs outline-none transition placeholder:text-[#4d5f81]/70 focus:border-[#069494] focus:ring-2 focus:ring-[#069494]/15 sm:w-64"
-            />
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <input
+                type="text"
+                placeholder={copy.searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setTablePage(1) }}
+                className={searchInputClass}
+              />
+            </div>
           </div>}
         </section>
 
         {/* MAIN BODY: TABLE + DRAWER */}
         {managementView === 'ATTENDANCE' ? <div className="mx-auto flex max-w-[1600px] flex-col gap-5 px-4 py-6 xl:flex-row sm:px-6">
-          <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+          <div className={`min-w-0 flex-1 overflow-hidden ${cardClass}`}>
             {loading ? (
               <SkeletonTable rows={8} columns={6} />
             ) : filteredData.length === 0 ? (
-              <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center text-xs text-[#4d5f81]">
-                <AlertCircle size={32} className="text-[#becabd]" />
-                <p className="mt-2 font-bold text-[#121b2e]">{copy.noAttendance}</p>
+              <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center text-xs text-slate-500">
+                <AlertCircle size={32} className="text-slate-300" />
+                <p className="mt-2 text-sm font-semibold text-slate-700">{copy.noAttendance}</p>
                 <p className="mt-1">{copy.noResults}</p>
               </div>
             ) : (
               <div className="overflow-x-auto flex-1">
-                <table className="w-full min-w-[720px] text-left text-xs">
+                <table className={`${tableClass.table} min-w-[720px]`}>
                   <thead>
-                    <tr className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
-                      <th className="px-4 py-3">{copy.employee}</th>
-                      <th className="px-3 py-3">{copy.date}</th>
-                      <th className="px-3 py-3">{copy.clock}</th>
-                      <th className="px-3 py-3">{copy.workDuration}</th>
-                      <th className="px-3 py-3">{copy.durationStatus}</th>
-                      <th className="px-3 py-3">{copy.correctionStatus}</th>
+                    <tr className={tableClass.head}>
+                      <th className={`${tableClass.headCell} min-w-[180px]`}>{copy.employee}</th>
+                      <th className={tableClass.headCell}>{copy.date}</th>
+                      <th className={tableClass.headCell}>{copy.clock}</th>
+                      <th className={tableClass.headCell}>{copy.workDuration}</th>
+                      <th className={tableClass.headCell}>{copy.durationStatus}</th>
+                      <th className={tableClass.headCell}>{copy.correctionStatus}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody>
                     {paginatedFilteredData.map((row) => {
                       const duration = calculateDuration(row.clock_in, row.clock_out)
                       const isSelected = selectedItem?.id === row.id
@@ -784,16 +776,14 @@ export default function AttendancePageUI() {
                         <tr
                           key={row.id}
                           onClick={() => setSelectedItem(row)}
-                          className={`cursor-pointer transition hover:bg-[#f7f8ff] ${
-                            isSelected ? 'bg-[#eaf7f0]' : ''
-                          }`}
+                          className={`${isSelected ? tableClass.rowSelected : tableClass.row} cursor-pointer`}
                         >
-                          <td className="px-4 py-3.5">
-                            <div className="text-xs font-bold text-[#121b2e]">{row.full_name}</div>
-                            <div className="mt-0.5 text-[10px] text-[#4d5f81]">{row.employee_id} • {row.department}</div>
+                          <td className={tableClass.cell}>
+                            <div className="font-semibold text-slate-900">{row.full_name}</div>
+                            <div className="mt-0.5 text-xs text-slate-500">{row.employee_id} • {row.department}</div>
                           </td>
-                          <td className="px-3 py-3.5 font-medium text-[#3f4940]">{row.date}</td>
-                          <td className="px-3 py-3.5 text-[#4d5f81]">
+                          <td className={`${tableClass.cell} whitespace-nowrap font-medium`}>{row.date}</td>
+                          <td className={`${tableClass.cell} whitespace-nowrap`}>
                             <div>
                               {copy.in}:{' '}
                               {formatAttendanceTime(row.clock_in)}{' '}
@@ -804,31 +794,29 @@ export default function AttendancePageUI() {
                               {row.clock_out ? `${formatAttendanceTime(row.clock_out)} WIB` : '-'}
                             </div>
                           </td>
-                          <td className="px-3 py-3.5">
-                            <span className={`font-semibold ${duration.isUnderMin ? 'text-[#b7791f]' : 'text-[#121b2e]'}`}>
+                          <td className={tableClass.cell}>
+                            <span className={`font-semibold ${duration.isUnderMin ? 'text-amber-700' : 'text-slate-900'}`}>
                               {duration.text}
                             </span>
                             {duration.isUnderMin && (
-                              <span className="mt-0.5 block text-[9px] font-bold text-[#b7791f]">{copy.lessThanSeven}</span>
+                              <span className="mt-0.5 block text-[11px] font-semibold text-amber-700">{copy.lessThanSeven}</span>
                             )}
                           </td>
-                          <td className="px-3 py-3.5">
+                          <td className={tableClass.cell}>
                             <span
-                              className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold ${
-                                duration.isUnderMin ? 'bg-[#fef9c3] text-[#b7791f]' : 'bg-[#eaf7f0] text-[#16834b]'
-                              }`}
+                              className={badgeClass(duration.isUnderMin ? 'amber' : 'green')}
                             >
                               {duration.isUnderMin ? copy.underSeven : copy.meetsSeven}
                             </span>
                           </td>
-                          <td className="px-3 py-3.5">
+                          <td className={tableClass.cell}>
                             <div className="flex flex-wrap items-center gap-1">
                               {row.correction ? (
                                 <span className={correctionStatusBadgeClass(row.correction.status)}>
                                   {copy.correction}: {correctionStatusLabel(row.correction.status)}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center text-[#94a3b8]" aria-label={copy.noCorrectionForDate}>
+                                <span className="inline-flex items-center text-slate-400" aria-label={copy.noCorrectionForDate}>
                                   <Minus size={14} strokeWidth={2.5} />
                                 </span>
                               )}
@@ -846,41 +834,41 @@ export default function AttendancePageUI() {
 
           {/* DRAWER PANEL DETAIL (KANAN) */}
           {selectedItem && (
-            <div className="w-full shrink-0 overflow-y-auto rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] xl:w-[400px]">
+            <div className={`w-full shrink-0 overflow-y-auto p-5 ${cardClass} xl:w-[400px]`}>
               <div className="space-y-4">
-                <div className="flex items-start justify-between border-b border-[#becabd]/35 pb-3">
+                <div className="flex items-start justify-between border-b border-slate-100 pb-3">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]">
+                    <span className="text-xs font-semibold text-slate-500">
                       {copy.detailAudit}
                     </span>
-                    <h3 className="mt-0.5 text-sm font-bold text-[#121b2e]">
+                    <h3 className="mt-0.5 text-base font-bold text-slate-900">
                       {selectedItem.full_name}
                     </h3>
-                    <p className="text-xs text-[#4d5f81]">{selectedItem.employee_id} • {copy.date} {selectedItem.date}</p>
+                    <p className="text-xs text-slate-500">{selectedItem.employee_id} • {copy.date} {selectedItem.date}</p>
                   </div>
                 </div>
 
-                <div className="space-y-2 rounded-xl border border-[#becabd]/35 bg-[#f7f8ff] p-3 text-xs">
-                  <div className="border-b border-[#becabd]/35 pb-1 font-bold text-[#121b2e]">
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+                  <div className="border-b border-slate-200 pb-1 font-bold text-slate-900">
                     {copy.originalLog}
                   </div>
-                  <div className="flex justify-between text-[#4d5f81]">
+                  <div className="flex justify-between text-slate-500">
                     <span>{copy.clockInLabel}:</span>
-                    <span className="font-mono font-semibold">
+                    <span className="font-mono font-semibold text-slate-800">
                       {formatAttendanceTime(selectedItem.clock_in)} WIB
                     </span>
                   </div>
-                  <div className="flex justify-between text-[#4d5f81]">
+                  <div className="flex justify-between text-slate-500">
                     <span>{copy.clockOutLabel}:</span>
-                    <span className="font-mono font-semibold">
+                    <span className="font-mono font-semibold text-slate-800">
                       {selectedItem.clock_out
                         ? `${formatAttendanceTime(selectedItem.clock_out)} WIB`
                         : copy.noScan}
                     </span>
                   </div>
-                  <div className="flex justify-between border-t border-[#becabd]/35 pt-1 text-[11px] text-[#4d5f81]">
+                  <div className="flex justify-between border-t border-slate-200 pt-1 text-[11px] text-slate-500">
                     <span>{copy.dataSource}:</span>
-                    <span className="font-semibold text-[#1971c2]">{copy.attendanceSource}</span>
+                    <span className="font-semibold text-blue-700">{copy.attendanceSource}</span>
                   </div>
                 </div>
 
@@ -899,30 +887,18 @@ export default function AttendancePageUI() {
 
                 {selectedItem.correction ? (
                   <div
-                    className={`space-y-2 rounded-xl border p-3.5 text-xs ${
-                      selectedItem.correction.status === 'APPROVED'
-                        ? 'border-emerald-200 bg-emerald-100'
-                        : selectedItem.correction.status === 'REJECTED'
-                        ? 'border-red-200 bg-red-100'
-                        : 'border-[#b9d6ff] bg-[#edf6ff]'
-                    }`}
+                    className={`space-y-2 rounded-xl border p-3.5 text-xs ${correctionPanelClass(selectedItem.correction.status)}`}
                   >
-                    <div className="flex items-center justify-between font-bold text-[#1e3765]">
+                    <div className="flex items-center justify-between gap-2 font-bold text-slate-900">
                       <span>{copy.correctionRequest}</span>
                       <span
-                        className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                          selectedItem.correction.status === 'APPROVED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : selectedItem.correction.status === 'REJECTED'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-[#b9d6ff] text-[#1971c2]'
-                        }`}
+                        className={correctionStatusBadgeClass(selectedItem.correction.status)}
                       >
                         {correctionStatusLabel(selectedItem.correction.status)}
                       </span>
                     </div>
 
-                    <div className="space-y-1 text-[#4d5f81]">
+                    <div className="space-y-1 text-slate-600">
                       <div>
                         <span className="font-semibold">{copy.correctionTypeLabel}:</span> {({ CLOCK_IN: copy.correctClockIn, CLOCK_OUT: copy.correctClockOut, FULL_DAY: copy.correctFullDay } as Record<string, string>)[selectedItem.correction.correction_type] ?? selectedItem.correction.correction_type}
                       </div>
@@ -938,32 +914,32 @@ export default function AttendancePageUI() {
                       )}
                     </div>
 
-                    <div className="border-t border-black/10 pt-2">
-                      <span className="block font-semibold text-[#4d5f81]">{copy.reasonRequired}:</span>
-                      <p className="mt-1 rounded border border-black/10 bg-white p-2 text-[11px] italic text-[#121b2e]">
+                    <div className="border-t border-slate-900/10 pt-2">
+                      <span className="block font-semibold text-slate-600">{copy.reasonRequired}:</span>
+                      <p className="mt-1 rounded-lg border border-slate-200 bg-white p-2.5 text-xs italic text-slate-700">
                         &quot;{selectedItem.correction.reason}&quot;
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-[#becabd] bg-[#f7f8ff] p-3 text-center text-xs italic text-[#4d5f81]">
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-center text-xs text-slate-500">
                     {copy.activeCorrectionNone}
                   </div>
                 )}
 
                 <div className="space-y-2 pt-2">
-                  <div className="text-xs font-bold text-[#121b2e]">{copy.progressTrail}</div>
-                  <div className="space-y-3 border-l-2 border-[#d9e2fc] pl-3 text-xs">
+                  <div className="text-xs font-bold text-slate-900">{copy.progressTrail}</div>
+                  <div className="space-y-3 border-l-2 border-slate-200 pl-3 text-xs">
                     <div className="relative">
                       <div className="w-2 h-2 rounded-full bg-emerald-500 absolute -left-[17px] top-1"></div>
-                      <div className="font-semibold text-[#121b2e]">{copy.attendanceReceived}</div>
-                      <div className="text-[10px] text-[#4d5f81]">{copy.attendanceSource} • {selectedItem.date}</div>
+                      <div className="font-semibold text-slate-900">{copy.attendanceReceived}</div>
+                      <div className="text-[11px] text-slate-500">{copy.attendanceSource} • {selectedItem.date}</div>
                     </div>
                     {selectedItem.correction && (
                       <div className="relative">
-                        <div className="absolute -left-[17px] top-1 size-2 rounded-full bg-[#1971c2]"></div>
-                        <div className="font-semibold text-[#1971c2]">{copy.correctionCreated}</div>
-                        <div className="text-[10px] text-[#4d5f81]">
+                        <div className="absolute -left-[17px] top-1 size-2 rounded-full bg-blue-600"></div>
+                        <div className="font-semibold text-blue-700">{copy.correctionCreated}</div>
+                        <div className="text-[11px] text-slate-500">
                           {copy.byEmployee} • {formatCorrectionSubmittedAt(selectedItem.correction.created_at, locale)}
                         </div>
                       </div>
@@ -982,7 +958,7 @@ export default function AttendancePageUI() {
                         >
                           {selectedItem.correction.status === 'APPROVED' ? copy.correctionApprovedTrail : copy.correctionRejectedTrail}
                         </div>
-                        <div className="text-[10px] text-[#4d5f81]">{copy.byHr}</div>
+                        <div className="text-[11px] text-slate-500">{copy.byHr}</div>
                       </div>
                     )}
                   </div>
@@ -990,18 +966,18 @@ export default function AttendancePageUI() {
               </div>
 
               {selectedItem.correction?.status === 'PENDING' && (
-                <div className="mt-4 flex gap-2 border-t border-[#becabd]/35 pt-4">
+                <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
                   <button
                     type="button"
                     onClick={() => handleUpdateCorrectionStatus('APPROVED')}
-                    className="flex-1 rounded-lg bg-[#16834b] py-2 text-xs font-bold text-white transition hover:bg-[#006838]"
+                    className={buttonClass('success', 'md', 'flex-1')}
                   >
                     {copy.approve}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleUpdateCorrectionStatus('REJECTED')}
-                    className="flex-1 rounded-lg bg-[#d64545] py-2 text-xs font-bold text-white transition hover:bg-[#b4232b]"
+                    className={buttonClass('danger', 'md', 'flex-1')}
                   >
                     {copy.reject}
                   </button>
@@ -1073,7 +1049,7 @@ function AttendanceAuditPanel({ entries, copy, dateFrom, dateTo, searchQuery }: 
       ])
   })
 
-  return <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6"><div className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="border-b border-[#becabd]/35 px-5 py-4"><div className="flex items-center gap-2"><History size={17} className="text-[#006838]" /><h2 className="text-sm font-bold">{copy.auditTab}</h2></div><p className="mt-1 text-xs text-[#4d5f81]">{visibleEntries.length} {copy.auditAction}</p></div>{visibleEntries.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.auditEmpty}</div> : <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-xs"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-4 py-3">{copy.date}</th><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.action}</th><th className="px-3 py-3">{copy.actor}</th><th className="px-3 py-3">{copy.reason}</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleEntries.map((entry) => <tr key={entry.id}><td className="whitespace-nowrap px-4 py-3.5 text-[#4d5f81]">{formatAttendanceAuditDate(entry.created_at, language)}</td><td className="px-3 py-3.5 font-semibold">{entry.target_name}</td><td className="px-3 py-3.5"><span className="rounded bg-[#eaf7f0] px-2 py-1 text-[10px] font-bold text-[#006838]">{attendanceAuditActionLabel(entry.action, language)}</span></td><td className="px-3 py-3.5 text-[#4d5f81]">{entry.actor_name}</td><td className="max-w-[360px] px-3 py-3.5 text-[#4d5f81]">{typeof entry.details.reason === 'string' ? entry.details.reason : entry.action === 'ATTENDANCE_PERIOD_CLOSED' || entry.action === 'ATTENDANCE_PERIOD_REOPENED' ? `${entry.details.period_start ?? ''} – ${entry.details.period_end ?? ''}` : '-'}</td></tr>)}</tbody></table></div>}</div></div>
+  return <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6"><div className={`overflow-hidden ${cardClass}`}><div className="border-b border-slate-100 px-5 py-4"><div className="flex items-center gap-2"><History size={17} className="text-blue-600" /><h2 className="text-sm font-bold text-slate-900">{copy.auditTab}</h2></div><p className="mt-1 text-xs text-slate-500">{visibleEntries.length} {copy.auditAction}</p></div>{visibleEntries.length === 0 ? <div className="flex min-h-[260px] items-center justify-center p-6 text-center text-xs font-medium text-slate-500">{copy.auditEmpty}</div> : <div className="overflow-x-auto"><table className={`${tableClass.table} min-w-[900px]`}><thead className={tableClass.head}><tr><th className={tableClass.headCell}>{copy.date}</th><th className={tableClass.headCell}>{copy.employee}</th><th className={tableClass.headCell}>{copy.action}</th><th className={tableClass.headCell}>{copy.actor}</th><th className={tableClass.headCell}>{copy.reason}</th></tr></thead><tbody>{visibleEntries.map((entry) => <tr key={entry.id} className={tableClass.row}><td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500">{formatAttendanceAuditDate(entry.created_at, language)}</td><td className={`${tableClass.cell} font-semibold`}>{entry.target_name}</td><td className={tableClass.cell}><span className={badgeClass('blue')}>{attendanceAuditActionLabel(entry.action, language)}</span></td><td className="px-4 py-3 text-sm text-slate-500">{entry.actor_name}</td><td className="max-w-[360px] px-4 py-3 text-sm text-slate-500">{typeof entry.details.reason === 'string' ? entry.details.reason : entry.action === 'ATTENDANCE_PERIOD_CLOSED' || entry.action === 'ATTENDANCE_PERIOD_REOPENED' ? `${entry.details.period_start ?? ''} – ${entry.details.period_end ?? ''}` : '-'}</td></tr>)}</tbody></table></div>}</div></div>
 }
 
 function AttendanceClosingPanel({ closings, copy, dateFrom, dateTo, searchQuery, closingStart, closingEnd, closingReason, isSaving, onStartChange, onEndChange, onReasonChange, onSubmit, onEmergencyEdit }: { closings: AttendanceClosing[]; copy: AttendancePanelCopy; dateFrom: string; dateTo: string; searchQuery: string; closingStart: string; closingEnd: string; closingReason: string; isSaving: boolean; onStartChange: (value: string) => void; onEndChange: (value: string) => void; onReasonChange: (value: string) => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; onEmergencyEdit: (closing: AttendanceClosing) => void }) {
@@ -1091,5 +1067,5 @@ function AttendanceClosingPanel({ closings, copy, dateFrom, dateTo, searchQuery,
     ])
   ))
 
-  return <div className="mx-auto grid w-full max-w-[1600px] gap-5 px-4 py-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:px-6"><form onSubmit={onSubmit} className="h-fit rounded-xl border border-[#becabd]/45 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="flex items-center gap-2"><LockKeyhole size={17} className="text-[#006838]" /><h2 className="text-sm font-bold">{copy.closePeriod}</h2></div><p className="mt-1 text-xs leading-5 text-[#4d5f81]">{copy.closedPeriod}</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-xs font-bold text-[#4d5f81]">{copy.periodStart}<input required type="date" value={closingStart} onChange={(event) => onStartChange(event.target.value)} className="h-10 rounded-lg border border-[#d9e2fc] px-3 text-sm font-normal" /></label><label className="grid gap-1 text-xs font-bold text-[#4d5f81]">{copy.periodEnd}<input required type="date" value={closingEnd} onChange={(event) => onEndChange(event.target.value)} className="h-10 rounded-lg border border-[#d9e2fc] px-3 text-sm font-normal" /></label></div><label className="mt-3 grid gap-1 text-xs font-bold text-[#4d5f81]">{copy.reason}<textarea maxLength={500} value={closingReason} onChange={(event) => onReasonChange(event.target.value)} className="min-h-20 resize-y rounded-lg border border-[#d9e2fc] p-3 text-sm font-normal" /></label><button disabled={isSaving} className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-[#006838] px-4 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><LockKeyhole size={14} />{isSaving ? copy.sending : copy.closePeriod}</button></form><section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"><div className="border-b border-[#becabd]/35 px-5 py-4"><h2 className="text-sm font-bold">{copy.closingTab}</h2><p className="mt-1 text-xs text-[#4d5f81]">{visibleClosings.length} {copy.recorded}</p></div>{visibleClosings.length === 0 ? <div className="flex min-h-[220px] items-center justify-center p-6 text-center text-xs text-[#4d5f81]">{copy.closingEmpty}</div> : <div className="divide-y divide-slate-100">{visibleClosings.map((closing) => <article key={closing.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><div className="flex items-center gap-2 text-sm font-bold"><span>{closing.period_start} – {closing.period_end}</span><span className={`rounded px-2 py-0.5 text-[10px] ${closing.status === 'CLOSED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{closing.status === 'CLOSED' ? copy.closedPeriod : copy.openPeriod}</span></div><p className="mt-1 text-xs text-[#4d5f81]">{closing.status === 'CLOSED' ? copy.closedAt : copy.reopenedAt}: {formatAttendanceAuditDate(closing.status === 'CLOSED' ? closing.closed_at : closing.reopened_at ?? closing.closed_at, language)}</p>{closing.reason && <p className="mt-1 text-xs text-[#4d5f81]">{closing.reason}</p>}</div>{closing.status === 'CLOSED' && <button type="button" disabled={isSaving} onClick={() => onEmergencyEdit(closing)} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"><Unlock size={14} />{copy.emergencyEdit}</button>}</article>)}</div>}</section></div>
+  return <div className="mx-auto grid w-full max-w-[1600px] gap-5 px-4 py-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:px-6"><form onSubmit={onSubmit} className={`h-fit p-5 ${cardClass}`}><div className="flex items-center gap-2"><LockKeyhole size={17} className="text-blue-600" /><h2 className="text-sm font-bold text-slate-900">{copy.closePeriod}</h2></div><p className="mt-1 text-xs leading-5 text-slate-500">{copy.closedPeriod}</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-xs font-semibold text-slate-700">{copy.periodStart}<input required type="date" value={closingStart} onChange={(event) => onStartChange(event.target.value)} className={inputClass('font-normal')} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-700">{copy.periodEnd}<input required type="date" value={closingEnd} onChange={(event) => onEndChange(event.target.value)} className={inputClass('font-normal')} /></label></div><label className="mt-3 grid gap-1.5 text-xs font-semibold text-slate-700">{copy.reason}<textarea maxLength={500} value={closingReason} onChange={(event) => onReasonChange(event.target.value)} className={inputClass('min-h-20 resize-y font-normal')} /></label><button disabled={isSaving} className={buttonClass('primary', 'md', 'mt-4')}><LockKeyhole size={14} />{isSaving ? copy.sending : copy.closePeriod}</button></form><section className={`overflow-hidden ${cardClass}`}><div className="border-b border-slate-100 px-5 py-4"><h2 className="text-sm font-bold text-slate-900">{copy.closingTab}</h2><p className="mt-1 text-xs text-slate-500">{visibleClosings.length} {copy.recorded}</p></div>{visibleClosings.length === 0 ? <div className="flex min-h-[220px] items-center justify-center p-6 text-center text-xs font-medium text-slate-500">{copy.closingEmpty}</div> : <div className="divide-y divide-slate-100">{visibleClosings.map((closing) => <article key={closing.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><div className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-900"><span>{closing.period_start} – {closing.period_end}</span><span className={badgeClass(closing.status === 'CLOSED' ? 'amber' : 'green')}>{closing.status === 'CLOSED' ? copy.closedPeriod : copy.openPeriod}</span></div><p className="mt-1 text-xs text-slate-500">{closing.status === 'CLOSED' ? copy.closedAt : copy.reopenedAt}: {formatAttendanceAuditDate(closing.status === 'CLOSED' ? closing.closed_at : closing.reopened_at ?? closing.closed_at, language)}</p>{closing.reason && <p className="mt-1 text-xs text-slate-600">{closing.reason}</p>}</div>{closing.status === 'CLOSED' && <button type="button" disabled={isSaving} onClick={() => onEmergencyEdit(closing)} className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-800 shadow-xs transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"><Unlock size={14} />{copy.emergencyEdit}</button>}</article>)}</div>}</section></div>
 }

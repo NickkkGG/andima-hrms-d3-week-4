@@ -1,6 +1,7 @@
 "use client";
 
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { badgeClass, type BadgeTone } from "@/components/ui/styles";
 
 interface HrmsStatusPillProps {
   value: string | null;
@@ -19,19 +20,19 @@ export function hrmsStatusLabel(value: string, language: "id" | "en") {
 
 // Colour follows the stored status, not the translated label, so it is the
 // same in both languages.
-function statusClass(value: string) {
+function statusTone(value: string): BadgeTone {
   const normalized = value.toUpperCase();
 
-  if (["PERMANENT", "VALID", "PRESENT"].includes(normalized)) return "border-emerald-600/45 bg-emerald-50/40 text-emerald-700";
-  if (["CONTRACT", "PROBATION", "INTERN", "EXPIRING", "LATE"].includes(normalized)) return "border-amber-600/45 bg-amber-50/40 text-amber-700";
-  if (["RESIGNED", "TERMINATED", "EXPIRED", "ABSENT"].includes(normalized)) return "border-rose-600/45 bg-rose-50/40 text-rose-700";
+  if (["PERMANENT", "VALID", "PRESENT"].includes(normalized)) return "green";
+  if (["CONTRACT", "PROBATION", "INTERN", "EXPIRING", "LATE"].includes(normalized)) return "amber";
+  if (["RESIGNED", "TERMINATED", "EXPIRED", "ABSENT"].includes(normalized)) return "red";
 
-  return "border-slate-500/30 bg-slate-50 text-slate-700";
+  return "slate";
 }
 
 export default function HrmsStatusPill({ value }: HrmsStatusPillProps) {
   const { language } = useLanguage();
   const label = value ? hrmsStatusLabel(value, language) : language === "id" ? "Belum tersedia" : "Not available";
 
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] ${statusClass(value ?? "")}`}>{label}</span>;
+  return <span className={badgeClass(statusTone(value ?? ""))}>{label}</span>;
 }

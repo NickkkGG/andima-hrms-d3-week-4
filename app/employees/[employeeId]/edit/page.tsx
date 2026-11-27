@@ -1,4 +1,5 @@
-import Link from "next/link";
+import BackLink from "@/components/ui/BackLink";
+import { pageTitleClass } from "@/components/ui/styles";
 import { redirect } from "next/navigation";
 import EmployeeEditForm from "@/components/EmployeeEditForm";
 import EmployeeManagementAccessDenied from "@/components/hrms/EmployeeManagementAccessDenied";
@@ -42,7 +43,7 @@ interface D3MirrorProvisionResult {
 }
 
 export default async function EditEmployeePage({ params }: EditEmployeePageProps) {
-  const copy = localizedCopy({ id: { title: "Edit profil pegawai", back: "← Profil pegawai", eyebrow: "MANAJEMEN PEGAWAI" }, en: { title: "Edit employee profile", back: "← Employee profile", eyebrow: "EMPLOYEE MANAGEMENT" } });
+  const copy = localizedCopy({ id: { title: "Edit profil pegawai", back: "Kembali ke profil pegawai", eyebrow: "MANAJEMEN PEGAWAI" }, en: { title: "Edit employee profile", back: "Back to employee profile", eyebrow: "EMPLOYEE MANAGEMENT" } });
   const { employeeId } = await params;
   const supabase = await createClient();
   const {
@@ -79,12 +80,12 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
 
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">{copy.title}</h1>
-          <p className="mt-2"><LocalizedText id="Profil pegawai belum dapat dimuat. Silakan coba lagi nanti." en="The employee profile could not be loaded. Please try again later." /></p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
-          </Link>
+        <section className="mx-auto max-w-5xl rounded-2xl border border-red-200 bg-white p-6 shadow-xs">
+          <h1 className="text-xl font-bold text-slate-900">{copy.title}</h1>
+          <p className="mt-2 text-sm text-red-700"><LocalizedText id="Profil pegawai belum dapat dimuat. Silakan coba lagi nanti." en="The employee profile could not be loaded. Please try again later." /></p>
+          <BackLink className="mt-4" href="/employees">
+            <LocalizedText id="Kembali ke Daftar Pegawai" en="Back to Employee Directory" />
+          </BackLink>
         </section>
       </HrmsShell>
     );
@@ -93,12 +94,12 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
   if (!b2Employee) {
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-5xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
-          <p className="mt-2 text-slate-600"><LocalizedText id="Data pegawai tidak ditemukan." en="Employee data was not found." /></p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
-          </Link>
+        <section className="mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <h1 className="text-xl font-bold text-slate-900">{copy.title}</h1>
+          <p className="mt-2 text-sm text-slate-600"><LocalizedText id="Data pegawai tidak ditemukan." en="Employee data was not found." /></p>
+          <BackLink className="mt-4" href="/employees">
+            <LocalizedText id="Kembali ke Daftar Pegawai" en="Back to Employee Directory" />
+          </BackLink>
         </section>
       </HrmsShell>
     );
@@ -120,12 +121,12 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
   if (b2SourceError) {
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-5xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
-          <p className="mt-2 text-slate-600"><LocalizedText id="Pemetaan data pegawai belum dapat dimuat." en="The employee data mapping could not be loaded." /></p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
-          </Link>
+        <section className="mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <h1 className="text-xl font-bold text-slate-900">{copy.title}</h1>
+          <p className="mt-2 text-sm text-slate-600"><LocalizedText id="Pemetaan data pegawai belum dapat dimuat." en="The employee data mapping could not be loaded." /></p>
+          <BackLink className="mt-4" href="/employees">
+            <LocalizedText id="Kembali ke Daftar Pegawai" en="Back to Employee Directory" />
+          </BackLink>
         </section>
       </HrmsShell>
     );
@@ -154,12 +155,12 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
           : { id: "Data D3 belum dapat dibuat. Pastikan posisi dan departemen pegawai sudah tersedia di B2.", en: "D3 data could not be created. Make sure the employee's position and department exist in B2." };
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
-          <p className="mt-2"><LocalizedText id={userMessage.id} en={userMessage.en} /></p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href={`/employees/${encodeURIComponent(employeeId)}`}>
-            <LocalizedText id="← Kembali ke Profil Pegawai" en="← Back to Employee Profile" />
-          </Link>
+        <section className="mx-auto max-w-5xl rounded-2xl border border-red-200 bg-white p-6 shadow-xs">
+          <h1 className="text-xl font-bold text-slate-900">{copy.title}</h1>
+          <p className="mt-2 text-sm text-red-700"><LocalizedText id={userMessage.id} en={userMessage.en} /></p>
+          <BackLink className="mt-4" href={`/employees/${encodeURIComponent(employeeId)}`}>
+            <LocalizedText id="Kembali ke Profil Pegawai" en="Back to Employee Profile" />
+          </BackLink>
         </section>
       </HrmsShell>
     );
@@ -179,12 +180,12 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     });
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-5xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
-          <p className="mt-2 text-slate-600"><LocalizedText id="Data tambahan pegawai belum tersinkronisasi ke D3." en="Additional employee data has not been synchronized to D3 yet." /></p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href={`/employees/${encodeURIComponent(employeeId)}`}>
-            <LocalizedText id="← Kembali ke Profil Pegawai" en="← Back to Employee Profile" />
-          </Link>
+        <section className="mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <h1 className="text-xl font-bold text-slate-900">{copy.title}</h1>
+          <p className="mt-2 text-sm text-slate-600"><LocalizedText id="Data tambahan pegawai belum tersinkronisasi ke D3." en="Additional employee data has not been synchronized to D3 yet." /></p>
+          <BackLink className="mt-4" href={`/employees/${encodeURIComponent(employeeId)}`}>
+            <LocalizedText id="Kembali ke Profil Pegawai" en="Back to Employee Profile" />
+          </BackLink>
         </section>
       </HrmsShell>
     );
@@ -268,15 +269,12 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
 
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">{copy.title}</h1>
-          <p className="mt-2"><LocalizedText id="Pilihan posisi atau departemen belum dapat dimuat. Silakan coba lagi nanti." en="Position or department options could not be loaded. Please try again later." /></p>
-          <Link
-            className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]"
-            href={`/employees/${encodeURIComponent(employee.employee_id)}`}
-          >
-            <LocalizedText id="← Kembali ke Profil Pegawai" en="← Back to Employee Profile" />
-          </Link>
+        <section className="mx-auto max-w-5xl rounded-2xl border border-red-200 bg-white p-6 shadow-xs">
+          <h1 className="text-xl font-bold text-slate-900">{copy.title}</h1>
+          <p className="mt-2 text-sm text-red-700"><LocalizedText id="Pilihan posisi atau departemen belum dapat dimuat. Silakan coba lagi nanti." en="Position or department options could not be loaded. Please try again later." /></p>
+          <BackLink className="mt-4" href={`/employees/${encodeURIComponent(employee.employee_id)}`}>
+            <LocalizedText id="Kembali ke Profil Pegawai" en="Back to Employee Profile" />
+          </BackLink>
         </section>
       </HrmsShell>
     );
@@ -285,12 +283,12 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
   return (
     <HrmsShell userEmail={user.email} userRole={userRole}>
       <section className="mx-auto max-w-6xl space-y-7">
-        <Link className="inline-flex text-sm font-semibold text-[#1E3765] hover:text-[#155DFC]" href={`/employees/${encodeURIComponent(employee.employee_id)}`}>{copy.back}</Link>
+        <BackLink href={`/employees/${encodeURIComponent(employee.employee_id)}`}>{copy.back}</BackLink>
 
         <header>
-          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#1E3765]">{copy.eyebrow}</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{copy.title}</h1>
-          <p className="mt-1 text-sm text-[#4d5f81]"><LocalizedText id={`Perbarui informasi profil untuk ${employee.full_name}.`} en={`Update profile information for ${employee.full_name}.`} /></p>
+          <p className={pageTitleClass.eyebrow}>{copy.eyebrow}</p>
+          <h1 className={`mt-1 ${pageTitleClass.title}`}>{copy.title}</h1>
+          <p className={pageTitleClass.subtitle}><LocalizedText id={`Perbarui informasi profil untuk ${employee.full_name}.`} en={`Update profile information for ${employee.full_name}.`} /></p>
         </header>
 
         <EmployeeEditForm

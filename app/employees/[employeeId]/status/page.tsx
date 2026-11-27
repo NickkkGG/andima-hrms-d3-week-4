@@ -1,4 +1,5 @@
-import Link from "next/link";
+import BackLink from "@/components/ui/BackLink";
+import { pageTitleClass } from "@/components/ui/styles";
 import { redirect } from "next/navigation";
 import EmployeeStatusForm from "@/components/EmployeeStatusForm";
 import EmployeeManagementAccessDenied from "@/components/hrms/EmployeeManagementAccessDenied";
@@ -24,7 +25,7 @@ interface EmployeeStatusProfile {
 }
 
 export default async function EmployeeStatusPage({ params }: EmployeeStatusPageProps) {
-  const copyText = { id: { title: "Ubah status kepegawaian", back: "← Profil pegawai", eyebrow: "MANAJEMEN PEGAWAI", description: "Perbarui status tanpa mengubah data profil atau riwayat pegawai." }, en: { title: "Change employment status", back: "← Employee profile", eyebrow: "EMPLOYEE MANAGEMENT", description: "Update status without changing employee profile data or history." } }; const copy = localizedCopy(copyText);
+  const copyText = { id: { title: "Ubah status kepegawaian", back: "Kembali ke profil pegawai", eyebrow: "MANAJEMEN PEGAWAI", description: "Perbarui status tanpa mengubah data profil atau riwayat pegawai." }, en: { title: "Change employment status", back: "Back to employee profile", eyebrow: "EMPLOYEE MANAGEMENT", description: "Update status without changing employee profile data or history." } }; const copy = localizedCopy(copyText);
   const { employeeId } = await params;
   const supabase = await createClient();
   const {
@@ -61,12 +62,12 @@ export default async function EmployeeStatusPage({ params }: EmployeeStatusPageP
 
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-3xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold">{copy.title}</h1>
-          <p className="mt-2"><LocalizedText id="Data pegawai belum dapat dimuat. Silakan coba lagi nanti." en="Employee data could not be loaded. Please try again later." /></p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
-          </Link>
+        <section className="mx-auto max-w-3xl rounded-2xl border border-red-200 bg-white p-6 shadow-xs">
+          <h1 className="text-xl font-bold text-slate-900">{copy.title}</h1>
+          <p className="mt-2 text-sm text-red-700"><LocalizedText id="Data pegawai belum dapat dimuat. Silakan coba lagi nanti." en="Employee data could not be loaded. Please try again later." /></p>
+          <BackLink className="mt-4" href="/employees">
+            <LocalizedText id="Kembali ke Daftar Pegawai" en="Back to Employee Directory" />
+          </BackLink>
         </section>
       </HrmsShell>
     );
@@ -75,12 +76,12 @@ export default async function EmployeeStatusPage({ params }: EmployeeStatusPageP
   if (!b2Employee) {
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-3xl rounded-xl border border-[#D9E2FC] bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-bold text-[#121B2E]">{copy.title}</h1>
-          <p className="mt-2 text-slate-600"><LocalizedText id="Data pegawai tidak ditemukan." en="Employee data was not found." /></p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
-          </Link>
+        <section className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <h1 className="text-xl font-bold text-slate-900">{copy.title}</h1>
+          <p className="mt-2 text-sm text-slate-600"><LocalizedText id="Data pegawai tidak ditemukan." en="Employee data was not found." /></p>
+          <BackLink className="mt-4" href="/employees">
+            <LocalizedText id="Kembali ke Daftar Pegawai" en="Back to Employee Directory" />
+          </BackLink>
         </section>
       </HrmsShell>
     );
@@ -97,12 +98,12 @@ export default async function EmployeeStatusPage({ params }: EmployeeStatusPageP
   return (
     <HrmsShell userEmail={user.email} userRole={userRole}>
       <section className="mx-auto max-w-4xl space-y-7">
-        <Link className="inline-flex text-sm font-semibold text-[#1E3765] hover:text-[#155DFC]" href={`/employees/${encodeURIComponent(employee.employee_id)}`}>{copy.back}</Link>
+        <BackLink href={`/employees/${encodeURIComponent(employee.employee_id)}`}>{copy.back}</BackLink>
 
         <header>
-          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#1E3765]">{copy.eyebrow}</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-[-0.4px] text-[#121b2e]">{copy.title}</h1>
-          <p className="mt-1 text-sm text-[#4d5f81]">{copy.description}</p>
+          <p className={pageTitleClass.eyebrow}>{copy.eyebrow}</p>
+          <h1 className={`mt-1 ${pageTitleClass.title}`}>{copy.title}</h1>
+          <p className={pageTitleClass.subtitle}>{copy.description}</p>
         </header>
 
         <EmployeeStatusForm employee={employee} />

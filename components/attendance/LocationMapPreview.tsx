@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ExternalLink, Map, MapPin, Satellite } from "lucide-react";
 import { useLanguage, type SupportedLanguage } from "@/components/i18n/LanguageProvider";
+import { segmentedClass } from "@/components/ui/styles";
 
 export type AttendanceLocation = {
   latitude: number | null | undefined;
@@ -111,7 +112,7 @@ export default function LocationMapPreview({ clockIn, clockOut, className = "" }
   const selected = availableSlots.find((slot) => slot.id === selectedSlot) ?? availableSlots[0];
   if (!selected) {
     return (
-      <div className={`rounded-xl border border-dashed border-[#becabd] bg-[#f7f8ff] p-3 text-xs text-[#4d5f81] ${className}`}>
+      <div className={`rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-500 ${className}`}>
         {copy.noLocation}
       </div>
     );
@@ -120,24 +121,26 @@ export default function LocationMapPreview({ clockIn, clockOut, className = "" }
   const { location } = selected;
 
   return (
-    <section className={`overflow-hidden rounded-xl border border-[#d9e2fc] bg-white ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#d9e2fc] px-3 py-2.5">
-        <div className="flex items-center gap-2 text-xs font-bold text-[#121b2e]"><MapPin size={15} className="text-[#006838]" />{copy.title}</div>
-        <div className="flex rounded-lg bg-[#f1f3ff] p-0.5 text-[10px] font-bold">
-          <button type="button" onClick={() => setMapMode("standard")} className={`inline-flex items-center gap-1 rounded-md px-2 py-1 ${mapMode === "standard" ? "bg-white text-[#006838] shadow-sm" : "text-[#4d5f81]"}`}><Map size={12} />{copy.standard}</button>
-          <button type="button" onClick={() => setMapMode("satellite")} className={`inline-flex items-center gap-1 rounded-md px-2 py-1 ${mapMode === "satellite" ? "bg-white text-[#006838] shadow-sm" : "text-[#4d5f81]"}`}><Satellite size={12} />{copy.satellite}</button>
+    <section className={`overflow-hidden rounded-xl border border-slate-200 bg-white ${className}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2.5">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-900"><MapPin size={15} className="text-blue-600" />{copy.title}</div>
+        <div className={segmentedClass.group}>
+          <button type="button" onClick={() => setMapMode("standard")} className={`${segmentedClass.item} ${mapMode === "standard" ? segmentedClass.active : segmentedClass.idle}`}><Map size={12} />{copy.standard}</button>
+          <button type="button" onClick={() => setMapMode("satellite")} className={`${segmentedClass.item} ${mapMode === "satellite" ? segmentedClass.active : segmentedClass.idle}`}><Satellite size={12} />{copy.satellite}</button>
         </div>
       </div>
 
       {availableSlots.length > 1 && (
-        <div className="flex gap-1 border-b border-[#d9e2fc] px-3 py-2 text-[10px] font-bold">
-          {availableSlots.map((slot) => <button key={slot.id} type="button" onClick={() => setSelectedSlot(slot.id)} className={`rounded-md px-2 py-1 ${selected.id === slot.id ? "bg-[#eaf7f0] text-[#006838]" : "text-[#4d5f81] hover:bg-[#f1f3ff]"}`}>{slot.label}</button>)}
+        <div className="flex border-b border-slate-200 px-3 py-2">
+          <div className={segmentedClass.group}>
+            {availableSlots.map((slot) => <button key={slot.id} type="button" onClick={() => setSelectedSlot(slot.id)} className={`${segmentedClass.item} ${selected.id === slot.id ? segmentedClass.active : segmentedClass.idle}`}>{slot.label}</button>)}
+          </div>
         </div>
       )}
 
-      <div className="relative aspect-[16/8] bg-[#eaf0f8]">
+      <div className="relative aspect-[16/8] bg-slate-100">
         {/* Visible behind the map frame until the map has painted. */}
-        <span aria-hidden="true" className="absolute inset-0 animate-pulse bg-[#e2ebf7] motion-reduce:animate-none" />
+        <span aria-hidden="true" className="absolute inset-0 animate-pulse bg-slate-200 motion-reduce:animate-none" />
         {mapMode === "standard" ? (
           <iframe title={`${selected.label} ${copy.onMap}`} src={standardMapUrl(location)} className="absolute inset-0 size-full border-0" loading="lazy" />
         ) : (
@@ -145,11 +148,11 @@ export default function LocationMapPreview({ clockIn, clockOut, className = "" }
         )}
       </div>
 
-      <div className="space-y-2 px-3 py-2.5 text-[10px] text-[#4d5f81]">
-        <p><span className="font-bold text-[#121b2e]">{selected.label}:</span> {coordinateText(location)}{location.accuracyMeters != null ? ` · ${copy.accuracy} ±${Math.round(location.accuracyMeters)} m` : ""}</p>
-        <div className="flex flex-wrap gap-2 font-bold">
-          <a href={googleMapsUrl(location)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#1971c2] hover:underline"><ExternalLink size={12} />Google Maps</a>
-          <a href={appleMapsUrl(location)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#1971c2] hover:underline"><ExternalLink size={12} />Apple Maps</a>
+      <div className="space-y-2 px-3 py-2.5 text-[11px] text-slate-500">
+        <p><span className="font-bold text-slate-900">{selected.label}:</span> {coordinateText(location)}{location.accuracyMeters != null ? ` · ${copy.accuracy} ±${Math.round(location.accuracyMeters)} m` : ""}</p>
+        <div className="flex flex-wrap gap-3 font-semibold">
+          <a href={googleMapsUrl(location)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-700 hover:underline"><ExternalLink size={12} />Google Maps</a>
+          <a href={appleMapsUrl(location)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-700 hover:underline"><ExternalLink size={12} />Apple Maps</a>
         </div>
       </div>
     </section>

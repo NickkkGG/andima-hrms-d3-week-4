@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import HrmsStatusPill from "@/components/hrms/HrmsStatusPill";
 import TablePagination from "@/components/hrms/TablePagination";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { cardClass, searchInputClass, segmentedClass } from "@/components/ui/styles";
 import type { EmployeeListItem } from "@/types/employee";
 
 interface EmployeeTableProps {
@@ -51,29 +52,25 @@ export default function EmployeeTable({ employees, summary }: EmployeeTableProps
 
   return (
     <div className="mt-5 space-y-5">
-      {summary && <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className="rounded-2xl border border-[#BCD4EE] bg-white p-4 shadow-[0_6px_18px_rgba(31,77,130,0.06)]"><p className="text-xs font-semibold text-[#4D5F81]">{copy.total}</p><p className="mt-1 text-2xl font-bold text-[#0B2548]">{summary.total}</p></div><div className="rounded-2xl border border-[#BCD4EE] bg-white p-4 shadow-[0_6px_18px_rgba(31,77,130,0.06)]"><p className="text-xs font-semibold text-[#4D5F81]">{copy.active}</p><p className="mt-1 text-2xl font-bold text-[#187244]">{summary.active}</p></div><div className="rounded-2xl border border-[#BCD4EE] bg-white p-4 shadow-[0_6px_18px_rgba(31,77,130,0.06)]"><p className="text-xs font-semibold text-[#4D5F81]">{copy.probation}</p><p className="mt-1 text-2xl font-bold text-amber-700">{summary.probation}</p></div><div className="rounded-2xl border border-[#BCD4EE] bg-white p-4 shadow-[0_6px_18px_rgba(31,77,130,0.06)]"><p className="text-xs font-semibold text-[#4D5F81]">{copy.inactive}</p><p className="mt-1 text-2xl font-bold text-slate-600">{summary.inactive}</p></div></div>}
+      {summary && <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><div className={`p-4 ${cardClass}`}><p className="text-xs font-semibold text-slate-500">{copy.total}</p><p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{summary.total}</p></div><div className={`p-4 ${cardClass}`}><p className="text-xs font-semibold text-slate-500">{copy.active}</p><p className="mt-1 text-2xl font-bold tracking-tight text-emerald-700">{summary.active}</p></div><div className={`p-4 ${cardClass}`}><p className="text-xs font-semibold text-slate-500">{copy.probation}</p><p className="mt-1 text-2xl font-bold tracking-tight text-amber-700">{summary.probation}</p></div><div className={`p-4 ${cardClass}`}><p className="text-xs font-semibold text-slate-500">{copy.inactive}</p><p className="mt-1 text-2xl font-bold tracking-tight text-slate-600">{summary.inactive}</p></div></div>}
       <label className="relative block">
         <span className="sr-only">{copy.searchLabel}</span>
-        <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
         <input
-          className="h-11 w-full rounded-xl border border-[#BCD4EE] bg-white py-2 pl-10 pr-3 text-sm text-[#172033] outline-none transition placeholder:text-slate-400 focus:border-[#0C68D5] focus:ring-4 focus:ring-[#0C68D5]/10"
+          className={searchInputClass}
           onChange={(event) => { setSearchQuery(event.target.value); setPage(1); }}
           placeholder={copy.searchPlaceholder}
           type="search"
           value={searchQuery}
         />
       </label>
-      <div className="flex gap-2 overflow-x-auto pb-2" aria-label={copy.filter}>
+      <div className={segmentedClass.group} aria-label={copy.filter}>
         {["__all__", ...departments].map((department) => {
           const isSelected = selectedDepartment === department;
 
           return (
             <button
-              className={`h-9 shrink-0 rounded-full border px-4 text-xs font-semibold transition ${
-                isSelected
-                  ? "border-[#0C68D5] bg-[#0C68D5] text-white shadow-[0_5px_12px_rgba(12,104,213,0.25)]"
-                  : "border-[#BCD4EE] bg-white text-[#0B2548] hover:border-[#0C68D5] hover:bg-[#EAF2FC] hover:text-[#0C68D5]"
-              }`}
+              className={`${segmentedClass.item} ${isSelected ? segmentedClass.active : segmentedClass.idle}`}
               key={department}
               onClick={() => { setSelectedDepartment(department); setPage(1); }}
               type="button"
@@ -85,24 +82,23 @@ export default function EmployeeTable({ employees, summary }: EmployeeTableProps
       </div>
 
       {visibleEmployees.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#BCD4EE] bg-white px-5 py-10 text-center text-sm text-[#4D5F81]">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm text-slate-500">
           {copy.noResult}
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {paginatedEmployees.map((employee) => (
             <Link
-              className="group relative min-h-[116px] overflow-hidden rounded-2xl border border-[#BCD4EE] bg-white px-5 py-4 shadow-[0_8px_22px_rgba(31,77,130,0.07)] transition hover:-translate-y-0.5 hover:border-[#0C68D5] hover:shadow-[0_12px_28px_rgba(31,77,130,0.13)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0C68D5]"
+              className={`group relative min-h-[116px] overflow-hidden px-5 py-4 transition hover:border-blue-400 hover:bg-slate-50/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3B6FF5]/40 ${cardClass}`}
               href={`/employees/${encodeURIComponent(employee.employee_id)}`}
               key={employee.id}
             >
-              <span className="absolute inset-x-0 top-0 h-1 bg-[#0B2548]" />
-              <div className="flex items-start gap-3 pt-1">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#EAF2FC] text-sm font-bold text-[#0C68D5]">{initials(employee.full_name)}</span>
+              <div className="flex items-start gap-3">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-sm font-bold text-blue-700">{initials(employee.full_name)}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2"><h2 className="truncate text-sm font-bold leading-5 text-[#121b2e] transition group-hover:text-[#0C68D5]">{employee.full_name}</h2><HrmsStatusPill value={employee.employment_status} /></div>
-                  <p className="mt-0.5 truncate text-[11px] font-semibold leading-4 text-[#4D5F81]">{[employee.position_title, employee.department_name].filter(Boolean).join(" · ") || copy.positionMissing}</p>
-                  <div className="mt-3 flex items-center justify-between gap-2"><p className="text-xs font-bold tracking-[0.08em] text-[#0B2548]">{employee.employee_id}</p><span className="text-xs font-bold text-[#0C68D5]">{copy.viewProfile} →</span></div>
+                  <div className="flex items-start justify-between gap-2"><h2 className="truncate text-sm font-bold leading-5 text-slate-900 transition group-hover:text-blue-700">{employee.full_name}</h2><HrmsStatusPill value={employee.employment_status} /></div>
+                  <p className="mt-0.5 truncate text-[11px] font-medium leading-4 text-slate-500">{[employee.position_title, employee.department_name].filter(Boolean).join(" · ") || copy.positionMissing}</p>
+                  <div className="mt-3 flex items-center justify-between gap-2"><p className="text-xs font-bold tracking-[0.08em] text-slate-700">{employee.employee_id}</p><span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700">{copy.viewProfile}<ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span></div>
                 </div>
               </div>
             </Link>

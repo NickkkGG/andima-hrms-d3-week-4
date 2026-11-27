@@ -3,7 +3,7 @@ export const languageCookieName = "andima-hrms-language";
 export type SupportedLanguage = "id" | "en";
 
 export function normalizeLanguage(value: string | undefined | null): SupportedLanguage {
-  return value === "en" ? "en" : "id";
+  return value === "id" ? "id" : "en";
 }
 
 /** Shared copy used by client components and server-rendered pages. */
@@ -14,7 +14,7 @@ export const messages = {
     faceBiometricAttendance: "Presensi Biometrik Wajah", attendanceHistoryCorrection: "Riwayat & Koreksi Presensi",
     attendanceProductivity: "Presensi & Produktivitas", feedbackReward: "Umpan Balik & Apresiasi",
     employeeReportTicket: "Laporan & Tiket Karyawan", employee: "Karyawan", manager: "Manajer", hrmsUser: "Pengguna HRMS",
-    logout: "Keluar", signingOut: "Keluar...", openNavigation: "Buka navigasi", closeNavigation: "Tutup navigasi",
+    logout: "Keluar", signingOut: "Keluar...", openNavigation: "Buka navigasi", closeNavigation: "Tutup navigasi", toggleNavigation: "Buka/tutup sidebar",
     d3: "D3", myAttendance: "Presensi Saya", reportTicket: "Laporan & Tiket", back: "Kembali", cancel: "Batal",
     save: "Simpan", saving: "Menyimpan...", edit: "Ubah", add: "Tambah", delete: "Hapus", close: "Tutup",
     search: "Cari", filter: "Filter", reset: "Atur ulang", loading: "Memuat...", noData: "Belum ada data.",
@@ -36,7 +36,7 @@ export const messages = {
     faceBiometricAttendance: "Face Biometric Attendance", attendanceHistoryCorrection: "Attendance History & Correction",
     attendanceProductivity: "Attendance & Productivity", feedbackReward: "Feedback & Reward",
     employeeReportTicket: "Employee Report & Ticket", employee: "Employee", manager: "Manager", hrmsUser: "HRMS User",
-    logout: "Logout", signingOut: "Signing out...", openNavigation: "Open navigation", closeNavigation: "Close navigation",
+    logout: "Logout", signingOut: "Signing out...", openNavigation: "Open navigation", closeNavigation: "Close navigation", toggleNavigation: "Open/close sidebar",
     d3: "D3", myAttendance: "My Attendance", reportTicket: "Report & Ticket", back: "Back", cancel: "Cancel",
     save: "Save", saving: "Saving...", edit: "Edit", add: "Add", delete: "Delete", close: "Close",
     search: "Search", filter: "Filter", reset: "Reset", loading: "Loading...", noData: "No data yet.",

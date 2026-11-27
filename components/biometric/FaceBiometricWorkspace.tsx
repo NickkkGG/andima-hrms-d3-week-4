@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
-  ChevronRight,
+
   CircleAlert,
   Clock3,
   Eye,
@@ -15,9 +15,10 @@ import {
   Video,
   VideoOff,
 } from "lucide-react";
-import HeaderAccount from "@/components/HeaderAccount";
+import AppHeader from "@/components/AppHeader";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { SkeletonBlock } from "@/components/hrms/Skeleton";
+import { badgeClass, buttonClass, cardClass, modalClass, pageTitleClass, type BadgeTone } from "@/components/ui/styles";
 import { createClient } from "@/utils/supabase/client";
 
 type Mode = "enrollment" | "attendance";
@@ -246,16 +247,16 @@ function RealtimeAttendanceClock({ variant = "header", frozenAt = null }: { vari
     : null;
 
   if (variant === "inline") {
-    return time ? <p className="mt-0.5 font-mono text-[11px] font-bold tracking-[0.06em] text-[#0b5fbf]">{time} WIB</p> : <SkeletonBlock className="mt-1 h-3 w-24" />;
+    return time ? <p className="mt-0.5 text-[11px] font-bold tabular-nums text-blue-700">{time} WIB</p> : <SkeletonBlock className="mt-1 h-3 w-24" />;
   }
 
   return (
-    <div className="flex items-center justify-center gap-3 rounded-2xl border border-[#b8d4f6] bg-[linear-gradient(135deg,rgba(255,255,255,0.88),rgba(224,240,255,0.88))] px-5 py-3 text-center shadow-[0_10px_28px_rgba(35,91,156,0.13)] backdrop-blur-xl">
-      <div className="grid size-9 place-items-center rounded-xl border border-[#9dc9f8] bg-[#e1f0ff] text-[#0c68d5] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]"><Clock3 size={18} /></div>
+    <div className={`${cardClass} flex items-center justify-center gap-3 px-5 py-3 text-center`}>
+      <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600"><Clock3 size={18} /></div>
       <div>
-        <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[#41658f]">{language === "id" ? "Waktu presensi · WIB" : "Attendance time · WIB"}</p>
-        {time ? <p className="mt-0.5 font-mono text-xl font-bold tracking-[0.08em] text-[#0a2446] sm:text-2xl">{time}</p> : <SkeletonBlock className="mx-auto mt-1.5 h-6 w-28" />}
-        {date ? <p className="mt-0.5 text-[10px] font-medium text-[#58769c]">{date}</p> : <SkeletonBlock className="mx-auto mt-1.5 h-2.5 w-40" />}
+        <p className="text-[11px] font-semibold text-slate-500">{language === "id" ? "Waktu presensi · WIB" : "Attendance time · WIB"}</p>
+        {time ? <p className="mt-0.5 text-xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-2xl">{time}</p> : <SkeletonBlock className="mx-auto mt-1.5 h-6 w-28" />}
+        {date ? <p className="mt-0.5 text-[11px] font-medium text-slate-500">{date}</p> : <SkeletonBlock className="mx-auto mt-1.5 h-2.5 w-40" />}
       </div>
     </div>
   );
@@ -1265,9 +1266,12 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
       : copy.statusReady;
 
   const title = isEnrollment ? t("biometricRegistration") : t("faceBiometricAttendance");
+  const scanStatusTone: BadgeTone = scanState === "scanning" ? "blue" : scanState === "error" ? "red" : scanState === "complete" ? "green" : "slate";
+  // BUG-D3-023: the countdown turns red in the last five seconds.
+  const isScanTimeLow = scanSecondsLeft !== null && scanSecondsLeft <= 5;
 
   return (
-    <main className="relative isolate h-[100dvh] overflow-hidden bg-[#eaf2fc] text-[#172033]">
+    <main className="relative isolate h-[100dvh] overflow-hidden bg-white text-slate-900">
       <style>{`
         @keyframes biometric-scan-sweep {
           0%, 100% { top: 10%; opacity: 0.35; }
@@ -1277,39 +1281,26 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
           .biometric-scan-line { animation: none !important; }
         }
       `}</style>
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-50" style={{ backgroundImage: "linear-gradient(rgba(71, 125, 187, 0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(71, 125, 187, 0.09) 1px, transparent 1px)", backgroundSize: "34px 34px" }} />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_5%,rgba(151,207,255,0.62),transparent_28%),radial-gradient(circle_at_86%_84%,rgba(183,221,255,0.65),transparent_34%)]" />
-      <header className="relative z-20 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 pl-16 pr-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:pr-6 lg:pl-6">
-        <div className="flex w-full min-w-0 items-center justify-between gap-3">
-          <div className="hidden min-w-0 items-center gap-3 sm:flex">
-            <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span>
-            <span className="h-5 border-l border-[#BCD4EE]" />
-            <span className="text-xs font-semibold text-[#3F4940]">HRMS</span>
-            <ChevronRight size={13} className="shrink-0 text-[#52749B]/60" />
-            <span className="truncate text-xs font-semibold text-[#0C68D5]">{title}</span>
-          </div>
-          <span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">{title}</span>
-          <HeaderAccount />
-        </div>
-      </header>
+      <AppHeader pageTitle={title} />
 
       {isSavingTemplate && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-[#0a1931]/45 p-4 backdrop-blur-sm" role="status" aria-live="polite">
-          <div className="w-full max-w-sm rounded-2xl border border-white/20 bg-white p-6 text-center shadow-2xl">
-            <div className="mx-auto grid size-12 place-items-center rounded-full bg-[#e9f3ff] text-[#1971c2]"><LoaderCircle size={24} className="animate-spin" /></div>
-            <h2 className="mt-4 text-base font-bold text-[#172033]">{copy.savingRegistration}</h2>
-            <p className="mt-2 text-sm leading-6 text-[#60708d]">{savingStage || copy.processingSample}</p>
-            <p className="mt-3 text-[11px] text-[#8290a8]">{copy.doNotClose}</p>
+        <div className={modalClass.overlay} role="status" aria-live="polite">
+          <div className={`${modalClass.panel} max-w-sm p-6 text-center`}>
+            <div className="mx-auto grid size-12 place-items-center rounded-full bg-blue-50 text-blue-600"><LoaderCircle size={24} className="animate-spin" /></div>
+            <h2 className="mt-4 text-base font-bold text-slate-900">{copy.savingRegistration}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{savingStage || copy.processingSample}</p>
+            <p className="mt-3 text-[11px] text-slate-500">{copy.doNotClose}</p>
           </div>
         </div>
       )}
 
-      <div className="relative z-10 mx-auto flex h-[calc(100dvh-4rem)] max-w-[1440px] min-h-0 flex-col px-3 py-3 sm:px-5 sm:py-4 lg:px-7">
+      {/* The shared AppHeader is 58px tall; the workspace fills the rest of the viewport. */}
+      <div className="relative z-10 mx-auto flex h-[calc(100dvh-58px)] max-w-[1440px] min-h-0 flex-col px-3 py-3 sm:px-5 sm:py-4 lg:px-7">
         <section className="shrink-0">
           {isEnrollment ? (
-            <div className="mx-auto flex max-w-3xl items-center justify-center gap-3 rounded-2xl border border-[#b8d4f6] bg-white/75 px-5 py-3 text-center shadow-[0_10px_28px_rgba(35,91,156,0.13)] backdrop-blur-xl">
-              <div className="grid size-9 place-items-center rounded-xl border border-[#9dc9f8] bg-[#e1f0ff] text-[#0c68d5]"><Eye size={18} /></div>
-              <div><p className="text-sm font-bold text-[#0a2446]">{copy.registration}</p><p className="mt-0.5 text-[10px] font-medium text-[#58769c]">{copy.registrationHelp}</p></div>
+            <div className={`${cardClass} mx-auto flex max-w-3xl items-center justify-center gap-3 px-5 py-3 text-center`}>
+              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600"><Eye size={18} /></div>
+              <div><p className="text-sm font-bold text-slate-900">{copy.registration}</p><p className="mt-0.5 text-[11px] font-medium text-slate-500">{copy.registrationHelp}</p></div>
             </div>
           ) : <RealtimeAttendanceClock frozenAt={attendanceReady ? verificationLockedAt : null} />}
         </section>
@@ -1322,10 +1313,14 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
         )}
 
         <div className="mx-auto mt-3 w-full max-w-[1440px]">
-          <section className="flex w-full flex-col overflow-hidden rounded-3xl border border-[#b9d4f0] bg-white/72 shadow-[0_16px_42px_rgba(30,79,134,0.14)] backdrop-blur-xl">
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#cddff3] bg-[linear-gradient(90deg,rgba(246,251,255,0.88),rgba(226,241,255,0.72))] px-4 py-3 sm:px-5">
-              <div><p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[#5080b6]">{copy.liveIdentity}</p><h3 className="mt-0.5 text-sm font-bold text-[#0a2446]">{copy.camera}</h3></div>
-              <span className={`rounded-full border px-3 py-1 font-mono text-[10px] font-bold tracking-[0.08em] ${scanState === "scanning" ? "border-[#9acbff] bg-[#e3f1ff] text-[#0865cc]" : scanState === "error" ? "border-red-200 bg-red-50 text-red-600" : "border-[#cfddec] bg-white/75 text-[#54708f]"}`}>{scanState === "scanning" ? copy.scanning : scanState === "loading" ? copy.preparing : scanState === "complete" ? copy.complete : isScanTimedOut ? copy.timedOut : copy.ready}{scanSecondsLeft !== null && <> · <span aria-hidden="true">{Math.floor(scanSecondsLeft / 60)}:{String(scanSecondsLeft % 60).padStart(2, "0")}</span><span className="sr-only">{copy.timeLeft(scanSecondsLeft)}</span></>}</span>
+          <section className={`${cardClass} flex w-full flex-col overflow-hidden`}>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+              <div><p className={pageTitleClass.eyebrow}>{copy.liveIdentity}</p><h3 className="mt-0.5 text-sm font-bold text-slate-900">{copy.camera}</h3></div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span className={badgeClass(scanStatusTone, "tracking-[0.04em]")}>{scanState === "scanning" ? copy.scanning : scanState === "loading" ? copy.preparing : scanState === "complete" ? copy.complete : isScanTimedOut ? copy.timedOut : copy.ready}</span>
+                {/* BUG-D3-023: a large countdown (registration 90 s, attendance 60 s) that turns red at 5 s or less. */}
+                {scanSecondsLeft !== null && <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 ring-1 ring-inset transition-colors ${isScanTimeLow ? "bg-red-50 text-[#DC2626] ring-red-200" : "bg-blue-50 text-[#3B6FF5] ring-blue-200"}`}><Clock3 size={18} aria-hidden="true" className="shrink-0" /><span aria-hidden="true" className="text-2xl font-bold leading-8 tabular-nums">{Math.floor(scanSecondsLeft / 60)}:{String(scanSecondsLeft % 60).padStart(2, "0")}</span><span className="sr-only">{copy.timeLeft(scanSecondsLeft)}</span></span>}
+              </div>
             </div>
 
             <div className={`relative mx-auto shrink-0 transition-all duration-500 ${compactCamera ? "p-3 sm:p-4" : "p-5 sm:p-7"}`} style={{ width: cameraDiameter, height: cameraDiameter, flex: "0 0 auto" }}>
@@ -1336,8 +1331,8 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
               {isAttendanceRejected ? (
                 <div className="absolute inset-0 grid place-items-center p-6 text-center text-red-100"><div><div className="mx-auto grid size-14 place-items-center rounded-full border border-red-200/30 bg-red-500/20"><CircleAlert size={27} /></div><p className="mt-3 text-xs font-bold tracking-[0.08em]">{copy.faceRejected}</p></div></div>
               ) : scanState !== "scanning" && (
-                <div className="absolute inset-0 grid place-items-center p-6 text-center text-[#d9e2fc]">
-                  <div><div className="mx-auto grid size-14 place-items-center rounded-full border border-white/20 bg-white/10"><Video size={25} /></div><p className="mt-3 text-sm font-bold">{copy.cameraInactive}</p><p className="mt-1 text-xs text-[#d9e2fc]/70">{copy.cameraHelp}</p></div>
+                <div className="absolute inset-0 grid place-items-center p-6 text-center text-slate-100">
+                  <div><div className="mx-auto grid size-14 place-items-center rounded-full border border-white/20 bg-white/10"><Video size={25} /></div><p className="mt-3 text-sm font-bold">{copy.cameraInactive}</p><p className="mt-1 text-xs text-slate-300">{copy.cameraHelp}</p></div>
                 </div>
               )}
               {scanState === "scanning" && <>
@@ -1354,41 +1349,41 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
                   </g>
                 </svg>}
                 <div className="biometric-scan-line pointer-events-none absolute inset-x-[14%] h-px bg-[#c4ecff] shadow-[0_0_18px_4px_rgba(83,184,255,0.85)]" style={{ animation: "biometric-scan-sweep 2.15s ease-in-out infinite" }} />
-                {activePrompt && <div className="pointer-events-none absolute inset-x-[18%] top-3 rounded-lg border border-white/20 bg-[#061326]/85 px-2 py-1.5 text-center text-white shadow-lg"><p className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#9ed1ff]">{copy.liveness} {completedChallenges.length + 1}/{challengeOrder.length}</p><p className="mt-0.5 text-xs font-bold">{activePrompt.label}</p><p className="mt-0.5 text-[10px] leading-3 text-[#dcefff]">{activePrompt.helper}</p></div>}
-                {isEnrollment && allChallengesCompleted && !isSavingTemplate && <div className="pointer-events-none absolute left-1/2 top-4 w-[62%] -translate-x-1/2 rounded-xl border border-[#9ed1ff]/35 bg-[#061326]/85 px-3 py-1.5 text-center text-[10px] font-bold leading-4 text-white shadow-lg">{copy.recordingSample} {faceSampleCount}/{REQUIRED_FACE_SAMPLES} · {copy.stayStill}</div>}
-                {!isEnrollment && allChallengesCompleted && !identityVerified && <div className="pointer-events-none absolute left-1/2 top-4 max-w-[calc(100%-2rem)] -translate-x-1/2 whitespace-nowrap rounded-full border border-[#9ed1ff]/35 bg-[#061326]/85 px-3 py-1.5 text-center text-[10px] font-bold text-white shadow-lg">{copy.verifying}</div>}
-                {attendanceReady && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500/90 px-3 py-1 text-[9px] font-bold tracking-[0.12em] text-white">{copy.faceVerified}</div>}
-                {!attendanceReady && !activePrompt && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#061326]/75 px-3 py-1 text-[9px] font-bold tracking-[0.14em] text-[#dcefff]">{copy.faceLock}</div>}
+                {activePrompt && <div className="pointer-events-none absolute inset-x-[18%] top-3 rounded-lg border border-white/15 bg-slate-900/80 px-2 py-1.5 text-center text-white shadow-lg"><p className="text-[9px] font-bold uppercase tracking-[0.1em] text-blue-200">{copy.liveness} {completedChallenges.length + 1}/{challengeOrder.length}</p><p className="mt-0.5 text-xs font-bold">{activePrompt.label}</p><p className="mt-0.5 text-[10px] leading-3 text-slate-200">{activePrompt.helper}</p></div>}
+                {isEnrollment && allChallengesCompleted && !isSavingTemplate && <div className="pointer-events-none absolute left-1/2 top-4 w-[62%] -translate-x-1/2 rounded-lg border border-white/15 bg-slate-900/80 px-3 py-1.5 text-center text-[10px] font-bold leading-4 text-white shadow-lg">{copy.recordingSample} {faceSampleCount}/{REQUIRED_FACE_SAMPLES} · {copy.stayStill}</div>}
+                {!isEnrollment && allChallengesCompleted && !identityVerified && <div className="pointer-events-none absolute left-1/2 top-4 max-w-[calc(100%-2rem)] -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-slate-900/80 px-3 py-1.5 text-center text-[10px] font-bold text-white shadow-lg">{copy.verifying}</div>}
+                {attendanceReady && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-emerald-600/90 px-3 py-1 text-[10px] font-bold tracking-[0.08em] text-white">{copy.faceVerified}</div>}
+                {!attendanceReady && !activePrompt && <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-slate-900/75 px-3 py-1 text-[10px] font-bold tracking-[0.08em] text-slate-100">{copy.faceLock}</div>}
               </>}
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 border-t border-[#e7edf5] px-4 py-3 sm:px-5">
+            <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
               {isAttendanceRejected ? (
-                <button type="button" onClick={() => void startScan()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#c4343f] px-4 py-2.5 text-xs font-bold text-white shadow-[0_6px_16px_rgba(196,52,63,0.25)] transition hover:bg-[#a82431] active:scale-[0.98]"><Video size={16} /> {copy.retry}</button>
+                <button type="button" onClick={() => void startScan()} className={buttonClass("danger", "md", "min-h-11")}><Video size={16} /> {copy.retry}</button>
               ) : scanState === "loading" || isResolvingSession ? (
-                <button disabled className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#1d4f87] px-4 py-2.5 text-xs font-bold text-white opacity-75"><LoaderCircle size={16} className="animate-spin" /> {copy.preparingCamera}</button>
+                <button disabled className={buttonClass("primary", "md", "min-h-11")}><LoaderCircle size={16} className="animate-spin" /> {copy.preparingCamera}</button>
               ) : scanState === "scanning" ? (
-                <button type="button" onClick={resetScan} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#f0b9bd] bg-red-50/85 px-4 py-2.5 text-xs font-bold text-[#b4232b] transition hover:bg-red-100 active:scale-[0.98]"><VideoOff size={16} /> {copy.cancelScan}</button>
+                <button type="button" onClick={resetScan} className={buttonClass("dangerOutline", "md", "min-h-11")}><VideoOff size={16} /> {copy.cancelScan}</button>
               ) : (
-                <button type="button" onClick={() => void startScan()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0b67d1] px-4 py-2.5 text-xs font-bold text-white shadow-[0_7px_18px_rgba(11,103,209,0.3)] transition hover:bg-[#075ab9] active:scale-[0.98]"><Video size={16} /> {scanState === "complete" ? copy.startNewScan : isScanTimedOut ? copy.retry : copy.startCamera}</button>
+                <button type="button" onClick={() => void startScan()} className={buttonClass("primary", "md", "min-h-11")}><Video size={16} /> {scanState === "complete" ? copy.startNewScan : isScanTimedOut ? copy.retry : copy.startCamera}</button>
               )}
-              {!isEnrollment && !template && <Link href="/biometric-enrollment" className="text-xs font-semibold text-[#1971c2] underline underline-offset-4">{copy.noTemplate}</Link>}
+              {!isEnrollment && !template && <Link href="/biometric-enrollment" className="text-xs font-semibold text-blue-700 hover:underline">{copy.noTemplate}</Link>}
             </div>
 
-            {attendanceReady && <section className="mx-4 mb-3 shrink-0 rounded-2xl border border-emerald-200 bg-[linear-gradient(135deg,rgba(242,255,249,0.98),rgba(224,247,240,0.86))] p-2.5 shadow-[0_8px_20px_rgba(0,138,79,0.08)] sm:mx-5 sm:p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-2">
-                <div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-emerald-600 text-white shadow-[0_4px_10px_rgba(0,138,79,0.22)]"><CheckCircle2 size={15} /></span><div><p className="text-xs font-bold text-emerald-950">{copy.verifiedFace}</p><p className="font-mono text-[9px] font-bold uppercase tracking-[0.1em] text-emerald-700">{copy.identityLockActive}</p></div></div>
-                <span className="rounded-full border border-emerald-200 bg-white/70 px-2.5 py-1 text-[9px] font-bold text-emerald-800">{attendanceStatus}</span>
+            {attendanceReady && <section className="mx-4 mb-3 shrink-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-2.5 shadow-xs sm:mx-5 sm:p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2">
+                <div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-emerald-600 text-white"><CheckCircle2 size={15} /></span><div><p className="text-xs font-bold text-emerald-900">{copy.verifiedFace}</p><p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-700">{copy.identityLockActive}</p></div></div>
+                <span className={badgeClass("green")}>{attendanceStatus}</span>
               </div>
               <div className="mt-2 grid grid-cols-3 gap-1.5">
-                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><UserRound size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">{copy.employee}</p></div><p className="mt-0.5 truncate text-xs font-bold text-[#123b2a]">{currentUser?.fullName ?? <SkeletonBlock className="mt-1 h-3 w-24" />}</p><p className="mt-0.5 font-mono text-[10px] text-[#4d7567]">ID · {currentUser?.employeeCode ?? "—"}</p></div>
-                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><Clock3 size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">{copy.attendanceTime}</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">{hasClockedIn ? `Clock-in · ${formatJakartaTime(todayAttendance!.clock_in, language)} WIB` : copy.waitingClockIn}</p>{hasClockedIn && attendanceCompleted ? <p className="mt-0.5 text-[10px] text-[#4d7567]">Clock-out · {formatJakartaTime(todayAttendance!.clock_out!, language)} WIB</p> : <RealtimeAttendanceClock variant="inline" frozenAt={verificationLockedAt} />}</div>
-                <div className="rounded-xl border border-emerald-100 bg-white/70 px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-[#3f7462]"><MapPin size={13} /><p className="text-[9px] font-bold uppercase tracking-[0.1em]">{copy.location}</p></div><p className="mt-0.5 text-xs font-bold text-[#123b2a]">{copy.gpsReady}</p><p className="mt-0.5 text-[10px] leading-3 text-[#4d7567]">{copy.locationRecorded}</p></div>
+                <div className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-slate-500"><UserRound size={13} /><p className="text-[10px] font-semibold uppercase tracking-[0.06em]">{copy.employee}</p></div><p className="mt-0.5 truncate text-xs font-bold text-slate-900">{currentUser?.fullName ?? <SkeletonBlock className="mt-1 h-3 w-24" />}</p><p className="mt-0.5 text-[10px] tabular-nums text-slate-500">ID · {currentUser?.employeeCode ?? "—"}</p></div>
+                <div className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-slate-500"><Clock3 size={13} /><p className="text-[10px] font-semibold uppercase tracking-[0.06em]">{copy.attendanceTime}</p></div><p className="mt-0.5 text-xs font-bold text-slate-900">{hasClockedIn ? `Clock-in · ${formatJakartaTime(todayAttendance!.clock_in, language)} WIB` : copy.waitingClockIn}</p>{hasClockedIn && attendanceCompleted ? <p className="mt-0.5 text-[10px] text-slate-500">Clock-out · {formatJakartaTime(todayAttendance!.clock_out!, language)} WIB</p> : <RealtimeAttendanceClock variant="inline" frozenAt={verificationLockedAt} />}</div>
+                <div className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5"><div className="flex items-center gap-1.5 text-slate-500"><MapPin size={13} /><p className="text-[10px] font-semibold uppercase tracking-[0.06em]">{copy.location}</p></div><p className="mt-0.5 text-xs font-bold text-slate-900">{copy.gpsReady}</p><p className="mt-0.5 text-[10px] leading-3 text-slate-500">{copy.locationRecorded}</p></div>
               </div>
-              <div className="mt-2 flex flex-col gap-2 border-t border-emerald-200/80 pt-2 sm:flex-row sm:items-center sm:justify-between"><p className="text-[10px] text-emerald-800">{attendanceCompleted ? copy.dayComplete : copy.continueToRecord}</p><button type="button" disabled={isRecordingAttendance || attendanceCompleted} onClick={() => void recordAttendance()} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#008a4f] px-4 py-2 text-xs font-bold text-white shadow-[0_7px_16px_rgba(0,138,79,0.24)] transition hover:bg-[#007842] disabled:cursor-not-allowed disabled:opacity-55 active:scale-[0.98]">{isRecordingAttendance ? <LoaderCircle size={16} className="animate-spin" /> : <Clock3 size={16} />}{isRecordingAttendance ? copy.readingLocation : attendanceCompleted ? copy.attendanceComplete : nextAttendanceAction === "CLOCK_OUT" ? copy.clockOutNow : copy.clockInNow}</button></div>
+              <div className="mt-2 flex flex-col gap-2 border-t border-emerald-200 pt-2 sm:flex-row sm:items-center sm:justify-between"><p className="text-[11px] text-emerald-800">{attendanceCompleted ? copy.dayComplete : copy.continueToRecord}</p><button type="button" disabled={isRecordingAttendance || attendanceCompleted} onClick={() => void recordAttendance()} className={buttonClass("success", "md", "min-h-10 shrink-0")}>{isRecordingAttendance ? <LoaderCircle size={16} className="animate-spin" /> : <Clock3 size={16} />}{isRecordingAttendance ? copy.readingLocation : attendanceCompleted ? copy.attendanceComplete : nextAttendanceAction === "CLOCK_OUT" ? copy.clockOutNow : copy.clockInNow}</button></div>
             </section>}
-            {isAttendanceRejected && <div className="mx-4 mb-3 flex shrink-0 flex-col justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 sm:mx-5 sm:flex-row sm:items-center"><div><p className="text-xs font-bold text-red-800">{copy.faceRejected}</p><p className="mt-0.5 text-[10px] text-red-700">{copy.rejectionHelp}</p></div><button type="button" onClick={() => void startScan()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#c4343f] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#a82431]"><Video size={16} /> {copy.retry}</button></div>}
+            {isAttendanceRejected && <div className="mx-4 mb-3 flex shrink-0 flex-col justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 sm:mx-5 sm:flex-row sm:items-center"><div><p className="text-xs font-bold text-red-800">{copy.faceRejected}</p><p className="mt-0.5 text-[11px] text-red-700">{copy.rejectionHelp}</p></div><button type="button" onClick={() => void startScan()} className={buttonClass("danger", "md", "shrink-0")}><Video size={16} /> {copy.retry}</button></div>}
           </section>
         </div>
       </div>

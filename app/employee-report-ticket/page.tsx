@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Bell,
   CheckCircle2,
   ChevronRight,
   Clock3,
@@ -9,19 +8,21 @@ import {
   Filter,
   MessageSquareText,
   Paperclip,
-  RefreshCw,
   Search,
   Send,
   Ticket,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import HeaderAccount from "@/components/HeaderAccount";
+import AppHeader from "@/components/AppHeader";
+import { TicketNotificationButton, TicketNotificationPanel, useDismiss } from "@/components/TicketNotificationBell";
+import { buildTicketNotifications, readTicketNotificationIds, writeTicketNotificationIds } from "@/lib/ticket-notifications";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import TablePagination from "@/components/hrms/TablePagination";
 import { PageSkeleton, SkeletonPanel, SkeletonTableRows } from "@/components/hrms/Skeleton";
+import { badgeClass, buttonClass, cardClass, iconButtonClass, inputClass, labelClass, modalClass, pageTitleClass, searchInputClass, segmentedClass, tableClass, type BadgeTone } from "@/components/ui/styles";
 
 type TicketStatus = "PENDING" | "TODO" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
 type ViewRole = "manager" | "employee";
@@ -64,22 +65,17 @@ type CreateTicketInput = {
   attachment?: File;
 };
 
-type TicketNotification = {
-  id: string;
-  ticketId: string;
-  ticketTitle: string;
-  message: string;
-  at: string;
-  kind: "submitted" | "overdue" | "status" | "followup";
+const statusMeta: Record<TicketStatus, { tone: BadgeTone }> = {
+  PENDING: { tone: "slate" },
+  TODO: { tone: "blue" },
+  IN_PROGRESS: { tone: "amber" },
+  RESOLVED: { tone: "green" },
+  REJECTED: { tone: "red" },
 };
 
-const statusMeta: Record<TicketStatus, { className: string }> = {
-  PENDING: { className: "border-[#d9e2fc] bg-[#f1f3ff] text-[#4d5f81]" },
-  TODO: { className: "border-[#b9d6ff] bg-[#edf6ff] text-[#1971c2]" },
-  IN_PROGRESS: { className: "border-[#fde68a] bg-[#fef9c3] text-[#b7791f]" },
-  RESOLVED: { className: "border-[#bbf0d2] bg-[#eaf7f0] text-[#16834b]" },
-  REJECTED: { className: "border-[#fecaca] bg-[#fff1f2] text-[#d64545]" },
-};
+// Compact control (select, date) used in the ticket settings and the 24-hour
+// date/time picker: the same look as inputClass at a smaller height.
+const compactControlClass = "rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-800 outline-none transition focus:border-[#3B6FF5] focus:ring-2 focus:ring-[#3B6FF5]/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
 
 function statusLabel(status: TicketStatus, language: "id" | "en") {
   const labels = language === "id"
@@ -171,7 +167,7 @@ function StatusBadge({ status }: { status: TicketStatus }) {
   const { language } = useLanguage();
   const meta = statusMeta[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${meta.className}`}>
+    <span className={badgeClass(meta.tone, "w-fit")}>
       <span className="size-1.5 rounded-full bg-current" />
       {statusLabel(status, language)}
     </span>
@@ -224,12 +220,12 @@ function DateTimeField({ id, initialValue, minDate, maxDate, disabled, onChange 
     onChange({ value, isPartial: next.isDateIncomplete || (!value && Boolean(next.date || next.hour || next.minute)) });
   }
 
-  const controlClass = "rounded-lg border border-[#becabd]/60 bg-white px-2 py-2 text-xs font-semibold tabular-nums text-[#121b2e] outline-none focus:border-[#069494] disabled:opacity-60";
+  const controlClass = `${compactControlClass} tabular-nums`;
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1.5">
       <input id={id} type="date" aria-label={labels.date} disabled={disabled} defaultValue={initial.date} min={minDate} max={maxDate} onChange={(event) => update({ date: event.target.value, isDateIncomplete: event.target.validity.badInput })} className={`${controlClass} min-w-0 flex-1`} />
       <select aria-label={labels.hour} disabled={disabled} value={parts.hour} onChange={(event) => update({ hour: event.target.value })} className={controlClass}><option value="">--</option>{HOUR_OPTIONS.map((hour) => <option key={hour} value={hour}>{hour}</option>)}</select>
-      <span aria-hidden="true" className="text-xs font-bold text-[#4d5f81]">{language === "id" ? "." : ":"}</span>
+      <span aria-hidden="true" className="text-xs font-bold text-slate-500">{language === "id" ? "." : ":"}</span>
       <select aria-label={labels.minute} disabled={disabled} value={parts.minute} onChange={(event) => update({ minute: event.target.value })} className={controlClass}><option value="">--</option>{MINUTE_OPTIONS.map((minute) => <option key={minute} value={minute}>{minute}</option>)}</select>
     </div>
   );
@@ -248,26 +244,15 @@ function DueDateEditor({ ticket, disabled, onSave }: { ticket: TicketItem; disab
   const fieldId = `due-date-${ticket.dbId}`;
 
   return (
-    <div className="grid gap-1 text-[11px] font-semibold text-[#4d5f81] sm:col-span-2">
-      <label htmlFor={fieldId}>{copy.dueDate}</label>
+    <div className="grid sm:col-span-2">
+      <label htmlFor={fieldId} className={labelClass}>{copy.dueDate}</label>
       <div className="flex items-center gap-2">
         <DateTimeField id={fieldId} initialValue={saved} minDate={localDateString(new Date(ticket.createdAt))} disabled={disabled} onChange={setDraft} />
-        <button type="button" disabled={!canSave} onClick={() => onSave(draft.value || null)} className="shrink-0 rounded-lg bg-[#1e3765] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#0f2342] disabled:cursor-not-allowed disabled:opacity-40">{copy.save}</button>
+        <button type="button" disabled={!canSave} onClick={() => onSave(draft.value || null)} className={buttonClass("primary", "sm", "shrink-0")}>{copy.save}</button>
       </div>
-      <p className={`text-[10px] font-normal ${draft.isPartial ? "text-[#d64545]" : ""}`}>{draft.isPartial ? copy.incomplete : copy.hint}</p>
+      <p className={`mt-1.5 text-[11px] ${draft.isPartial ? "font-semibold text-red-600" : "text-slate-500"}`}>{draft.isPartial ? copy.incomplete : copy.hint}</p>
     </div>
   );
-}
-
-function readTicketNotificationIds(authUserId: string) {
-  if (!authUserId || typeof window === "undefined") return [];
-  try {
-    const saved = window.localStorage.getItem(`d3-ticket-read-notifications:${authUserId}`);
-    const ids = saved ? JSON.parse(saved) : [];
-    return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
-  } catch {
-    return [];
-  }
 }
 
 function toDateTimeLocal(value?: string) {
@@ -305,6 +290,11 @@ export default function EmployeeReportTicketPage() {
   const [notice, setNotice] = useState("");
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+  const closeNotifications = useCallback(() => setIsNotificationOpen(false), []);
+  const notificationRef = useDismiss(isNotificationOpen, closeNotifications);
+  // A notification opened from the bell on another page arrives as ?ticket=CODE.
+  const requestedTicketRef = useRef<string | null>(null);
+  const hasReadTicketParamRef = useRef(false);
   const [lastSyncedAt, setLastSyncedAt] = useState(0);
 
   async function loadTickets(actorEmployeeId = viewerEmployeeId, actorName = viewerName) {
@@ -410,7 +400,13 @@ export default function EmployeeReportTicketPage() {
     }));
     setTickets(loadedTickets);
     setLastSyncedAt(Date.now());
-    setSelectedId((current) => loadedTickets.some((ticket) => ticket.id === current) ? current : (loadedTickets[0]?.id ?? ""));
+    const requestedTicket = requestedTicketRef.current;
+    if (requestedTicket && loadedTickets.some((ticket) => ticket.id === requestedTicket)) {
+      requestedTicketRef.current = null;
+      setSelectedId(requestedTicket);
+    } else {
+      setSelectedId((current) => loadedTickets.some((ticket) => ticket.id === current) ? current : (loadedTickets[0]?.id ?? ""));
+    }
     hasLoadedTicketsRef.current = true;
     setIsTicketLoading(false);
     setIsRefreshing(false);
@@ -418,6 +414,14 @@ export default function EmployeeReportTicketPage() {
 
   useEffect(() => {
     let isMounted = true;
+
+    // Read once, after mount: during the first render Next.js may not have
+    // committed the new URL yet. Language switches re-run this effect and must
+    // not re-select the ticket from the link.
+    if (!hasReadTicketParamRef.current) {
+      hasReadTicketParamRef.current = true;
+      requestedTicketRef.current = new URLSearchParams(window.location.search).get("ticket");
+    }
 
     async function loadAccountAccess() {
       try {
@@ -492,40 +496,23 @@ export default function EmployeeReportTicketPage() {
   // - HR/Manager: incoming tickets from employees and tickets past their due date.
   // An employee never receives HR-side notifications, even if a ticket row of
   // someone else were ever returned by the API.
-  const ticketNotifications = useMemo(() => {
-    if (!appRole || !viewerEmployeeId) return [];
-
-    if (appRole === "EMPLOYEE") {
-      return tickets
-        .filter((ticket) => ticket.employeeUuid === viewerEmployeeId)
-        .flatMap((ticket) => ticket.history.flatMap((activity): TicketNotification[] => {
-          if (activity.actorEmployeeId === viewerEmployeeId) return [];
-          if (activity.kind === "status" && activity.toStatus) {
-            return [{ id: `status-${activity.id}`, ticketId: ticket.id, ticketTitle: ticket.title, message: copy.employeeStatus(activity.toStatus), at: activity.at, kind: "status" }];
-          }
-          if (activity.kind === "followup") {
-            return [{ id: activity.id, ticketId: ticket.id, ticketTitle: ticket.title, message: copy.employeeFollowUp(activity.message), at: activity.at, kind: "followup" }];
-          }
-          return [];
-        }))
-        .sort((first, second) => second.at.localeCompare(first.at));
-    }
-
-    return tickets
-      .flatMap((ticket): TicketNotification[] => {
-        const items: TicketNotification[] = [];
-        const created = ticket.history.find((activity) => activity.kind === "created");
-        if (created && created.actorEmployeeId !== viewerEmployeeId) {
-          items.push({ id: `submitted-${created.id}`, ticketId: ticket.id, ticketTitle: ticket.title, message: copy.hrNewTicket(ticket.employeeName, ticket.department), at: created.at, kind: "submitted" });
-        }
-        const isOpen = ticket.status !== "RESOLVED" && ticket.status !== "REJECTED";
-        if (ticket.dueAt && isOpen && lastSyncedAt && new Date(ticket.dueAt).getTime() < lastSyncedAt) {
-          items.push({ id: `overdue-${ticket.dbId}-${ticket.dueAt}`, ticketId: ticket.id, ticketTitle: ticket.title, message: copy.hrOverdue, at: ticket.dueAt, kind: "overdue" });
-        }
-        return items;
-      })
-      .sort((first, second) => second.at.localeCompare(first.at));
-  }, [appRole, tickets, viewerEmployeeId, lastSyncedAt, copy]);
+  const ticketNotifications = useMemo(() => buildTicketNotifications({
+    role: appRole,
+    viewerEmployeeId,
+    syncedAt: lastSyncedAt,
+    language,
+    tickets: tickets.map((ticket) => ({
+      dbId: ticket.dbId,
+      ticketCode: ticket.id,
+      title: ticket.title,
+      employeeUuid: ticket.employeeUuid,
+      employeeName: ticket.employeeName,
+      department: ticket.department,
+      status: ticket.status,
+      dueAt: ticket.dueAt,
+      events: ticket.history.map((activity) => ({ id: activity.id, kind: activity.kind, toStatus: activity.toStatus, actorEmployeeId: activity.actorEmployeeId ?? null, note: activity.message, at: activity.at })),
+    })),
+  }), [appRole, tickets, viewerEmployeeId, lastSyncedAt, language]);
 
   const unreadTicketNotifications = useMemo(() => {
     const readIds = new Set(readNotificationIds);
@@ -533,16 +520,9 @@ export default function EmployeeReportTicketPage() {
   }, [readNotificationIds, ticketNotifications]);
 
   function saveReadNotifications(ids: string[]) {
-    const nextIds = Array.from(new Set(ids)).slice(-200);
-    setReadNotificationIds(nextIds);
-    if (authUserId) {
-      try {
-        window.localStorage.setItem(`d3-ticket-read-notifications:${authUserId}`, JSON.stringify(nextIds));
-      } catch {
-        // Storage can be unavailable (private mode); the read state still applies for this visit.
-      }
-    }
+    setReadNotificationIds(writeTicketNotificationIds(authUserId, ids));
   }
+
 
   function markAllTicketNotificationsRead() {
     saveReadNotifications([...readNotificationIds, ...ticketNotifications.map((notification) => notification.id)]);
@@ -722,32 +702,27 @@ export default function EmployeeReportTicketPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#eaf2fc] text-[#121b2e]">
+    <main className="min-h-screen bg-white text-slate-900">
       <section className="min-h-screen">
-        <header className="sticky top-0 z-30 flex h-16 items-center border-b border-[#bcd4ee]/80 bg-white/72 pl-16 pr-4 shadow-[0_4px_16px_rgba(31,77,130,0.08)] backdrop-blur-2xl sm:pr-6 lg:pl-6">
-          <div className="flex w-full min-w-0 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3"><div className="hidden min-w-0 items-center gap-3 sm:flex"><span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548]">ANDIMA HRMS</span><span className="h-5 border-l border-[#BCD4EE]" /><span className="text-xs font-semibold text-[#3f4940]">HRMS</span><ChevronRight size={13} className="shrink-0 text-[#52749B]/60" /><span className="truncate text-xs font-semibold text-[#0C68D5]">{t("employeeReportTicket")}</span></div><span className="font-[family:var(--font-poppins)] text-sm font-semibold text-[#0B2548] sm:hidden">{t("reportTicket")}</span></div>
-            <div className="relative flex items-center gap-2 sm:gap-3"><button onClick={() => setIsNotificationOpen((current) => !current)} className="relative grid size-9 place-items-center rounded-lg text-[#4d5f81] hover:bg-[#f1f3ff]" aria-label={unreadTicketNotifications.length > 0 ? `${copy.notifications}, ${copy.newNotifications}` : copy.notifications} aria-expanded={isNotificationOpen}><Bell size={17} />{unreadTicketNotifications.length > 0 && <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-[#d64545] ring-2 ring-white" aria-hidden="true" />}</button>{isNotificationOpen && <TicketNotificationPanel role={viewRole} notifications={unreadTicketNotifications} isLoading={isTicketLoading || isRefreshing} onRefresh={refreshTickets} onReadAll={markAllTicketNotificationsRead} onSelect={openTicketNotification} />}<HeaderAccount /></div>
-          </div>
-        </header>
+        <AppHeader pageTitle={t("employeeReportTicket")} notificationSlot={<div ref={notificationRef} className="flex h-full items-center"><TicketNotificationButton count={unreadTicketNotifications.length} isOpen={isNotificationOpen} onToggle={() => setIsNotificationOpen((current) => !current)} />{isNotificationOpen && <TicketNotificationPanel isManager={viewRole === "manager"} notifications={unreadTicketNotifications} isLoading={isTicketLoading || isRefreshing} onRefresh={refreshTickets} onReadAll={markAllTicketNotificationsRead} onSelect={openTicketNotification} />}</div>} />
 
         <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
-          <div className="flex flex-col justify-between gap-4 border-b border-[#d9e2fc] pb-5 xl:flex-row xl:items-end">
-            <div><div className="mb-3 flex items-center gap-2 text-xs font-semibold text-[#4d5f81]"><span className="rounded-full bg-[#d9e2fc]/60 px-2 py-0.5">{accessibleTickets.length} {copy.tickets}</span><span className="text-[#006838]">{copy.ticketList}</span></div><h1 className="text-2xl font-bold tracking-[-0.4px]">{t("employeeReportTicket")}</h1><p className="mt-1 text-sm text-[#4d5f81]">{copy.description}</p></div>
-            <div className="flex flex-wrap items-center gap-2"><label className="hidden w-64 items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:flex"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => { setQuery(event.target.value); setTablePage(1); }} className="w-full bg-transparent text-xs outline-none placeholder:text-[#4d5f81]/70" placeholder={copy.search} maxLength={TICKET_LIMITS.searchMax} /></label>{viewRole === "employee" && <button onClick={() => setIsCreateOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#006838]"><FilePlus2 size={15} /> {copy.create}</button>}</div>
+          <div className="flex flex-col justify-between gap-4 border-b border-slate-200 pb-5 xl:flex-row xl:items-end">
+            <div><div className="mb-2 flex items-center gap-2"><span className={badgeClass("blue")}>{accessibleTickets.length} {copy.tickets}</span><span className={pageTitleClass.eyebrow}>{copy.ticketList}</span></div><h1 className={pageTitleClass.title}>{t("employeeReportTicket")}</h1><p className={pageTitleClass.subtitle}>{copy.description}</p></div>
+            <div className="flex flex-wrap items-center gap-2"><label className="relative hidden w-72 md:block"><Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => { setQuery(event.target.value); setTablePage(1); }} className={searchInputClass} placeholder={copy.search} maxLength={TICKET_LIMITS.searchMax} /></label>{viewRole === "employee" && <button onClick={() => setIsCreateOpen(true)} className={buttonClass("primary")}><FilePlus2 size={16} /> {copy.create}</button>}</div>
           </div>
 
           <div className="mt-5 flex flex-col gap-5 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_400px]">
-            <section className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-              <div className="flex flex-col gap-3 border-b border-[#becabd]/35 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap items-center gap-2"><label className="inline-flex h-8 w-fit items-center gap-2 rounded-md border border-[#d9e2fc] bg-[#f7f8ff] px-2.5 text-[#1e3765]"><Filter size={14} aria-hidden="true" /><span className="sr-only">{language === "id" ? "Filter status tiket" : "Filter ticket status"}</span><select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as "ALL" | TicketStatus); setTablePage(1); }} className="min-w-30 bg-transparent text-[11px] font-semibold outline-none"><option value="ALL">{copy.all} ({accessibleTickets.length})</option>{(["PENDING", "TODO", "IN_PROGRESS", "RESOLVED", "REJECTED"] as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select></label><div role="group" aria-label={copy.sortBy} className="inline-flex h-8 w-fit items-center rounded-md border border-[#d9e2fc] bg-[#f7f8ff] p-0.5">{([["NEWEST", copy.newest], ["DUE_DATE", copy.dueDate]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={ticketSort === value} onClick={() => { setTicketSort(value); setTablePage(1); }} className={`inline-flex h-full items-center rounded px-2.5 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0C68D5]/40 ${ticketSort === value ? "bg-[#1e3765] text-white shadow-sm" : "text-[#1e3765] hover:bg-[#e6ecfb]"}`}>{label}</button>)}</div></div><label className="flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 md:hidden"><Search size={14} className="text-[#4d5f81]/70" /><input value={query} onChange={(event) => { setQuery(event.target.value); setTablePage(1); }} className="w-full bg-transparent text-xs outline-none" placeholder={copy.search} maxLength={TICKET_LIMITS.searchMax} /></label></div>
-              <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="border-b border-[#becabd]/35 bg-[#f7f8ff] text-[10px] font-bold uppercase tracking-[0.08em] text-[#4d5f81]"><tr><th className="px-3 py-3">{copy.employee}</th><th className="px-3 py-3">{copy.ticket}</th><th className="px-3 py-3">{copy.submitted}</th><th className="px-3 py-3">{copy.dueDate}</th><th className="px-3 py-3">{copy.status}</th><th className="w-10 px-3 py-3"><span className="sr-only">{copy.openDetail}</span></th></tr></thead><tbody className="divide-y divide-[#becabd]/25">{isTicketLoading ? <SkeletonTableRows rows={6} columns={6} /> : paginatedTickets.map((ticket) => {
+            <section className={`${cardClass} overflow-hidden`}>
+              <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap items-center gap-2"><label className="inline-flex h-[34px] w-fit items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 text-slate-500 shadow-xs transition focus-within:border-[#3B6FF5] focus-within:ring-2 focus-within:ring-[#3B6FF5]/20"><Filter size={14} aria-hidden="true" /><span className="sr-only">{language === "id" ? "Filter status tiket" : "Filter ticket status"}</span><select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value as "ALL" | TicketStatus); setTablePage(1); }} className="min-w-30 cursor-pointer bg-transparent text-xs font-semibold text-slate-700 outline-none"><option value="ALL">{copy.all} ({accessibleTickets.length})</option>{(["PENDING", "TODO", "IN_PROGRESS", "RESOLVED", "REJECTED"] as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select></label><div role="group" aria-label={copy.sortBy} className={segmentedClass.group}>{([["NEWEST", copy.newest], ["DUE_DATE", copy.dueDate]] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={ticketSort === value} onClick={() => { setTicketSort(value); setTablePage(1); }} className={`${segmentedClass.item} ${ticketSort === value ? segmentedClass.active : segmentedClass.idle}`}>{label}</button>)}</div></div><label className="relative md:hidden"><Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => { setQuery(event.target.value); setTablePage(1); }} className={searchInputClass} placeholder={copy.search} maxLength={TICKET_LIMITS.searchMax} /></label></div>
+              <div className="overflow-x-auto"><table className={`${tableClass.table} min-w-[760px]`}><thead className={tableClass.head}><tr className="border-b border-slate-200"><th className={tableClass.headCell}>{copy.employee}</th><th className={tableClass.headCell}>{copy.ticket}</th><th className={tableClass.headCell}>{copy.submitted}</th><th className={tableClass.headCell}>{copy.dueDate}</th><th className={tableClass.headCell}>{copy.status}</th><th className={`${tableClass.headCell} w-10`}><span className="sr-only">{copy.openDetail}</span></th></tr></thead><tbody className="divide-y divide-slate-100">{isTicketLoading ? <SkeletonTableRows rows={6} columns={6} /> : paginatedTickets.map((ticket) => {
                 // BUG-D3-008: the whole row is the one way to open a ticket. The
                 // chevron and the highlighted row show that, so there is no
                 // separate "View" button doing the same thing.
                 const isSelected = selectedTicket?.id === ticket.id;
-                return <tr key={ticket.id} tabIndex={0} aria-current={isSelected ? "true" : undefined} aria-label={`${copy.openDetail} ${ticket.id}: ${ticket.title}`} onClick={() => selectTicket(ticket.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectTicket(ticket.id); } }} className={`group cursor-pointer outline-none transition hover:bg-[#f7f8ff] focus-visible:bg-[#f1f3ff] focus-visible:shadow-[inset_3px_0_0_#0C68D5] ${isSelected ? "bg-[#eaf7f0] shadow-[inset_3px_0_0_#16834b]" : "bg-white"}`}><td className="px-3 py-3.5"><div className="flex items-center gap-2"><span className="grid size-7 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId}</p></div></div></td><td className="px-3 py-3.5"><p className="max-w-[420px] text-xs font-semibold [overflow-wrap:anywhere]">{ticket.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{ticket.id} · {categoryLabel(ticket.category, language)}</p></td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{formatDate(ticket.createdAt, language)}</td><td className="px-3 py-3.5 text-xs text-[#3f4940]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</td><td className="px-3 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-3 py-3.5 text-right"><ChevronRight size={16} aria-hidden="true" className={`inline-block transition ${isSelected ? "text-[#16834b]" : "text-[#9aabc4] group-hover:translate-x-0.5 group-hover:text-[#1e3765]"}`} /></td></tr>;
-              })}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={6} className="px-6 py-14 text-center text-sm text-[#4d5f81]">{copy.noTickets}</td></tr>}</tbody></table></div>
-              <div className="flex flex-col gap-1 border-t border-[#becabd]/35 px-4 py-3 text-xs text-[#4d5f81] sm:flex-row sm:items-center sm:justify-between"><span>{copy.showing} <b className="text-[#121b2e]">{paginatedTickets.length}</b> {copy.of} <b className="text-[#121b2e]">{visibleTickets.length}</b> {copy.tickets}.</span>{visibleTickets.length > 0 && <span className="text-[11px]">{copy.rowHint}</span>}</div>
+                return <tr key={ticket.id} tabIndex={0} aria-current={isSelected ? "true" : undefined} aria-label={`${copy.openDetail} ${ticket.id}: ${ticket.title}`} onClick={() => selectTicket(ticket.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectTicket(ticket.id); } }} className={`group cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#3B6FF5]/40 ${isSelected ? "bg-blue-50/60 shadow-[inset_3px_0_0_#3B6FF5]" : "bg-white hover:bg-slate-50"}`}><td className="px-4 py-3.5"><div className="flex items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-blue-100 text-[11px] font-bold text-blue-700">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold text-slate-900">{ticket.employeeName}</p><p className="mt-0.5 text-[11px] text-slate-500">{ticket.employeeId}</p></div></div></td><td className="px-4 py-3.5"><p className="max-w-[420px] text-xs font-semibold text-slate-900 [overflow-wrap:anywhere]">{ticket.title}</p><p className="mt-0.5 text-[11px] text-slate-500">{ticket.id} · {categoryLabel(ticket.category, language)}</p></td><td className="px-4 py-3.5 text-xs text-slate-600">{formatDate(ticket.createdAt, language)}</td><td className="px-4 py-3.5 text-xs text-slate-600">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</td><td className="px-4 py-3.5"><StatusBadge status={ticket.status} /></td><td className="px-4 py-3.5 text-right"><ChevronRight size={16} aria-hidden="true" className={`inline-block transition ${isSelected ? "text-[#3B6FF5]" : "text-slate-400 group-hover:translate-x-0.5 group-hover:text-slate-700"}`} /></td></tr>;
+              })}{!isTicketLoading && visibleTickets.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-sm font-medium text-slate-400">{copy.noTickets}</td></tr>}</tbody></table></div>
+              <div className="flex flex-col gap-1 border-t border-slate-100 px-4 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span>{copy.showing} <b className="font-semibold text-slate-800">{paginatedTickets.length}</b> {copy.of} <b className="font-semibold text-slate-800">{visibleTickets.length}</b> {copy.tickets}.</span>{visibleTickets.length > 0 && <span>{copy.rowHint}</span>}</div>
               <TablePagination page={currentPage} pageSize={tablePageSize} totalItems={visibleTickets.length} onPageChange={setTablePage} />
             </section>
 
@@ -756,46 +731,25 @@ export default function EmployeeReportTicketPage() {
         </div>
       </section>
 
-      {notice && <div role="status" aria-live="polite" className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-lg bg-[#0f2342] px-4 py-3 text-sm font-semibold text-white shadow-xl"><CheckCircle2 size={17} className="text-[#77d8cd]" />{notice}</div>}
+      {notice && <div role="status" aria-live="polite" className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-lg"><CheckCircle2 size={17} className="shrink-0 text-emerald-600" />{notice}</div>}
       {isCreateOpen && <CreateTicketModal onClose={() => setIsCreateOpen(false)} onSubmit={createTicket} />}
     </main>
   );
 }
 
-function TicketNotificationPanel({ role, notifications, isLoading, onRefresh, onReadAll, onSelect }: { role: ViewRole; notifications: TicketNotification[]; isLoading: boolean; onRefresh: () => void; onReadAll: () => void; onSelect: (ticketId: string, notificationId: string) => void }) {
-  const { language } = useLanguage();
-  const isManager = role === "manager";
-  const copy = language === "id"
-    ? { title: isManager ? "Tiket masuk & tenggat" : "Pembaruan tiket Anda", sync: "Disinkronkan setiap 15 detik", readAll: "Baca semua", refresh: "Muat ulang notifikasi", empty: isManager ? "Tidak ada tiket baru atau tiket yang melewati tenggat." : "Belum ada pembaruan dari HR untuk tiket Anda." }
-    : { title: isManager ? "Incoming & overdue tickets" : "Your ticket updates", sync: "Synchronizes every 15 seconds", readAll: "Read all", refresh: "Refresh notifications", empty: isManager ? "No new or overdue tickets." : "HR has not updated your tickets yet." };
-  const dotClass: Record<TicketNotification["kind"], string> = { submitted: "bg-[#16834b]", overdue: "bg-[#d64545]", status: "bg-[#069494]", followup: "bg-[#0C68D5]" };
-  return <section aria-label={copy.title} className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[#d9e2fc] bg-white shadow-xl">
-    <div className="flex items-center justify-between border-b border-[#d9e2fc] px-4 py-3">
-      <div><p className="text-xs font-bold text-[#121b2e]">{copy.title}</p><p className="mt-0.5 text-[10px] text-[#4d5f81]">{copy.sync}</p></div>
-      <div className="flex shrink-0 items-center gap-1"><button type="button" onClick={onReadAll} disabled={notifications.length === 0} className="inline-flex h-7 items-center whitespace-nowrap rounded-md border border-[#d9e2fc] px-2 text-[10px] font-bold leading-none text-[#0C68D5] transition hover:bg-[#EAF2FC] disabled:cursor-not-allowed disabled:opacity-45">{copy.readAll}</button><button type="button" onClick={onRefresh} disabled={isLoading} className="grid size-7 place-items-center rounded-md text-[#4d5f81] transition hover:bg-[#f1f3ff] disabled:opacity-50" aria-label={copy.refresh}><RefreshCw size={13} className={isLoading ? "animate-spin" : ""} /></button></div>
-    </div>
-    <div className="max-h-80 overflow-y-auto p-2">
-      {notifications.length === 0 ? <p className="px-3 py-6 text-center text-xs text-[#4d5f81]">{copy.empty}</p> : notifications.map((notification) => <button key={notification.id} type="button" onClick={() => onSelect(notification.ticketId, notification.id)} className="flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition hover:bg-[#f7f8ff]">
-        <span className={`mt-1 size-2 shrink-0 rounded-full ${dotClass[notification.kind]}`} />
-        <span className="min-w-0"><span className="block truncate text-xs font-bold text-[#121b2e]">{notification.ticketTitle}</span><span className="mt-0.5 block text-[11px] leading-4 text-[#4d5f81] [overflow-wrap:anywhere]">{notification.message}</span><span className="mt-1 block text-[10px] text-[#4d5f81]">{formatDate(notification.at, language, true)}</span></span>
-      </button>)}
-    </div>
-  </section>;
-}
-
 function TicketDetail({ ticket, isLoading, role, followUp, isSaving, onFollowUpChange, onAddFollowUp, onUpdateWorkflow, onOpenAttachment, onClose }: { ticket?: TicketItem; isLoading: boolean; role: ViewRole; followUp: string; isSaving: boolean; onFollowUpChange: (value: string) => void; onAddFollowUp: () => void; onUpdateWorkflow: (update: { status?: TicketStatus; dueAt?: string | null }) => void; onOpenAttachment: (attachment: { fileName: string; storagePath: string }) => void; onClose: () => void }) {
   const { language } = useLanguage();
   const copy = language === "id" ? { empty: "Pilih tiket untuk melihat detail.", details: "Detail tiket", workflow: "Alur laporan karyawan", close: "Tutup detail", current: "Pengaturan tiket", restricted: "Pengaturan hanya dapat diperbarui oleh HR atau Manager.", status: "Status", dueDate: "Batas waktu", noDueDate: "Belum ditentukan", reported: "Dilaporkan", occurred: "Kejadian/pengajuan", history: "Progres & riwayat", noFollowUp: "Belum ada tindak lanjut untuk tiket ini.", add: "Tambah tindak lanjut", placeholder: "Tuliskan tindakan atau informasi tindak lanjut...", autoTime: "Waktu tindak lanjut dicatat otomatis saat disimpan.", saving: "Menyimpan...", save: "Simpan tindak lanjut" } : { empty: "Select a ticket to view its details.", details: "Ticket details", workflow: "Employee report workflow", close: "Close details", current: "Ticket settings", restricted: "Settings can be updated by HR or a Manager.", status: "Status", dueDate: "Due date", noDueDate: "Not set", reported: "Reported", occurred: "Occurrence/submission", history: "Progress & history", noFollowUp: "There is no follow-up for this ticket yet.", add: "Add follow-up", placeholder: "Describe the action taken or follow-up information...", autoTime: "The follow-up time is recorded automatically when you save.", saving: "Saving...", save: "Save follow-up" };
-  if (!ticket) return isLoading ? <SkeletonPanel /> : <aside className="rounded-xl border border-[#becabd]/45 bg-white p-6 text-sm text-[#4d5f81]">{copy.empty}</aside>;
+  if (!ticket) return isLoading ? <SkeletonPanel /> : <aside className={`${cardClass} p-6 text-sm text-slate-500`}>{copy.empty}</aside>;
   const canManage = role === "manager";
 
-  return <aside id="ticket-detail" className="overflow-hidden rounded-xl border border-[#becabd]/45 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] scroll-mt-20 2xl:sticky 2xl:top-21 2xl:h-fit">
-    <div className="flex items-start justify-between bg-[#1e3765] px-5 py-4 text-white"><div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-lg border border-[#069494] bg-[#577c8e]"><Ticket size={15} /></span><div><p className="text-sm font-bold">{copy.details} — {ticket.id}</p><p className="text-[11px] text-[#d9e2fc]">{copy.workflow}</p></div></div><button onClick={onClose} className="rounded p-1 text-[#d9e2fc] hover:bg-white/10" aria-label={copy.close}><X size={16} /></button></div>
+  return <aside id="ticket-detail" className={`${cardClass} overflow-hidden scroll-mt-20 2xl:sticky 2xl:top-21 2xl:h-fit`}>
+    <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600"><Ticket size={16} /></span><div className="min-w-0"><p className="text-sm font-bold text-slate-900 [overflow-wrap:anywhere]">{copy.details} — {ticket.id}</p><p className="mt-0.5 text-xs text-slate-500">{copy.workflow}</p></div></div><button type="button" onClick={onClose} className={iconButtonClass()} aria-label={copy.close}><X className="size-5" /></button></div>
     <div className="space-y-5 p-5">
-      <div><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[#4d5f81]">{copy.current}</p><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-[11px] font-semibold text-[#4d5f81]"><span>{copy.status}</span>{canManage ? <select disabled={isSaving} value={ticket.status} onChange={(event) => onUpdateWorkflow({ status: event.target.value as TicketStatus })} className="rounded-lg border border-[#becabd]/60 bg-white px-2.5 py-2 text-xs font-semibold text-[#121b2e] outline-none focus:border-[#069494] disabled:opacity-60">{(Object.keys(statusMeta) as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select> : <StatusBadge status={ticket.status} />}</label>{canManage ? <DueDateEditor key={`${ticket.id}-${ticket.dueAt ?? ""}`} ticket={ticket} disabled={isSaving} onSave={(dueAt) => onUpdateWorkflow({ dueAt })} /> : <div className="grid gap-1 text-[11px] font-semibold text-[#4d5f81]"><span>{copy.dueDate}</span><span className="text-xs font-semibold text-[#121b2e]">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</span></div>}</div>{!canManage && <p className="mt-3 text-xs text-[#4d5f81]">{copy.restricted}</p>}</div>
-      <div className="border-y border-[#becabd]/35 py-4"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-full bg-[#b0c6d4] text-[10px] font-bold text-[#1e3765]">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold">{ticket.employeeName}</p><p className="text-[10px] text-[#4d5f81]">{ticket.employeeId} · {ticket.department}</p></div></div><h2 className="mt-4 text-base font-bold leading-6 [overflow-wrap:anywhere]">{ticket.title}</h2><p className="mt-1 text-xs text-[#4d5f81]">{categoryLabel(ticket.category, language)} · {copy.reported} {formatDate(ticket.createdAt, language, true)}</p>{ticket.occurredAt && <p className="mt-1 text-xs text-[#4d5f81]">{copy.occurred}: {formatDate(ticket.occurredAt, language, true)}</p>}<p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#3f4940] [overflow-wrap:anywhere]">{ticket.description}</p>{ticket.attachment && <button onClick={() => onOpenAttachment(ticket.attachment!)} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#d9e2fc] bg-[#f1f3ff] px-3 py-2 text-xs font-semibold text-[#1e3765] hover:bg-[#d9e2fc]"><Paperclip size={14} />{ticket.attachment.fileName}</button>}</div>
-      <div><div className="mb-3 flex items-center gap-2"><Clock3 size={15} className="text-[#069494]" /><p className="text-xs font-bold">{copy.history}</p></div>{!ticket.history.some((activity) => activity.kind === "followup") && <p className="mb-3 rounded-lg bg-[#f7f8ff] px-3 py-2 text-xs text-[#4d5f81]">{copy.noFollowUp}</p>}<ol className="space-y-4 border-l border-[#d9e2fc] pl-4">{[...ticket.history].reverse().map((activity) => <li key={activity.id} className="relative"><span className={`absolute -left-[21px] top-1 grid size-3 place-items-center rounded-full ${activity.kind === "status" ? "bg-[#069494]" : activity.kind === "followup" ? "bg-[#16834b]" : "bg-[#b0c6d4]"}`}><span className="size-1 rounded-full bg-white" /></span><p className="whitespace-pre-line text-xs font-semibold text-[#3f4940] [overflow-wrap:anywhere]">{activity.message}</p><p className="mt-1 text-[10px] text-[#4d5f81]">{activity.actor} · {formatDate(activity.at, language, true)}</p></li>)}</ol></div>
-      {canManage && <div className="rounded-lg bg-[#f1f3ff] p-3"><label className="flex items-center gap-2 text-xs font-bold text-[#1e3765]"><MessageSquareText size={14} /> {copy.add}</label><textarea disabled={isSaving} value={followUp} maxLength={TICKET_LIMITS.followUpMax} onChange={(event) => onFollowUpChange(event.target.value)} className="mt-2 min-h-20 w-full resize-none rounded-lg border border-[#d9e2fc] bg-white p-2.5 text-xs outline-none focus:border-[#069494] disabled:opacity-60" placeholder={copy.placeholder} /><div className="mt-1 flex items-start justify-between gap-3 text-[10px] text-[#4d5f81]"><p className="flex items-center gap-1"><Clock3 size={11} aria-hidden="true" />{copy.autoTime}</p><p className="shrink-0">{followUp.length}/{TICKET_LIMITS.followUpMax}</p></div><button disabled={cleanMultilineText(followUp).length < TICKET_LIMITS.followUpMin || isSaving} onClick={onAddFollowUp} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Send size={13} /> {isSaving ? copy.saving : copy.save}</button></div>}</div>
+      <div><p className="mb-3 text-xs font-semibold text-slate-500">{copy.current}</p><div className="grid gap-3 sm:grid-cols-2"><label className="grid content-start justify-items-start"><span className={labelClass}>{copy.status}</span>{canManage ? <select disabled={isSaving} value={ticket.status} onChange={(event) => onUpdateWorkflow({ status: event.target.value as TicketStatus })} className={`${compactControlClass} w-full cursor-pointer`}>{(Object.keys(statusMeta) as TicketStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status, language)}</option>)}</select> : <StatusBadge status={ticket.status} />}</label>{canManage ? <DueDateEditor key={`${ticket.id}-${ticket.dueAt ?? ""}`} ticket={ticket} disabled={isSaving} onSave={(dueAt) => onUpdateWorkflow({ dueAt })} /> : <div className="grid content-start"><span className={labelClass}>{copy.dueDate}</span><span className="text-sm font-semibold text-slate-800">{ticket.dueAt ? formatDate(ticket.dueAt, language, true) : copy.noDueDate}</span></div>}</div>{!canManage && <p className="mt-3 text-xs text-slate-500">{copy.restricted}</p>}</div>
+      <div className="border-y border-slate-100 py-4"><div className="flex items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-lg bg-blue-100 text-[11px] font-bold text-blue-700">{ticket.employeeName.split(" ").map((name) => name[0]).join("").slice(0, 2)}</span><div><p className="text-xs font-bold text-slate-900">{ticket.employeeName}</p><p className="mt-0.5 text-[11px] text-slate-500">{ticket.employeeId} · {ticket.department}</p></div></div><h2 className="mt-4 text-base font-bold leading-6 text-slate-900 [overflow-wrap:anywhere]">{ticket.title}</h2><p className="mt-1 text-xs text-slate-500">{categoryLabel(ticket.category, language)} · {copy.reported} {formatDate(ticket.createdAt, language, true)}</p>{ticket.occurredAt && <p className="mt-1 text-xs text-slate-500">{copy.occurred}: {formatDate(ticket.occurredAt, language, true)}</p>}<p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">{ticket.description}</p>{ticket.attachment && <button type="button" onClick={() => onOpenAttachment(ticket.attachment!)} className={buttonClass("secondary", "sm", "mt-3 max-w-full")}><Paperclip size={14} className="shrink-0" /><span className="truncate">{ticket.attachment.fileName}</span></button>}</div>
+      <div><div className="mb-3 flex items-center gap-2"><Clock3 size={15} className="text-blue-600" /><p className="text-xs font-bold text-slate-800">{copy.history}</p></div>{!ticket.history.some((activity) => activity.kind === "followup") && <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">{copy.noFollowUp}</p>}<ol className="space-y-4 border-l border-slate-200 pl-4">{[...ticket.history].reverse().map((activity) => <li key={activity.id} className="relative"><span className={`absolute -left-[21px] top-1 grid size-3 place-items-center rounded-full ${activity.kind === "status" ? "bg-blue-600" : activity.kind === "followup" ? "bg-emerald-600" : "bg-slate-300"}`}><span className="size-1 rounded-full bg-white" /></span><p className="whitespace-pre-line text-xs font-semibold text-slate-700 [overflow-wrap:anywhere]">{activity.message}</p><p className="mt-1 text-[11px] text-slate-500">{activity.actor} · {formatDate(activity.at, language, true)}</p></li>)}</ol></div>
+      {canManage && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><label className="flex items-center gap-2 text-xs font-bold text-slate-800"><MessageSquareText size={14} className="text-blue-600" /> {copy.add}</label><textarea disabled={isSaving} value={followUp} maxLength={TICKET_LIMITS.followUpMax} onChange={(event) => onFollowUpChange(event.target.value)} className={inputClass("mt-2 min-h-20 resize-none")} placeholder={copy.placeholder} /><div className="mt-1 flex items-start justify-between gap-3 text-[11px] text-slate-500"><p className="flex items-center gap-1"><Clock3 size={11} aria-hidden="true" />{copy.autoTime}</p><p className="shrink-0 tabular-nums">{followUp.length}/{TICKET_LIMITS.followUpMax}</p></div><button disabled={cleanMultilineText(followUp).length < TICKET_LIMITS.followUpMin || isSaving} onClick={onAddFollowUp} className={buttonClass("primary", "sm", "mt-2")}><Send size={14} /> {isSaving ? copy.saving : copy.save}</button></div>}</div>
   </aside>;
 }
 
@@ -831,9 +785,9 @@ function CreateTicketModal({ onClose, onSubmit }: { onClose: () => void; onSubmi
     if (!result.ok) setError(result.message ?? copy.createFailed);
   }
 
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#0f2342]/45 p-4"><section role="dialog" aria-modal="true" aria-labelledby="create-ticket-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-[#d9e2fc] px-6 py-4"><div><h2 id="create-ticket-title" className="text-lg font-bold">{copy.title}</h2><p className="mt-0.5 text-xs text-[#4d5f81]">{copy.subtitle}</p></div><button disabled={isSubmitting} onClick={onClose} className="rounded p-1.5 text-[#4d5f81] hover:bg-[#f1f3ff] disabled:opacity-50" aria-label={copy.close}><X size={18} /></button></div><form noValidate onSubmit={handleSubmit} className="space-y-4 p-6"><Field label={copy.ticketTitle} required><input disabled={isSubmitting} name="title" value={titleValue} onChange={(event) => setTitleValue(event.target.value)} maxLength={TICKET_LIMITS.titleMax} className="field" placeholder={copy.titlePlaceholder} /><span className="mt-1 block text-right text-[10px] font-normal text-[#4d5f81]">{titleValue.length}/{TICKET_LIMITS.titleMax}</span></Field><Field label={copy.category} required><select disabled={isSubmitting} name="category" defaultValue="" className="field"><option value="" disabled>{copy.choose}</option>{categories.map((category) => <option key={category} value={category}>{categoryLabel(category, language)}</option>)}</select></Field><div className="block text-xs font-bold text-[#3f4940]"><label htmlFor="ticket-occurred-at">{copy.occurred}</label><span className="ml-2 font-normal text-[#4d5f81]">{copy.optional}</span><div className="mt-1.5 flex"><DateTimeField id="ticket-occurred-at" minDate={occurredRange.min} maxDate={occurredRange.max} disabled={isSubmitting} onChange={setOccurred} /></div></div><Field label={copy.description} required><textarea disabled={isSubmitting} name="description" value={descriptionValue} onChange={(event) => setDescriptionValue(event.target.value)} maxLength={TICKET_LIMITS.descriptionMax} className="field min-h-28 resize-y" placeholder={copy.descriptionPlaceholder} /><span className="mt-1 block text-right text-[10px] font-normal text-[#4d5f81]">{descriptionValue.length}/{TICKET_LIMITS.descriptionMax}</span></Field><Field label={copy.attachment} hint={copy.attachmentHint}><input disabled={isSubmitting} name="attachment" type="file" accept="image/jpeg,image/png,image/webp" className="field file:mr-3 file:rounded file:border-0 file:bg-[#eaf7f0] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-[#006838]" /></Field>{error && <p role="alert" className="rounded-lg bg-[#fff1f2] px-3 py-2 text-xs font-semibold text-[#d64545]">{error}</p>}<div className="flex justify-end gap-2 border-t border-[#d9e2fc] pt-4"><button disabled={isSubmitting} type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-xs font-bold text-[#4d5f81] hover:bg-[#f1f3ff] disabled:opacity-50">{copy.cancel}</button><button disabled={isSubmitting} type="submit" className="inline-flex items-center gap-2 rounded-lg bg-[#16834b] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#006838] disabled:opacity-50"><FilePlus2 size={14} /> {isSubmitting ? copy.submitting : copy.submit}</button></div></form></section></div>;
+  return <div className={modalClass.overlay}><section role="dialog" aria-modal="true" aria-labelledby="create-ticket-title" className={`${modalClass.panel} max-h-[90vh] max-w-xl overflow-y-auto`}><div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-6 py-4"><div><h2 id="create-ticket-title" className={modalClass.title}>{copy.title}</h2><p className="mt-0.5 text-xs text-slate-500">{copy.subtitle}</p></div><button type="button" disabled={isSubmitting} onClick={onClose} className={iconButtonClass()} aria-label={copy.close}><X className="size-5" /></button></div><form noValidate onSubmit={handleSubmit} className="space-y-4 p-6"><Field label={copy.ticketTitle} required><input disabled={isSubmitting} name="title" value={titleValue} onChange={(event) => setTitleValue(event.target.value)} maxLength={TICKET_LIMITS.titleMax} className={inputClass()} placeholder={copy.titlePlaceholder} /><span className="mt-1 block text-right text-[11px] font-normal tabular-nums text-slate-500">{titleValue.length}/{TICKET_LIMITS.titleMax}</span></Field><Field label={copy.category} required><select disabled={isSubmitting} name="category" defaultValue="" className={inputClass("cursor-pointer")}><option value="" disabled>{copy.choose}</option>{categories.map((category) => <option key={category} value={category}>{categoryLabel(category, language)}</option>)}</select></Field><div><label htmlFor="ticket-occurred-at" className="text-xs font-semibold text-slate-700">{copy.occurred}</label><span className="ml-2 text-xs text-slate-500">{copy.optional}</span><div className="mt-1.5 flex"><DateTimeField id="ticket-occurred-at" minDate={occurredRange.min} maxDate={occurredRange.max} disabled={isSubmitting} onChange={setOccurred} /></div></div><Field label={copy.description} required><textarea disabled={isSubmitting} name="description" value={descriptionValue} onChange={(event) => setDescriptionValue(event.target.value)} maxLength={TICKET_LIMITS.descriptionMax} className={inputClass("min-h-28 resize-y")} placeholder={copy.descriptionPlaceholder} /><span className="mt-1 block text-right text-[11px] font-normal tabular-nums text-slate-500">{descriptionValue.length}/{TICKET_LIMITS.descriptionMax}</span></Field><Field label={copy.attachment} hint={copy.attachmentHint}><input disabled={isSubmitting} name="attachment" type="file" accept="image/jpeg,image/png,image/webp" className={inputClass("file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-blue-700")} /></Field>{error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{error}</p>}<div className="flex justify-end gap-2 border-t border-slate-200 pt-4"><button disabled={isSubmitting} type="button" onClick={onClose} className={buttonClass("secondary")}>{copy.cancel}</button><button disabled={isSubmitting} type="submit" className={buttonClass("primary")}><FilePlus2 size={16} /> {isSubmitting ? copy.submitting : copy.submit}</button></div></form></section></div>;
 }
 
 function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
-  return <label className="block text-xs font-bold text-[#3f4940]"><span>{label}{required && <span className="ml-1 text-[#d64545]">*</span>}</span>{hint && <span className="ml-2 font-normal text-[#4d5f81]">{hint}</span>}<span className="mt-1.5 block [&_.field]:w-full [&_.field]:rounded-lg [&_.field]:border [&_.field]:border-[#becabd]/60 [&_.field]:bg-white [&_.field]:px-3 [&_.field]:py-2.5 [&_.field]:text-sm [&_.field]:font-normal [&_.field]:outline-none [&_.field]:focus:border-[#069494]">{children}</span></label>;
+  return <label className="block"><span className="text-xs font-semibold text-slate-700">{label}{required && <span className="ml-1 text-red-600">*</span>}</span>{hint && <span className="ml-2 text-xs font-normal text-slate-500">{hint}</span>}<span className="mt-1.5 block">{children}</span></label>;
 }

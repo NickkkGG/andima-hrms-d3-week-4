@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import CustomButton from "@/components/CustomButton";
 import type { DepartmentOption, EmployeeProfile, PositionOption } from "@/types/employee";
 import { createClient } from "@/utils/supabase/client";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { buttonClass, cardClass, inputClass, labelClass } from "@/components/ui/styles";
 import { hasEmployeeNameLetter, isValidIndonesianPhone } from "@/utils/employee-profile-validation";
 
 interface EmployeeEditFormProps {
@@ -36,18 +36,18 @@ interface ValidationRequirement {
   status: FieldFeedbackStatus;
 }
 
+// The status colours carry "!" so they win over the neutral border and focus
+// colours that inputClass already sets.
 function fieldClassName(status: FieldFeedbackStatus | boolean = "neutral") {
   const normalizedStatus = typeof status === "boolean" ? (status ? "invalid" : "neutral") : status;
   const statusClassName = {
-    neutral: "border-[#BCD4EE] focus:border-[#0C68D5] focus:ring-[#0C68D5]/10",
-    incomplete: "border-amber-400 focus:border-amber-500 focus:ring-amber-500/15",
-    invalid: "border-red-500 focus:border-red-600 focus:ring-red-600/15",
-    valid: "border-emerald-500 focus:border-emerald-600 focus:ring-emerald-600/15",
+    neutral: "",
+    incomplete: "border-amber-400! focus:border-amber-500! focus:ring-amber-500/15!",
+    invalid: "border-red-500! focus:border-red-600! focus:ring-red-600/15!",
+    valid: "border-emerald-500! focus:border-emerald-600! focus:ring-emerald-600/15!",
   }[normalizedStatus];
 
-  return `mt-2 h-11 w-full rounded-xl border bg-white px-3.5 text-sm font-medium text-[#172033] outline-none transition focus:ring-4 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500 ${
-    statusClassName
-  }`;
+  return inputClass(statusClassName);
 }
 
 function getAggregateStatus(requirements: ValidationRequirement[]) {
@@ -293,11 +293,11 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
   return (
     <form className="space-y-6" onSubmit={handleSubmit} noValidate>
       <fieldset disabled={isSubmitting}>
-        <section className="rounded-2xl border border-[#BCD4EE] bg-white p-5 shadow-[0_8px_24px_rgba(31,77,130,0.08)] sm:p-7">
-          <div className="flex flex-col gap-1 border-b border-[#D9E2FC] pb-5"><h2 className="text-base font-bold text-[#121b2e]">{copy.basic}</h2><p className="text-sm text-slate-500">{copy.basicDescription}</p></div>
+        <section className={`p-5 sm:p-6 ${cardClass}`}>
+          <div className="flex flex-col gap-1 border-b border-slate-100 pb-5"><h2 className="text-base font-bold text-slate-900">{copy.basic}</h2><p className="text-sm text-slate-500">{copy.basicDescription}</p></div>
           <div className="mt-6 grid gap-x-6 gap-y-5 md:grid-cols-2">
-            <label className="text-sm font-semibold text-[#121B2E]">
-              {copy.name} <span className="text-[#E5484D]">*</span>
+            <label className="block">
+              <span className={labelClass}>{copy.name} <span className="text-red-600">*</span></span>
               <input
                 className={fieldClassName(nameFieldStatus)}
                 value={formData.fullName}
@@ -314,10 +314,10 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
               {focusedField === "fullName" && <ValidationChecklist id="employee-name-requirements" requirements={nameRequirements} />}
               {focusedField !== "fullName" && nameError && <span id="employee-name-error" className="mt-1 block text-xs font-normal text-red-600" role="alert">{nameError}</span>}
             </label>
-            <label className="text-sm font-semibold text-[#121B2E]">{language === "id" ? "ID Pegawai" : "Employee ID"}<input className={fieldClassName(false)} value={employee.employee_id} disabled /><span className="mt-1 block text-xs font-normal text-slate-500">{copy.fromB2}</span></label>
-            <label className="text-sm font-semibold text-[#121B2E]">Email <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.email.trim()))} type="email" value={formData.email} onChange={(event) => updateField("email", event.target.value)} required /></label>
-            <label className="text-sm font-semibold text-[#121B2E]">
-              {copy.phone}
+            <label className="block"><span className={labelClass}>{language === "id" ? "ID Pegawai" : "Employee ID"}</span><input className={fieldClassName(false)} value={employee.employee_id} disabled /><span className="mt-1 block text-xs font-normal text-slate-500">{copy.fromB2}</span></label>
+            <label className="block"><span className={labelClass}>Email <span className="text-red-600">*</span></span><input className={fieldClassName(Boolean(errorMessage && !formData.email.trim()))} type="email" value={formData.email} onChange={(event) => updateField("email", event.target.value)} required /></label>
+            <label className="block">
+              <span className={labelClass}>{copy.phone}</span>
               <input
                 className={fieldClassName(phoneFieldStatus)}
                 type="tel"
@@ -341,41 +341,41 @@ export default function EmployeeEditForm({ employee, departments, positions }: E
               )}
               {focusedField !== "phone" && phoneError && <span id="employee-phone-error" className="mt-1 block text-xs font-normal text-red-600" role="alert">{phoneError}</span>}
             </label>
-            <label className="text-sm font-semibold text-[#121B2E]">{copy.joinDate}<input className={fieldClassName(false)} type="date" value={employee.join_date?.slice(0, 10) ?? ""} disabled /><span className="mt-1 block text-xs font-normal text-slate-500">{copy.fromB2}</span></label>
+            <label className="block"><span className={labelClass}>{copy.joinDate}</span><input className={fieldClassName(false)} type="date" value={employee.join_date?.slice(0, 10) ?? ""} disabled /><span className="mt-1 block text-xs font-normal text-slate-500">{copy.fromB2}</span></label>
           </div>
         </section>
-        <section className="mt-6 rounded-2xl border border-[#BCD4EE] bg-white p-5 shadow-[0_8px_24px_rgba(31,77,130,0.08)] sm:p-7">
-          <div className="flex flex-col gap-1 border-b border-[#D9E2FC] pb-5"><h2 className="text-base font-bold text-[#121b2e]">{copy.work}</h2><p className="text-sm text-slate-500">{copy.workDescription}</p></div>
+        <section className={`mt-6 p-5 sm:p-6 ${cardClass}`}>
+          <div className="flex flex-col gap-1 border-b border-slate-100 pb-5"><h2 className="text-base font-bold text-slate-900">{copy.work}</h2><p className="text-sm text-slate-500">{copy.workDescription}</p></div>
           <div className="mt-6 grid gap-x-6 gap-y-5 md:grid-cols-2">
-            <label className="text-sm font-semibold text-[#121B2E]">{copy.department} <span className="text-[#E5484D]">*</span><select className={fieldClassName(Boolean(errorMessage && !formData.departmentId))} value={formData.departmentId} onChange={(event) => { const departmentId = event.target.value; setFormData((current) => ({ ...current, departmentId, positionId: current.positionId && positions.find((position) => position.id === current.positionId)?.department_id === departmentId ? current.positionId : "" })); }} required><option value="">{copy.selectDepartment}</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name} ({department.code})</option>)}</select></label>
-            <label className="text-sm font-semibold text-[#121B2E]">{copy.position} <span className="text-[#E5484D]">*</span><select className={fieldClassName(Boolean(errorMessage && !formData.positionId))} value={formData.positionId} onChange={(event) => updateField("positionId", event.target.value)} disabled={!formData.departmentId} required><option value="">{formData.departmentId ? copy.selectPosition : copy.chooseDepartment}</option>{availablePositions.map((position) => <option key={position.id} value={position.id}>{position.title} ({position.code})</option>)}</select></label>
-            <label className="text-sm font-semibold text-[#121B2E]">{copy.location} <span className="text-[#E5484D]">*</span><input className={fieldClassName(Boolean(errorMessage && !formData.workLocation.trim()))} value={formData.workLocation} onChange={(event) => updateField("workLocation", event.target.value)} required /></label>
+            <label className="block"><span className={labelClass}>{copy.department} <span className="text-red-600">*</span></span><select className={fieldClassName(Boolean(errorMessage && !formData.departmentId))} value={formData.departmentId} onChange={(event) => { const departmentId = event.target.value; setFormData((current) => ({ ...current, departmentId, positionId: current.positionId && positions.find((position) => position.id === current.positionId)?.department_id === departmentId ? current.positionId : "" })); }} required><option value="">{copy.selectDepartment}</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name} ({department.code})</option>)}</select></label>
+            <label className="block"><span className={labelClass}>{copy.position} <span className="text-red-600">*</span></span><select className={fieldClassName(Boolean(errorMessage && !formData.positionId))} value={formData.positionId} onChange={(event) => updateField("positionId", event.target.value)} disabled={!formData.departmentId} required><option value="">{formData.departmentId ? copy.selectPosition : copy.chooseDepartment}</option>{availablePositions.map((position) => <option key={position.id} value={position.id}>{position.title} ({position.code})</option>)}</select></label>
+            <label className="block"><span className={labelClass}>{copy.location} <span className="text-red-600">*</span></span><input className={fieldClassName(Boolean(errorMessage && !formData.workLocation.trim()))} value={formData.workLocation} onChange={(event) => updateField("workLocation", event.target.value)} required /></label>
           </div>
         </section>
       </fieldset>
 
       {errorMessage && (
-        <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700" role="alert">
           {errorMessage}
         </p>
       )}
       {successMessage && (
-        <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700" role="status">
+        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700" role="status">
           {successMessage}
         </p>
       )}
 
-      <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-3 border-t border-[#D9E2FC] bg-[#F7F9FC]/95 py-4 backdrop-blur sm:flex-row sm:justify-end">
+      <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-3 border-t border-slate-200 bg-white/95 py-4 backdrop-blur sm:flex-row sm:justify-end">
         <Link
-          className="inline-flex h-11 items-center justify-center rounded-[15px] border border-[#155DFC] bg-[#EEF4FF] px-5 text-sm font-bold text-[#155DFC] transition hover:bg-[#DCE8FF]"
+          className={buttonClass("secondary")}
           href={profileUrl}
           onClick={(event) => { if (isDirty && !window.confirm(copy.unsaved)) event.preventDefault(); }}
         >
           {copy.cancel}
         </Link>
-        <CustomButton type="submit" fullWidth={false} disabled={isSubmitting}>
+        <button className={buttonClass("primary")} type="submit" disabled={isSubmitting}>
           {isSubmitting ? t("saving") : copy.saveChanges}
-        </CustomButton>
+        </button>
       </div>
     </form>
   );

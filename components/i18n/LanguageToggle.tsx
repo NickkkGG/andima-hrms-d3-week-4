@@ -4,10 +4,11 @@ import { useLanguage, type SupportedLanguage, type TranslationKey } from "@/comp
 
 // Text labels instead of flag emoji: Windows does not render regional-indicator
 // flags (it shows the letters "ID" / "GB" in boxes), so plain text looks the
-// same on Windows, macOS, and mobile.
+// same on Windows, macOS, and mobile. EN comes first and is the default
+// (QA BUG-D3-026).
 const options: { value: SupportedLanguage; label: string; nameKey: TranslationKey }[] = [
-  { value: "id", label: "ID", nameKey: "indonesian" },
   { value: "en", label: "EN", nameKey: "english" },
+  { value: "id", label: "ID", nameKey: "indonesian" },
 ];
 
 export default function LanguageToggle() {
@@ -17,7 +18,7 @@ export default function LanguageToggle() {
     <div
       role="group"
       aria-label={t("language")}
-      className="flex shrink-0 items-center rounded-lg border border-[#BCD4EE] bg-white/80 p-0.5 shadow-[0_1px_3px_rgba(31,77,130,0.07)]"
+      className="flex shrink-0 items-center rounded-lg border border-slate-200 bg-slate-100/80 p-0.5 text-xs font-semibold"
     >
       {options.map((option) => {
         const isActive = language === option.value;
@@ -28,8 +29,8 @@ export default function LanguageToggle() {
             onClick={() => setLanguage(option.value)}
             aria-pressed={isActive}
             title={t(option.nameKey)}
-            className={`inline-flex h-7 min-w-9 items-center justify-center rounded-md px-2 text-[11px] font-bold leading-none tracking-[0.04em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0C68D5]/40 ${
-              isActive ? "bg-[#0C68D5] text-white shadow-sm" : "text-[#47688E] hover:bg-[#EAF2FC]"
+            className={`cursor-pointer rounded-md px-2 py-0.5 text-[11px] transition-colors ${
+              isActive ? "bg-white font-bold text-blue-700 shadow-xs" : "text-slate-500 hover:text-slate-800"
             }`}
           >
             <span aria-hidden="true">{option.label}</span>

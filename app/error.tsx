@@ -1,6 +1,7 @@
 "use client";
 
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { buttonClass, pageTitleClass } from "@/components/ui/styles";
 
 export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const { language } = useLanguage();
@@ -10,7 +11,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
   return (
     <main className="grid min-h-screen place-items-center bg-white px-6 py-10">
       <section className="max-w-md text-center">
-        <div className="flex items-center justify-center gap-2.5 text-[#0b2548]">
+        <div className="flex items-center justify-center gap-2.5 text-slate-900">
           <img
             src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Logo-ANDIMA-wzx4gpZx20EFE5IYcH3jqabixELIo3.png"
             alt="Andima"
@@ -18,9 +19,9 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
           />
           <span className="font-[family:var(--font-poppins)] text-xl font-semibold tracking-[-0.03em]">ANDIMA HRMS</span>
         </div>
-        <h1 className="mt-10 font-[family:var(--font-poppins)] text-2xl font-semibold text-[#172033]">{copy.title}</h1>
-        <p className="mt-3 text-sm leading-6 text-[#4d5f81]">{copy.description}</p>
-        <button type="button" onClick={reset} className="mt-7 inline-flex h-10 items-center rounded-lg bg-[#0c68d5] px-5 text-sm font-semibold text-white transition hover:bg-[#0958b8] focus-visible:outline-offset-4">{copy.retry}</button>
+        <h1 className={`mt-10 ${pageTitleClass.title}`}>{copy.title}</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-500">{copy.description}</p>
+        <button type="button" onClick={reset} className={buttonClass("primary", "md", "mt-7")}>{copy.retry}</button>
       </section>
     </main>
   );

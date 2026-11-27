@@ -14,7 +14,10 @@ type LanguageContextValue = {
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
-const storageKey = "andima-hrms-language";
+// v2: the old key was saved on every visit (so it held "id" for everyone who
+// used the app before EN became the default). Real choices live in the cookie,
+// which is only written when the user presses the toggle.
+const storageKey = "andima-hrms-language-v2";
 const cookieMaxAge = 60 * 60 * 24 * 365;
 
 // localStorage can throw (blocked site data, strict privacy modes on some
@@ -42,7 +45,7 @@ function writeLanguageCookie(language: SupportedLanguage) {
   document.cookie = `${languageCookieName}=${language}; path=/; max-age=${cookieMaxAge}; samesite=lax${secure}`;
 }
 
-export function LanguageProvider({ children, initialLanguage = "id" }: { children: React.ReactNode; initialLanguage?: SupportedLanguage }) {
+export function LanguageProvider({ children, initialLanguage = "en" }: { children: React.ReactNode; initialLanguage?: SupportedLanguage }) {
   const router = useRouter();
   const [language, setLanguageState] = useState<SupportedLanguage>(initialLanguage);
 

@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { buttonClass, modalClass } from "@/components/ui/styles";
+
+// Shared modal look, kept above the shell's own z-50 layers.
+const idleOverlayClass = modalClass.overlay.replace("z-50", "z-[100]");
 
 type IdleSessionStatus = {
   status: "ACTIVE" | "EXPIRED" | "LOCATION_UNMAPPED" | "MISSING_SESSION" | "PROFILE_UNAVAILABLE";
@@ -207,10 +211,10 @@ export default function SessionIdleGuard() {
   if (!session || !isWarningVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-labelledby="idle-session-title">
-      <section className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <p className="text-sm font-bold uppercase tracking-wide text-amber-700">Peringatan sesi</p>
-        <h2 id="idle-session-title" className="mt-2 text-xl font-bold text-slate-900">Sesi Anda akan berakhir</h2>
+    <div className={idleOverlayClass} role="dialog" aria-modal="true" aria-labelledby="idle-session-title">
+      <section className={`${modalClass.panel} max-w-md p-6`}>
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-amber-700">Peringatan sesi</p>
+        <h2 id="idle-session-title" className={`mt-2 ${modalClass.title}`}>Sesi Anda akan berakhir</h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
           Tidak ada aktivitas terdeteksi. Anda akan logout otomatis dalam <strong>{remainingSeconds} detik</strong>.
         </p>
@@ -221,14 +225,14 @@ export default function SessionIdleGuard() {
           <button
             type="button"
             onClick={() => void signOutForPolicy()}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            className={buttonClass("secondary")}
           >
             Logout sekarang
           </button>
           <button
             type="button"
             onClick={() => void touchSession(true)}
-            className="rounded-lg bg-[#155cfd] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#124bd0]"
+            className={buttonClass("primary")}
           >
             Lanjutkan sesi
           </button>

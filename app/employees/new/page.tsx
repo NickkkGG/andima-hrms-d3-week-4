@@ -1,4 +1,5 @@
-import Link from "next/link";
+import BackLink from "@/components/ui/BackLink";
+import { modalClass } from "@/components/ui/styles";
 import { redirect } from "next/navigation";
 import EmployeeCreateForm from "@/components/EmployeeCreateForm";
 import EmployeeManagementAccessDenied from "@/components/hrms/EmployeeManagementAccessDenied";
@@ -52,12 +53,12 @@ export default async function NewEmployeePage() {
 
     return (
       <HrmsShell userEmail={user.email} userRole={userRole}>
-        <section className="mx-auto max-w-5xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm">
-          <h1 className="text-xl font-bold"><LocalizedText id="Tambah Pegawai Baru" en="Add a New Employee" /></h1>
-          <p className="mt-2"><LocalizedText id="Pilihan posisi atau departemen belum dapat dimuat. Silakan coba lagi nanti." en="Position or department options could not be loaded. Please try again later." /></p>
-          <Link className="mt-4 inline-block text-sm font-semibold text-[#1E3765] hover:text-[#0F2342]" href="/employees">
-            <LocalizedText id="← Kembali ke Daftar Pegawai" en="← Back to Employee Directory" />
-          </Link>
+        <section className="mx-auto max-w-5xl rounded-2xl border border-red-200 bg-white p-6 shadow-xs">
+          <h1 className="text-xl font-bold text-slate-900"><LocalizedText id="Tambah Pegawai Baru" en="Add a New Employee" /></h1>
+          <p className="mt-2 text-sm text-red-700"><LocalizedText id="Pilihan posisi atau departemen belum dapat dimuat. Silakan coba lagi nanti." en="Position or department options could not be loaded. Please try again later." /></p>
+          <BackLink className="mt-4" href="/employees">
+            <LocalizedText id="Kembali ke Daftar Pegawai" en="Back to Employee Directory" />
+          </BackLink>
         </section>
       </HrmsShell>
     );
@@ -65,8 +66,8 @@ export default async function NewEmployeePage() {
 
   return (
     <HrmsShell userEmail={user.email} userRole={userRole}>
-      <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#121B2E]/55 p-3 sm:p-6">
-        <section className="my-auto w-full max-w-[1185px] rounded-[15px] bg-white p-5 shadow-[4px_4px_10px_rgba(21,93,252,0.5)] sm:p-9">
+      <div className={`${modalClass.overlay} overflow-y-auto`}>
+        <section className={`my-auto max-w-[1185px] p-5 sm:p-8 ${modalClass.panel}`}>
           <EmployeeCreateForm departments={departmentsResult.data ?? []} positions={positionsResult.data ?? []} />
         </section>
       </div>
