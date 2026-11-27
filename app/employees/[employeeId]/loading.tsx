@@ -1,12 +1,12 @@
 import { LocalizedText } from "@/components/i18n/LocalizedText";
 import { SkeletonBlock, SkeletonTopBar } from "@/components/hrms/Skeleton";
-import { cardClass } from "@/components/ui/styles";
+import { cardClass, pageBgClass } from "@/components/ui/styles";
 
-// Same white page, padding, and cards as the profile page (HrmsShell), so the
+// Same grey page, padding, and cards as the profile page (HrmsShell), so the
 // layout does not change colour when the data arrives.
 export default function EmployeeProfileLoading() {
   return (
-    <div className="min-h-screen bg-white" role="status" aria-live="polite" aria-busy="true">
+    <div className={`min-h-screen ${pageBgClass}`} role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only"><LocalizedText id="Memuat profil pegawai…" en="Loading employee profile…" /></span>
       <SkeletonTopBar />
       <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8" aria-hidden="true">

@@ -22,7 +22,7 @@ import { buildTicketNotifications, readTicketNotificationIds, writeTicketNotific
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import TablePagination from "@/components/hrms/TablePagination";
 import { PageSkeleton, SkeletonPanel, SkeletonTableRows } from "@/components/hrms/Skeleton";
-import { badgeClass, buttonClass, cardClass, iconButtonClass, inputClass, labelClass, modalClass, pageTitleClass, searchInputClass, segmentedClass, tableClass, type BadgeTone } from "@/components/ui/styles";
+import { badgeClass, buttonClass, cardClass, iconButtonClass, inputClass, labelClass, modalClass, pageTitleClass, searchInputClass, segmentedClass, tableClass, type BadgeTone, pageBgClass } from "@/components/ui/styles";
 
 type TicketStatus = "PENDING" | "TODO" | "IN_PROGRESS" | "RESOLVED" | "REJECTED";
 type ViewRole = "manager" | "employee";
@@ -702,7 +702,7 @@ export default function EmployeeReportTicketPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-slate-900">
+    <main className={`min-h-screen ${pageBgClass} text-slate-900`}>
       <section className="min-h-screen">
         <AppHeader pageTitle={t("employeeReportTicket")} notificationSlot={<div ref={notificationRef} className="flex h-full items-center"><TicketNotificationButton count={unreadTicketNotifications.length} isOpen={isNotificationOpen} onToggle={() => setIsNotificationOpen((current) => !current)} />{isNotificationOpen && <TicketNotificationPanel isManager={viewRole === "manager"} notifications={unreadTicketNotifications} isLoading={isTicketLoading || isRefreshing} onRefresh={refreshTickets} onReadAll={markAllTicketNotificationsRead} onSelect={openTicketNotification} />}</div>} />
 

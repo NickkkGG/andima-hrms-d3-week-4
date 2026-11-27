@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import SessionIdleGuard from "@/components/SessionIdleGuard";
 import { SidebarProvider, useSidebar } from "@/components/SidebarContext";
 import { TicketNotificationProvider } from "@/components/TicketNotificationBell";
+import { pageBgClass } from "@/components/ui/styles";
 
 function ShellLayout({ children }: { children: ReactNode }) {
   const { isCollapsed, isMobileOpen, closeMobileSidebar } = useSidebar();
@@ -21,7 +22,7 @@ function ShellLayout({ children }: { children: ReactNode }) {
       />
       <Sidebar />
       <div
-        className={`min-h-full bg-white transition-[padding] duration-[250ms] ease-out ${
+        className={`min-h-full ${pageBgClass} transition-[padding] duration-[250ms] ease-out ${
           isCollapsed ? "lg:pl-0" : "lg:pl-[250px]"
         }`}
       >

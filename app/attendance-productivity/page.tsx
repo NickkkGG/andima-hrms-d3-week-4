@@ -16,7 +16,7 @@ import AppHeader from "@/components/AppHeader";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import LocationMapPreview from "@/components/attendance/LocationMapPreview";
 import TablePagination from "@/components/hrms/TablePagination";
-import { badgeClass, cardClass, inputClass, labelClass, pageTitleClass, searchInputClass, tableClass, type BadgeTone } from "@/components/ui/styles";
+import { badgeClass, cardClass, inputClass, labelClass, pageTitleClass, searchInputClass, tableClass, type BadgeTone, pageBgClass } from "@/components/ui/styles";
 
 // Small caption above a card title or stat value.
 const cardEyebrowClass = "text-xs font-semibold text-slate-500";
@@ -377,7 +377,7 @@ export default function AttendanceProductivityPage() {
   }, [filteredData]);
 
   return (
-    <div className="min-h-screen bg-white text-slate-800">
+    <div className={`min-h-screen ${pageBgClass} text-slate-800`}>
       {/* HEADER */}
       <AppHeader pageTitle={t("attendanceProductivity")} />
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLanguage } from "@/components/i18n/LanguageProvider";
+import { pageBgClass } from "@/components/ui/styles";
 
 // Shared loading skeletons. Every D3 page builds its loading state from these
 // pieces, so a page that is still loading looks the same in every feature
@@ -156,7 +157,7 @@ export function PageSkeleton({ withTopBar = false, stats = 0, layout = "table", 
   );
 
   return (
-    <div className={withTopBar ? "min-h-screen bg-white" : undefined} role="status" aria-live="polite" aria-busy="true">
+    <div className={withTopBar ? `min-h-screen ${pageBgClass}` : undefined} role="status" aria-live="polite" aria-busy="true">
       <LoadingStatus />
       {withTopBar && <SkeletonTopBar />}
       {contained ? <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">{body}</div> : body}

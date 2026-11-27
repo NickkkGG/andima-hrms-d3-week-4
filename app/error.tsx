@@ -1,7 +1,7 @@
 "use client";
 
 import { useLanguage } from "@/components/i18n/LanguageProvider";
-import { buttonClass, pageTitleClass } from "@/components/ui/styles";
+import { buttonClass, pageTitleClass, pageBgClass } from "@/components/ui/styles";
 
 export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const { language } = useLanguage();
@@ -9,7 +9,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
     ? { title: "Halaman belum dapat dimuat", description: "Terjadi gangguan saat memuat data. Silakan coba lagi.", retry: "Coba lagi" }
     : { title: "This page could not be loaded", description: "Something went wrong while loading the data. Please try again.", retry: "Try again" };
   return (
-    <main className="grid min-h-screen place-items-center bg-white px-6 py-10">
+    <main className={`grid min-h-screen place-items-center ${pageBgClass} px-6 py-10`}>
       <section className="max-w-md text-center">
         <div className="flex items-center justify-center gap-2.5 text-slate-900">
           <img

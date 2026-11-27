@@ -3,6 +3,7 @@
 import type { D3AppRole } from "@/utils/employee-access";
 import AppHeader from "@/components/AppHeader";
 import { pageTitleKey, useLanguage } from "@/components/i18n/LanguageProvider";
+import { pageBgClass } from "@/components/ui/styles";
 
 interface HrmsShellProps {
   children: React.ReactNode;
@@ -21,7 +22,7 @@ export default function HrmsShell({ children, userEmail, userRole, pageTitle = "
   void userRole;
 
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-800">
+    <div className={`min-h-screen ${pageBgClass} font-sans text-slate-800`}>
       <AppHeader pageTitle={localizedPageTitle} />
       <main className={contentClassName ?? "px-4 py-6 sm:px-6 lg:px-8 lg:py-8"}>{children}</main>
     </div>

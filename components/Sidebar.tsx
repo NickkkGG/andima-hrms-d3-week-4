@@ -139,8 +139,10 @@ export default function Sidebar() {
             href="/face-biometric-attendance"
             onClick={closeMobileSidebar}
             aria-current={isAttendanceActive ? "page" : undefined}
-            className={`flex w-full items-center gap-2.5 rounded-[8px] px-3.5 py-2.5 text-[13.5px] font-semibold tracking-[-0.01em] transition-colors ${
-              isAttendanceActive ? "bg-[#B0C6D4] text-[#45556C] hover:bg-[#A3BCCB]" : "text-white hover:bg-[#1E3765]"
+            className={`flex w-full items-center gap-2.5 rounded-[8px] px-3.5 py-2.5 text-[13.5px] font-semibold tracking-[-0.01em] text-white shadow-xs transition-colors ${
+              isAttendanceActive
+                ? "bg-[#047857] ring-2 ring-inset ring-white/30 hover:bg-[#065F46]"
+                : "bg-[#059669] hover:bg-[#047857] active:bg-[#065F46]"
             }`}
           >
             <ScanFace size={18} strokeWidth={1.9} className="shrink-0" /> {t("attendance")}

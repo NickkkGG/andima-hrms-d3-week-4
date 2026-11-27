@@ -18,7 +18,7 @@ import {
 import AppHeader from "@/components/AppHeader";
 import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { SkeletonBlock } from "@/components/hrms/Skeleton";
-import { badgeClass, buttonClass, cardClass, modalClass, pageTitleClass, type BadgeTone } from "@/components/ui/styles";
+import { badgeClass, buttonClass, cardClass, modalClass, pageTitleClass, type BadgeTone, pageBgClass } from "@/components/ui/styles";
 import { createClient } from "@/utils/supabase/client";
 
 type Mode = "enrollment" | "attendance";
@@ -1271,7 +1271,7 @@ export default function FaceBiometricWorkspace({ mode }: { mode: Mode }) {
   const isScanTimeLow = scanSecondsLeft !== null && scanSecondsLeft <= 5;
 
   return (
-    <main className="relative isolate h-[100dvh] overflow-hidden bg-white text-slate-900">
+    <main className={`relative isolate h-[100dvh] overflow-hidden ${pageBgClass} text-slate-900`}>
       <style>{`
         @keyframes biometric-scan-sweep {
           0%, 100% { top: 10%; opacity: 0.35; }

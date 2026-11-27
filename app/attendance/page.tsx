@@ -8,7 +8,7 @@ import { useLanguage } from '@/components/i18n/LanguageProvider'
 import LocationMapPreview from '@/components/attendance/LocationMapPreview'
 import TablePagination from '@/components/hrms/TablePagination'
 import { PageSkeleton, SkeletonTable } from '@/components/hrms/Skeleton'
-import { badgeClass, buttonClass, cardClass, iconButtonClass, inputClass, modalClass, pageTitleClass, searchInputClass, segmentedClass, tableClass, type BadgeTone } from '@/components/ui/styles'
+import { badgeClass, buttonClass, cardClass, iconButtonClass, inputClass, modalClass, pageTitleClass, searchInputClass, segmentedClass, tableClass, pageBgClass, type BadgeTone } from '@/components/ui/styles'
 
 // Inline notices in the class design system style.
 const noticeClass = 'flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-lg'
@@ -630,7 +630,7 @@ export default function AttendancePageUI() {
 
     return (
       <>
-        <div className="min-h-screen bg-white text-slate-800">
+        <div className={`min-h-screen ${pageBgClass} text-slate-800`}>
           <AppHeader pageTitle={t('myAttendance')} />
           <div className="mx-auto max-w-[1600px] space-y-5 px-4 py-6 sm:px-6">
           <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className={pageTitleClass.eyebrow}>{copy.selfService}</p><h1 className={`mt-1 ${pageTitleClass.title}`}>{copy.myHistory}</h1><p className={pageTitleClass.subtitle}>{copy.greeting}, {viewerName || copy.employee}. {copy.reviewMy}</p></div><div className="flex flex-wrap items-end justify-end gap-2"><label className="grid gap-1.5 text-xs font-semibold text-slate-700"><span>{copy.fromDate}</span><input aria-label={copy.fromDate} type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setTablePage(1) }} className={inputClass('text-xs font-normal')} /></label><label className="grid gap-1.5 text-xs font-semibold text-slate-700"><span>{copy.toDate}</span><input aria-label={copy.toDate} type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setTablePage(1) }} className={inputClass('text-xs font-normal')} /></label>{(dateFrom || dateTo) && <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); setTablePage(1) }} className={buttonClass('secondary')}>{copy.clearFilter}</button>}</div></section>
@@ -649,7 +649,7 @@ export default function AttendancePageUI() {
 
   return (
     <>
-      <div className="min-h-screen bg-white text-slate-800">
+      <div className={`min-h-screen ${pageBgClass} text-slate-800`}>
         {/* HEADER */}
         <AppHeader pageTitle={t('attendanceHistoryCorrection')} />
 

@@ -42,12 +42,17 @@ export function inputClass(extra = "") {
   return `${inputBase} bg-white px-3 text-sm${extra ? ` ${extra}` : ""}`;
 }
 
-// Search fields carry a 16px icon placed at left-3.5 by the caller.
-export const searchInputClass = `${inputBase} bg-slate-50 pl-10 pr-3 text-xs focus:bg-white`;
+// Search fields carry a 16px icon placed at left-3.5 by the caller. White like the
+// other inputs, so a search box sitting on the grey page background stays visible.
+export const searchInputClass = `${inputBase} bg-white pl-10 pr-3 text-xs`;
 
 export const labelClass = "mb-1.5 block text-xs font-semibold text-slate-700";
 
 export const cardClass = "rounded-2xl border border-slate-200 bg-white shadow-xs";
+
+// Page background behind the white header and cards. Same light grey as the
+// CCR pages (bg-[#F8FAFC]), so the white top bar and cards stand out from the page.
+export const pageBgClass = "bg-[#F8FAFC]";
 
 export type BadgeTone = "blue" | "green" | "amber" | "red" | "slate" | "violet";
 

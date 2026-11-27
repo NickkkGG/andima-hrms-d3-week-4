@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { LocalizedText } from "@/components/i18n/LocalizedText";
 import { pageMetadata } from "@/lib/page-metadata";
-import { buttonClass, pageTitleClass } from "@/components/ui/styles";
+import { buttonClass, pageTitleClass, pageBgClass } from "@/components/ui/styles";
 
 export const generateMetadata = () => pageMetadata("notFound");
 
 export default function NotFound() {
   return (
-    <main className="grid min-h-screen place-items-center bg-white px-6 py-10">
+    <main className={`grid min-h-screen place-items-center ${pageBgClass} px-6 py-10`}>
       <section className="max-w-md text-center">
         <div className="flex items-center justify-center gap-2.5 text-slate-900">
           <img
